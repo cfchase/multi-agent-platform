@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  # In-cluster PostgreSQL for development
+  - ../../postgres/database/in-cluster
+
+namespace: patternfly-fastapi-dev
+
+labels:
+  - pairs:
+      environment: development
+
+patches:
+  - path: deployment-patch.yaml
+
+configMapGenerator:
+  - name: oauth-proxy-config
+    envs:
+      - oauth-proxy.env
+
+secretGenerator:
+  - name: oauth-proxy-secret
+    envs:
+      - oauth-proxy-secret.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+    newTag: latest
+  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+    newTag: latest

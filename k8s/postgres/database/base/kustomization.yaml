@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base PostgreSQL configuration
+# This base is empty - use for external/managed databases (production)
+# For in-cluster PostgreSQL (dev/demo), use the in-cluster/ resources
+
+resources: []
+
+labels:
+  - pairs:
+      app.kubernetes.io/component: database

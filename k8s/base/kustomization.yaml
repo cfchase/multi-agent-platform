@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Combined application deployment with OAuth2-proxy sidecar
+# Database is added by overlays (dev uses in-cluster, prod uses external)
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: patternfly-fastapi-template
+      app.kubernetes.io/version: "1.0.0"
+
+images:
+  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+    newTag: latest
+  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+    newTag: latest

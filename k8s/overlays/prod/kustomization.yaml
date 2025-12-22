@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  # Production uses external managed database
+  # To use in-cluster postgres (not recommended for prod):
+  # - ../../postgres/database/in-cluster
+
+namespace: patternfly-fastapi-prod
+
+labels:
+  - pairs:
+      environment: production
+
+patches:
+  - path: deployment-patch.yaml
+
+replicas:
+  - name: app
+    count: 3
+
+configMapGenerator:
+  - name: oauth-proxy-config
+    envs:
+      - oauth-proxy.env
+
+secretGenerator:
+  - name: oauth-proxy-secret
+    envs:
+      - oauth-proxy-secret.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+    newTag: prod
+  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+    newTag: prod
