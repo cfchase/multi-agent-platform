@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: app
+  name: deep-research
   labels:
-    app: app
+    app: deep-research
 spec:
   selector:
-    app: app
+    app: deep-research
   ports:
   - name: public
     port: 4180

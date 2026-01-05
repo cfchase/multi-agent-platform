@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: deep-research
   labels:
-    app: app
+    app: deep-research
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: app
+      app: deep-research
   template:
     metadata:
       labels:
-        app: app
+        app: deep-research
     spec:
-      serviceAccountName: app-proxy
+      serviceAccountName: deep-research-proxy
       initContainers:
       - name: db-migration
-        image: quay.io/cfchase/pf-full-stack-fastapi-backend:latest
+        image: quay.io/cfchase/deep-research-backend:latest
         imagePullPolicy: Always
         command:
         - /bin/sh
@@ -36,7 +36,7 @@ spec:
             cpu: "250m"
       containers:
       - name: frontend
-        image: quay.io/cfchase/pf-full-stack-fastapi-frontend:latest
+        image: quay.io/cfchase/deep-research-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -66,7 +66,7 @@ spec:
             drop:
             - ALL
       - name: backend
-        image: quay.io/cfchase/pf-full-stack-fastapi-backend:latest
+        image: quay.io/cfchase/deep-research-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

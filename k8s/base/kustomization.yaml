@@ -11,11 +11,11 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/name: patternfly-fastapi-template
+      app.kubernetes.io/name: deep-research
       app.kubernetes.io/version: "1.0.0"
 
 images:
-  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+  - name: quay.io/cfchase/deep-research-backend
     newTag: latest
-  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+  - name: quay.io/cfchase/deep-research-frontend
     newTag: latest

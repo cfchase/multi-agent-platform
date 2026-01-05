@@ -1,13 +1,13 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: app-route
+  name: deep-research-route
   labels:
-    app: app
+    app: deep-research
 spec:
   to:
     kind: Service
-    name: app
+    name: deep-research
   port:
     targetPort: public
   tls:

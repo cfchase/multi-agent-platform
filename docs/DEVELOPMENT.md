@@ -15,7 +15,7 @@ This guide covers development setup, daily workflows, and best practices for wor
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd patternfly-full-stack-fastapi-template
+cd deep-research
 
 # 2. Install all dependencies
 make setup
@@ -125,7 +125,7 @@ make env-setup  # Creates .env files from .env.example
 POSTGRES_SERVER=localhost
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
-POSTGRES_DB=app
+POSTGRES_DB=deep-research
 POSTGRES_PORT=5432
 ```
 

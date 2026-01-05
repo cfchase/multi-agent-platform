@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a PatternFly FastAPI template for building full-stack applications with React frontend (Vite + PatternFly UI) and FastAPI backend, designed for deployment to OpenShift using Docker containers and Kustomize.
+Deep Research is a full-stack application with React frontend (Vite + PatternFly UI) and FastAPI backend, designed for deployment to OpenShift using Docker containers and Kustomize.
 
 ## Quick Decision Guide
 
@@ -362,15 +362,16 @@ This project follows [Conventional Commits v1.0.0](https://www.conventionalcommi
 
 **Format**: `<type>: <description>`
 
-**Types**:
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `refactor:` - Code refactoring
-- `test:` - Adding tests
-- `docs:` - Documentation
-- `chore:` - Build/dependencies
+**Types**: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
 
 **Guidelines**:
+- Keep messages concise - focus on **what** changed and **why**
 - Use imperative mood ("add" not "added")
-- Keep under 72 characters
+- First line under 72 characters
+- Skip bullet lists of individual file changes
 - Do NOT include AI assistant attribution
+
+**Examples**:
+- `feat: add user authentication with OAuth2`
+- `fix: resolve race condition in data fetching`
+- `refactor: rename project to deep-research`

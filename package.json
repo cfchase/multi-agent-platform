@@ -1,7 +1,7 @@
 {
-  "name": "patternfly-fastapi-template",
+  "name": "deep-research",
   "version": "1.0.0",
-  "description": "A full-stack template with React frontend and FastAPI backend",
+  "description": "Deep Research - Full-stack application with React frontend and FastAPI backend",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cfchase/patternfly-fastapi-template"
+    "url": "https://github.com/cfchase/deep-research"
   },
   "keywords": [
     "react",

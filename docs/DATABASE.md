@@ -40,7 +40,7 @@ POSTGRES_SERVER=localhost
 POSTGRES_PORT=5432
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
-POSTGRES_DB=app
+POSTGRES_DB=deep-research
 ```
 
 ### Container Details

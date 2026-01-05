@@ -12,7 +12,7 @@ CONTAINER_NAME="app-postgres-dev"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${POSTGRES_USER:-app}"
 DB_PASS="${POSTGRES_PASSWORD:-changethis}"
-DB_NAME="${POSTGRES_DB:-app}"
+DB_NAME="${POSTGRES_DB:-deep-research}"
 VOLUME_NAME="app-db-data"
 
 # Color output
@@ -138,7 +138,7 @@ case "$1" in
         echo "  DB_PORT          - Database port (default: 5432)"
         echo "  POSTGRES_USER    - Database user (default: app)"
         echo "  POSTGRES_PASSWORD- Database password (default: changethis)"
-        echo "  POSTGRES_DB      - Database name (default: app)"
+        echo "  POSTGRES_DB      - Database name (default: deep-research)"
         exit 1
         ;;
 esac

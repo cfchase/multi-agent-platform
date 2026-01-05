@@ -1,6 +1,6 @@
-# PatternFly FastAPI Template
+# Deep Research
 
-A production-ready full-stack application template with React frontend (Vite + PatternFly UI) and FastAPI backend, featuring PostgreSQL database, comprehensive testing, and OpenShift deployment.
+A full-stack application with React frontend (Vite + PatternFly UI) and FastAPI backend, featuring PostgreSQL database, comprehensive testing, and OpenShift deployment.
 
 ## Features
 
@@ -51,8 +51,8 @@ A production-ready full-stack application template with React frontend (Vite + P
 
 1. **Clone and install dependencies**:
    ```bash
-   git clone https://github.com/cfchase/patternfly-full-stack-fastapi-template
-   cd patternfly-full-stack-fastapi-template
+   git clone https://github.com/cfchase/deep-research
+   cd deep-research
    make setup
    ```
 
@@ -359,11 +359,11 @@ POSTGRES_SERVER=localhost
 POSTGRES_PORT=5432
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
-POSTGRES_DB=app
+POSTGRES_DB=deep-research
 
 # Application Settings
 ENVIRONMENT=local
-PROJECT_NAME=PatternFly FastAPI Template
+PROJECT_NAME=Deep Research
 FRONTEND_HOST=http://localhost:8080
 ```
 

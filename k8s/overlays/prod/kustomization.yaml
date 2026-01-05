@@ -7,7 +7,7 @@ resources:
   # To use in-cluster postgres (not recommended for prod):
   # - ../../postgres/database/in-cluster
 
-namespace: patternfly-fastapi-prod
+namespace: deep-research-prod
 
 labels:
   - pairs:
@@ -17,7 +17,7 @@ patches:
   - path: deployment-patch.yaml
 
 replicas:
-  - name: app
+  - name: deep-research
     count: 3
 
 configMapGenerator:
@@ -34,7 +34,7 @@ generatorOptions:
   disableNameSuffixHash: true
 
 images:
-  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+  - name: quay.io/cfchase/deep-research-backend
     newTag: prod
-  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+  - name: quay.io/cfchase/deep-research-frontend
     newTag: prod

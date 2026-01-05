@@ -6,7 +6,7 @@ resources:
   # In-cluster PostgreSQL for development
   - ../../postgres/database/in-cluster
 
-namespace: patternfly-fastapi-dev
+namespace: deep-research-dev
 
 labels:
   - pairs:
@@ -29,7 +29,7 @@ generatorOptions:
   disableNameSuffixHash: true
 
 images:
-  - name: quay.io/cfchase/pf-full-stack-fastapi-backend
+  - name: quay.io/cfchase/deep-research-backend
     newTag: latest
-  - name: quay.io/cfchase/pf-full-stack-fastapi-frontend
+  - name: quay.io/cfchase/deep-research-frontend
     newTag: latest

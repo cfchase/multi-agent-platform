@@ -544,7 +544,7 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "app"
     POSTGRES_PASSWORD: str = "changethis"
-    POSTGRES_DB: str = "app"
+    POSTGRES_DB: str = "deep-research"
     POSTGRES_PORT: int = 5432
 
     @property

@@ -1,4 +1,4 @@
-# GitHub Actions CI for PatternFly Full Stack FastAPI Template
+# GitHub Actions CI for Deep Research
 name: CI
 
 on:
@@ -11,8 +11,8 @@ on:
 
 env:
   REGISTRY: quay.io/cfchase
-  BACKEND_IMAGE: pf-full-stack-fastapi-backend
-  FRONTEND_IMAGE: pf-full-stack-fastapi-frontend
+  BACKEND_IMAGE: deep-research-backend
+  FRONTEND_IMAGE: deep-research-frontend
 
 jobs:
   # Validate that VERSION, pyproject.toml, uv.lock, and package.json are in sync
@@ -55,7 +55,7 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_DB: app
+          POSTGRES_DB: deep-research
           POSTGRES_USER: app
           POSTGRES_PASSWORD: changethis
         ports:
@@ -95,7 +95,7 @@ jobs:
           POSTGRES_PORT: "5432"
           POSTGRES_USER: app
           POSTGRES_PASSWORD: changethis
-          POSTGRES_DB: app
+          POSTGRES_DB: deep-research
         run: make test
 
   # Build and push container images (only on main branch push)

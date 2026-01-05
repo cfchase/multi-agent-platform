@@ -3,11 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "patternfly-fastapi-template-backend"
+name = "deep-research-backend"
 version = "0.1.0"
-description = "FastAPI backend for PatternFly FastAPI Template"
+description = "FastAPI backend for Deep Research"
 authors = [
-    {name = "PatternFly FastAPI Template Team"},
+    {name = "Deep Research Team"},
 ]
 requires-python = ">=3.11"
 classifiers = [
