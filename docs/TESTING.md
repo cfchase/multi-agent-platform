@@ -341,6 +341,5 @@ def test_delete_item_with_tags_preserves_tags(client, session):
 ## See Also
 
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Development setup
-- [INCREMENTAL-WORKFLOW.md](INCREMENTAL-WORKFLOW.md) - Testing in workflow
 - [../backend/CLAUDE.md](../backend/CLAUDE.md) - Backend testing details
 - [../frontend/CLAUDE.md](../frontend/CLAUDE.md) - Frontend testing details

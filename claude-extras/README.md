@@ -3,9 +3,9 @@
 This directory contains AI-focused documentation designed to provide context for Claude and other AI assistants when working with this codebase.
 
 **Purpose**: These documents are optimized for AI consumption - they include:
+- Workflow definitions for how Claude should operate
 - Code patterns with concrete examples
 - Decision trees for common scenarios
-- Quick reference information
 - Troubleshooting guides
 
 **Human Documentation**: For human-readable documentation, see the `docs/` directory:
@@ -16,6 +16,10 @@ This directory contains AI-focused documentation designed to provide context for
 - [docs/AUTHENTICATION.md](../docs/AUTHENTICATION.md) - OAuth2 Proxy setup
 
 ## Contents
+
+### Workflows
+- [autonomous-workflow.md](./autonomous-workflow.md) - Extended autonomous work with agent verification
+- [incremental-workflow.md](./incremental-workflow.md) - Step-by-step with human-in-the-loop review
 
 ### Code Patterns
 - [code-patterns.md](./code-patterns.md) - Common patterns used in this codebase

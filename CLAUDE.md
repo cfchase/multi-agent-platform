@@ -327,7 +327,7 @@ For complex features with multiple steps (5+ file changes), use the incremental 
 4. Per step: Implement → Test (>80% coverage) → Commit → Review → Approve
 5. Use Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 
-**📖 See**: [docs/INCREMENTAL-WORKFLOW.md](docs/INCREMENTAL-WORKFLOW.md) for detailed process.
+**📖 See**: [claude-extras/incremental-workflow.md](claude-extras/incremental-workflow.md) for detailed process.
 
 ### Autonomous Agent Workflow
 
@@ -339,15 +339,17 @@ For extended autonomous work with verification checkpoints:
 4. Handle errors with 3-attempt retry logic
 5. Escalate to user if blocked
 
-**📖 See**: [docs/AUTONOMOUS-WORKFLOW.md](docs/AUTONOMOUS-WORKFLOW.md) for detailed process.
+**📖 See**: [claude-extras/autonomous-workflow.md](claude-extras/autonomous-workflow.md) for detailed process.
 
 ## Additional Resources
+
+**Claude Agent Workflows (`claude-extras/`):**
+- [autonomous-workflow.md](claude-extras/autonomous-workflow.md) - Extended autonomous work with verification
+- [incremental-workflow.md](claude-extras/incremental-workflow.md) - Step-by-step with human review
 
 **Developer Documentation (`docs/`):**
 - [AUTHENTICATION.md](docs/AUTHENTICATION.md) - OAuth2 Proxy setup and configuration
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development setup and workflows
-- [INCREMENTAL-WORKFLOW.md](docs/INCREMENTAL-WORKFLOW.md) - Step-by-step development for complex features
-- [AUTONOMOUS-WORKFLOW.md](docs/AUTONOMOUS-WORKFLOW.md) - Self-running agents with verification
 - [TESTING.md](docs/TESTING.md) - Testing frameworks, patterns, coverage goals
 - [DATABASE.md](docs/DATABASE.md) - Schema, migrations, relationships
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Container builds, GitOps, environments

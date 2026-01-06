@@ -303,8 +303,6 @@ pkill -f pytest
 
 ## See Also
 
-- [INCREMENTAL-WORKFLOW.md](INCREMENTAL-WORKFLOW.md) - Complex feature development
-- [AUTONOMOUS-WORKFLOW.md](AUTONOMOUS-WORKFLOW.md) - Agent-based development
 - [TESTING.md](TESTING.md) - Testing strategies
 - [DATABASE.md](DATABASE.md) - Database details
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment guide

@@ -1,18 +1,18 @@
 # Autonomous Agent Workflow
 
-This document defines a workflow for running Claude agents autonomously for extended periods with incremental verification. Use this workflow for complex, multi-step tasks that benefit from continuous progress tracking and agent-based verification.
+This document defines how Claude agents should work autonomously for extended periods with incremental verification. Follow this workflow for complex, multi-step tasks that benefit from continuous progress tracking and agent-based verification.
 
 ## When to Use This Workflow
 
 **Use Autonomous Workflow when:**
 - Task requires 5+ implementation steps
-- Multiple agents can provide verification value
-- You want to run without frequent interruptions
+- Multiple agents can provide verification value (code review, testing)
+- User wants you to run without frequent interruptions
 - Progress observability is important
 
-**Use Incremental Development Workflow instead when:**
+**Use Incremental Workflow instead when:**
 - Task is smaller (< 5 steps)
-- User wants frequent checkpoints and approval
+- User wants frequent checkpoints and manual approval
 - Task is exploratory or requirements are unclear
 
 ## Directory Structure
@@ -21,7 +21,7 @@ Create a progress directory at `.tmp/{feature-name}/`:
 
 ```
 .tmp/{feature-name}/
-├── plan.md              # Implementation plan
+├── plan.md              # Implementation plan (copy or reference)
 ├── progress.md          # Running progress log (append-only)
 ├── current-step.md      # Current step details and status
 ├── verification/        # Agent verification reports
@@ -90,7 +90,7 @@ Create a progress directory at `.tmp/{feature-name}/`:
 
 ## Verification Checkpoints
 
-Spawn verification agents at these points:
+Spawn verification agents at these points using the Task tool:
 
 | Checkpoint | Agent | Trigger |
 |------------|-------|---------|
@@ -100,8 +100,6 @@ Spawn verification agents at these points:
 | After major milestone | code-review-expert | Architectural review |
 
 ### Spawning Verification Agents
-
-Use the Task tool to spawn verification agents:
 
 ```
 Task: code-review-expert
@@ -130,7 +128,7 @@ When verification fails:
 3. **Attempt 3**: Minimal fix or workaround
 4. **After 3 attempts**: Escalate to user
 
-```
+```python
 attempt = 0
 max_attempts = 3
 
@@ -160,6 +158,18 @@ When escalating to user:
    - Recommended next steps
 3. Stop and await user input
 
+## Multi-Instance Development
+
+Use `make dev-2` for isolated testing while user works on primary instance:
+
+```bash
+# Terminal 1: Primary instance (user's work)
+make dev              # frontend:8080, backend:8000
+
+# Terminal 2: Agent testing instance
+make dev-2            # frontend:8081, backend:8001
+```
+
 ## Running Tests
 
 ```bash
@@ -172,6 +182,8 @@ make test
 
 # Full E2E verification (after UI changes)
 make test-e2e
+# Or with alternate port:
+make test-e2e E2E_PORT=8081
 ```
 
 ## Agent Responsibilities
@@ -217,10 +229,10 @@ For each step:
 
 1. **Write progress frequently**: Update progress.md after every significant action
 2. **Keep current-step.md accurate**: Always reflect what you're working on
-3. **Use verification agents**: Don't skip checkpoints
+3. **Use verification agents**: Don't skip checkpoints - they catch issues early
 4. **Fail fast**: If something isn't working after 3 attempts, escalate
 5. **Document decisions**: Record why you made certain choices
-6. **Clean up**: Kill dangling processes after tests
+6. **Clean up**: Kill dangling processes after tests (`pkill -f vitest`)
 
 ## Example Workflow Execution
 
@@ -249,9 +261,3 @@ N+1. Update progress.md: Status: COMPLETED
 | Agent verification fails repeatedly | Check verification/issues-{n}.md for patterns |
 | Database state inconsistent | Use unique test data IDs; run cleanup |
 | E2E tests flaky | Add proper waits; use route mocking |
-
-## See Also
-
-- [INCREMENTAL-WORKFLOW.md](INCREMENTAL-WORKFLOW.md) - Step-by-step with manual review
-- [TESTING.md](TESTING.md) - Testing strategies
-- [../CLAUDE.md](../CLAUDE.md) - Project guidelines

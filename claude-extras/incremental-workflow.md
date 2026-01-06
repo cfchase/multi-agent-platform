@@ -1,21 +1,25 @@
 # Incremental Development Workflow
 
-For complex features with multiple steps (e.g., new database models with API routes and frontend), use this incremental approach to manage development systematically.
+This document defines how Claude should work on complex features with human-in-the-loop review at each step. Use this workflow when the user wants visibility and approval at each stage.
 
 ## When to Use This Workflow
 
-### Use For:
+**Use Incremental Workflow when:**
 - Features with 5+ file changes across multiple modules
-- Database schema changes + API changes + frontend changes
+- Database schema + API + frontend changes
 - Architectural changes
-- Features requiring multiple days of development
-- Any feature that benefits from step-by-step planning and review
+- User wants frequent checkpoints and approval
+- Task is exploratory or requirements are unclear
 
-### Don't Use For:
+**Don't Use For:**
 - Simple bug fixes (single file, < 50 lines)
 - Documentation-only changes
 - Configuration updates
 - Trivial refactoring
+
+**Use Autonomous Workflow instead when:**
+- User wants you to run without interruptions
+- Task requires 5+ steps and verification agents can provide value
 
 ## Workflow Overview
 
@@ -29,8 +33,8 @@ For complex features with multiple steps (e.g., new database models with API rou
    - Run tests
    - Commit
    - Mark as Awaiting Review
-   - Wait for approval
-4. Merge to main
+   - STOP - Wait for user approval
+4. After all steps approved, merge to main
 ```
 
 ## Step 0: Create Feature Branch
@@ -42,10 +46,12 @@ For complex features with multiple steps (e.g., new database models with API rou
 git checkout -b feature/<feature-name>    # New features
 git checkout -b refactor/<feature-name>   # Refactoring
 git checkout -b fix/<issue-description>   # Bug fixes
-
-# Example
-git checkout -b feature/user-authentication
 ```
+
+**Important**:
+- All work on feature branch, NOT on main
+- Merge to main only after all steps complete and final review
+- This prevents contaminating main with incomplete work
 
 ## Step 1: Create Implementation Plan
 
@@ -87,8 +93,8 @@ Use status markers in the plan file:
 | ⏳ | **Pending** | Not started |
 | 🚧 | **In Progress** | Currently working on this step |
 | ✅ | **Complete** | Implementation finished |
-| ⏸️ | **Awaiting Review** | Waiting for manual approval |
-| 🎉 | **Approved** | Reviewed and approved |
+| ⏸️ | **Awaiting Review** | Waiting for user approval |
+| 🎉 | **Approved** | Reviewed and approved, proceed |
 
 **Update the plan file after each step** to maintain clear progress tracking.
 
@@ -124,9 +130,11 @@ git commit -m "type: brief description"
 
 # 8. Update plan file - mark step as ⏸️ Awaiting Review
 
-# 9. STOP - Wait for manual review and approval
+# 9. STOP - Wait for user review and approval
 
-# 10. After approval, proceed to next step
+# 10. After approval:
+#     - Update plan: ⏸️ → 🎉 Approved
+#     - Next step: ⏳ → 🚧 In Progress
 ```
 
 ## Commit Message Format
@@ -136,8 +144,6 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 **Format:**
 ```
 <type>: <brief description>
-
-[optional body with more detail]
 ```
 
 **Types:**
@@ -148,13 +154,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `docs:` - Documentation only
 - `chore:` - Build process, dependencies
 
-**Examples:**
-```bash
-git commit -m "feat: add user authentication endpoints"
-git commit -m "refactor: extract item service layer"
-git commit -m "test: add comprehensive item API tests"
-git commit -m "docs: add authentication documentation"
-```
+**Guidelines:**
+- Keep focused on single step (no multi-step commits)
+- Write in imperative mood ("add" not "added")
+- Keep under 72 characters
+- Don't include AI assistant attribution
 
 ## Testing Strategy
 
@@ -187,16 +191,16 @@ make test-e2e                # E2E tests
 ## Review Checkpoints
 
 **Why Review Checkpoints?**
-- Catch issues early
-- Provides natural breakpoints
-- Maintains clean git history
-- Allows course correction
+- Catch issues early (easier to fix)
+- Provides natural breakpoints for context switching
+- Maintains clean, reviewable git history
+- Allows course correction before too much work is done
 
 **When to Request Review:**
 - After each step (for complex features)
-- After groups of related steps
+- After groups of related steps (for moderate features)
 - Before major architectural changes
-- When uncertain about approach
+- When uncertain about implementation approach
 
 ## Example Plan
 
@@ -208,7 +212,7 @@ Add category support to items - users can organize items into categories.
 
 ## Step 1: Database Model
 Status: ⏳ Pending
-Files: backend/app/models.py, backend/alembic/versions/
+Files: backend/app/models/, backend/alembic/versions/
 Testing: make test-backend
 Success Criteria:
 - Category model exists with name, description
@@ -242,7 +246,6 @@ Testing: make test-frontend
 Success Criteria:
 - CategoryBrowser component
 - List, create, edit, delete categories
-- Tests cover user interactions
 Commit: feat: add CategoryBrowser component
 
 ## Step 5: Item-Category Integration
@@ -255,6 +258,42 @@ Success Criteria:
 Commit: feat: integrate categories with items UI
 ```
 
+## Advanced Techniques
+
+### Parallel Development
+For independent steps, work on multiple branches:
+```bash
+# Branch for Step 1 (database)
+git checkout -b feature/categories-model
+
+# Branch for Step 3 (frontend service) - if independent
+git checkout main
+git checkout -b feature/categories-service
+```
+
+Merge in sequence once both are reviewed.
+
+### Checkpoint Commits
+Within a single step, use checkpoint commits:
+```bash
+# WIP commit (don't push)
+git commit -m "WIP: partial implementation of category model"
+
+# Later, squash WIP commits before review
+git rebase -i HEAD~3
+```
+
+### Feature Flags
+For very large features, use feature flags to merge to main before complete:
+```python
+if settings.ENABLE_CATEGORIES:
+    # New code path
+else:
+    # Old code path (fallback)
+```
+
+Allows incremental merging while keeping main stable.
+
 ## Common Pitfalls
 
 ### Skipping the Plan
@@ -263,7 +302,7 @@ Writing code without a plan leads to:
 - Missing edge cases
 - Poor organization
 
-**Solution**: Always write the plan first.
+**Solution**: Always write the plan first, even if it takes 30 minutes.
 
 ### Too-Large Steps
 Making steps too large defeats the purpose:
@@ -271,7 +310,7 @@ Making steps too large defeats the purpose:
 - Risky to commit
 - Difficult to rollback
 
-**Solution**: If a step touches >10 files, break it down.
+**Solution**: If a step touches >10 files or takes >4 hours, break it down.
 
 ### Skipping Tests
 Writing tests "later" never works:
@@ -279,7 +318,7 @@ Writing tests "later" never works:
 - Hard to achieve coverage
 - Regressions slip through
 
-**Solution**: Write tests AS PART OF each step.
+**Solution**: Write tests AS PART OF each step, commit together.
 
 ### Mixing Steps
 Implementing multiple steps in one commit:
@@ -287,10 +326,12 @@ Implementing multiple steps in one commit:
 - Hard to review
 - Can't rollback individually
 
-**Solution**: One step at a time, update plan file.
+**Solution**: Discipline yourself to one step at a time. Update plan file.
 
-## See Also
+### Ignoring Reviews
+Proceeding without approval on awaiting-review steps:
+- Might build on wrong foundation
+- Miss early feedback
+- Waste time on wrong approach
 
-- [AUTONOMOUS-WORKFLOW.md](AUTONOMOUS-WORKFLOW.md) - For extended autonomous work
-- [TESTING.md](TESTING.md) - Testing strategies
-- [../CLAUDE.md](../CLAUDE.md) - Project guidelines
+**Solution**: Actually wait for review. Use time to work on other tasks.
