@@ -1,0 +1,15 @@
+{
+  "name": "Hello Gemini",
+  "description": "A simple chat flow using Google's Gemini model. This is a minimal example to test LangFlow integration.",
+  "version": "1.0.0",
+  "data": {
+    "nodes": [],
+    "edges": [],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  },
+  "_comment": "This is a placeholder. Create the actual flow in LangFlow UI and export it here."
+}

@@ -1,0 +1,30 @@
+# Flow Metadata
+# This file describes the flow for the platform's flow registry
+
+name: Hello Gemini
+description: A simple chat flow using Google's Gemini model for basic Q&A
+version: 1.0.0
+author: Platform Team
+
+# Tags for filtering/searching
+tags:
+  - example
+  - chat
+  - gemini
+  - getting-started
+
+# Required environment variables or secrets
+requires:
+  - GOOGLE_API_KEY
+
+# PatternFly icon name (optional)
+icon: comments
+
+# Complexity level: minimal, low, medium, high
+complexity: minimal
+
+# Use cases this flow is good for
+use_cases:
+  - Simple Q&A
+  - Testing LangFlow integration
+  - Learning LangFlow basics
