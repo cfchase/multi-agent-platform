@@ -2,6 +2,16 @@
 
 This application uses OAuth2 Proxy for authentication, enabling integration with external identity providers like Keycloak, Google, and GitHub.
 
+> **Why Authentication Matters:** Full functionality—including user sessions, personalized research history, document access controls, and multi-user collaboration—requires proper authentication. While you can run in "local" mode for quick exploration, setting up OAuth unlocks the complete feature set.
+
+## Quick Reference
+
+| Mode | When to Use | Setup Time |
+|------|-------------|------------|
+| **Local (no auth)** | Quick exploration, UI development | 1 minute |
+| **Google OAuth (local)** | Full local development with auth | 15 minutes |
+| **Google OAuth (OpenShift)** | Production deployment | 20 minutes |
+
 ## Architecture
 
 ```
@@ -52,47 +62,177 @@ accessible through the OAuth2 Proxy. Never expose the backend directly to extern
 5. **Backend reads these headers** and auto-creates users on first login
 6. **Logout** redirects to `/oauth2/sign_out` which clears the session
 
-## Local Development
+## Local Development (No Auth)
 
-For local development without OAuth2 Proxy, the backend runs in "local" mode:
+For quick exploration without setting up OAuth:
 
 ```bash
-# Set ENVIRONMENT=local in .env
+# Edit backend/.env
 ENVIRONMENT=local
 
-# Start the backend
-make dev-backend
+# Start the app
+make db-start && make db-init
+make dev
 ```
 
 In local mode:
 - No authentication headers are required
 - A default "dev-user" is used for all requests
 - The frontend will show "dev-user@example.com" in the user menu
+- Access the app at http://localhost:8080
 
-## Kubernetes Deployment
+---
 
-### Prerequisites
+## Google OAuth Setup
 
-1. **Create OAuth2 Proxy Secret**
+This section provides step-by-step instructions for setting up Google OAuth for both local development and OpenShift deployment.
 
-   ```bash
-   # Copy the example secret
-   cp k8s/base/oauth2-proxy-secret.yaml.example k8s/base/oauth2-proxy-secret.yaml
+**Official Documentation:**
+- [Setting up OAuth 2.0](https://support.google.com/cloud/answer/6158849) - Google Cloud support guide
+- [Using OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server) - Developer guide
+- [OAuth 2.0 Scopes for Google APIs](https://developers.google.com/identity/protocols/oauth2/scopes) - Available scopes
 
-   # Generate a cookie secret
-   openssl rand -base64 32 | tr -- '+/' '-_'
+### Step 1: Create Google Cloud OAuth Credentials
 
-   # Edit the secret with your provider credentials
-   vim k8s/base/oauth2-proxy-secret.yaml
-   ```
+1. **Go to Google Cloud Console**
+   - Open [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials)
+   - Sign in with your Google account
 
-2. **Configure your OAuth provider** (see provider-specific sections below)
+2. **Select or Create a Project**
+   - Click the project dropdown at the top
+   - Select an existing project or click "New Project"
+   - If creating new: Enter a project name (e.g., "Deep Research Dev")
 
-3. **Update kustomization.yaml** to include OAuth2 proxy resources
+3. **Configure OAuth Consent Screen** (first time only)
+   - In the left sidebar, click "OAuth consent screen"
+   - Choose "External" (unless you have Google Workspace)
+   - Fill in required fields:
+     - **App name**: Deep Research
+     - **User support email**: Your email
+     - **Developer contact email**: Your email
+   - Click "Save and Continue" through the remaining steps
+   - Add your email as a test user if in "Testing" mode
 
-### Provider Configuration
+4. **Create OAuth 2.0 Credentials**
+   - Go back to "Credentials" in the left sidebar
+   - Click "+ CREATE CREDENTIALS" → "OAuth client ID"
+   - Select **Application type**: "Web application"
+   - **Name**: "Deep Research Local" (or "Deep Research Production")
+   - **Authorized JavaScript origins**: (see environment-specific sections below)
+   - **Authorized redirect URIs**: (see environment-specific sections below)
+   - Click "Create"
 
-#### Keycloak / Red Hat SSO
+5. **Copy Your Credentials**
+   - A dialog will show your **Client ID** and **Client Secret**
+   - Save these securely—you'll need them for configuration
+
+![Google OAuth setup diagram](assets/Google%20Auth.png)
+
+---
+
+### Step 2a: Local Development with OAuth
+
+After creating Google OAuth credentials, configure them for local development.
+
+**Authorized Origins & Redirect URIs** (in Google Console):
+```
+Authorized JavaScript origins:
+  http://localhost:4180
+
+Authorized redirect URIs:
+  http://localhost:4180/oauth2/callback
+```
+
+**Configure the Application:**
+
+```bash
+# Edit backend/.env with your credentials
+cp backend/.env.example backend/.env
+```
+
+Add these values to `backend/.env`:
+```bash
+ENVIRONMENT=development
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+
+# Generate a cookie secret:
+# python -c "import secrets; print(secrets.token_urlsafe(32))"
+OAUTH_COOKIE_SECRET=your-generated-secret
+```
+
+**Start the Application:**
+```bash
+make db-start && make db-init
+make dev
+```
+
+**Access the App:**
+- Open http://localhost:4180 (OAuth proxy port)
+- You'll be redirected to Google sign-in
+- After authentication, you'll return to the app
+
+---
+
+### Step 2b: OpenShift Deployment with OAuth
+
+After creating Google OAuth credentials, configure them for cluster deployment.
+
+**Authorized Origins & Redirect URIs** (in Google Console):
+
+Get your route URL first:
+```bash
+# After initial deploy, or estimate based on cluster:
+# https://deep-research-<namespace>.apps.<cluster-domain>
+```
+
+Then add to Google Console:
+```
+Authorized JavaScript origins:
+  https://deep-research-deep-research-dev.apps.your-cluster.com
+
+Authorized redirect URIs:
+  https://deep-research-deep-research-dev.apps.your-cluster.com/oauth2/callback
+```
+
+**Configure the OAuth Secret:**
+
+```bash
+# Copy the example file
+cp k8s/app/overlays/dev/oauth-proxy-secret.env.example \
+   k8s/app/overlays/dev/oauth-proxy-secret.env
+
+# Edit with your credentials
+```
+
+Contents of `oauth-proxy-secret.env`:
+```bash
+# Generate cookie secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
+cookie-secret=your-generated-cookie-secret
+
+# From Google Cloud Console
+client-id=your-client-id.apps.googleusercontent.com
+client-secret=your-client-secret
+```
+
+**Deploy:**
+```bash
+oc login --server=https://your-cluster
+make deploy
+```
+
+**Update Google Console** (if redirect URL changed):
+- After deployment, get the actual route URL:
+  ```bash
+  oc get route deep-research -n deep-research-dev -o jsonpath='{.spec.host}'
+  ```
+- Update the authorized redirect URI in Google Console if needed
+
+---
+
+## Alternative OAuth Providers
+
+### Keycloak / Red Hat SSO
 
 1. Create a new client in your Keycloak realm
 2. Set Access Type to "confidential"
@@ -109,26 +249,15 @@ stringData:
   OAUTH2_PROXY_COOKIE_SECRET: "<generated-secret>"
 ```
 
-#### Google OAuth
+### GitHub OAuth
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create OAuth 2.0 credentials
-3. Add authorized redirect URI: `https://your-app.example.com/oauth2/callback`
-
-```yaml
-# oauth2-proxy-secret.yaml
-stringData:
-  OAUTH2_PROXY_PROVIDER: "google"
-  OAUTH2_PROXY_CLIENT_ID: "your-id.apps.googleusercontent.com"
-  OAUTH2_PROXY_CLIENT_SECRET: "your-secret"
-  OAUTH2_PROXY_COOKIE_SECRET: "<generated-secret>"
-```
-
-#### GitHub OAuth
-
-1. Go to GitHub Settings > Developer settings > OAuth Apps
-2. Create a new OAuth App
-3. Set Authorization callback URL: `https://your-app.example.com/oauth2/callback`
+1. Go to [GitHub Settings > Developer settings > OAuth Apps](https://github.com/settings/developers)
+2. Click "New OAuth App"
+3. Fill in:
+   - **Application name**: Deep Research
+   - **Homepage URL**: Your app URL
+   - **Authorization callback URL**: `https://your-app.example.com/oauth2/callback`
+4. Copy the Client ID and generate a Client Secret
 
 ```yaml
 # oauth2-proxy-secret.yaml

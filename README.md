@@ -83,7 +83,36 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 git clone https://github.com/cfchase/deep-research
 cd deep-research
 make setup
+
+# Configure environment
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
+
+### Authentication Setup
+
+> **Note:** Full functionality (user sessions, document access, personalized research) requires OAuth authentication. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete setup instructions.
+
+**Option A: No Auth (Quick Start)**
+```bash
+# Edit backend/.env
+ENVIRONMENT=local
+```
+- Uses a default "dev-user" for all requests
+- Good for initial exploration and UI development
+- Some features requiring user identity won't work
+
+**Option B: Google OAuth (Recommended)**
+```bash
+# Edit backend/.env with your Google OAuth credentials
+ENVIRONMENT=development
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+OAUTH_COOKIE_SECRET=<generate-random-key>
+```
+- Requires [Google Cloud OAuth setup](docs/AUTHENTICATION.md#google-oauth-setup)
+- Enables full user authentication and sessions
+- Required for production-like development
 
 ### Local Development
 
@@ -91,24 +120,32 @@ make setup
 # Start database and run app
 make db-start && make db-init
 make dev
+```
 
-# Run AI services locally (optional)
+Access locally:
+- **App**: http://localhost:8080 (or http://localhost:4180 with OAuth)
+- **LangFlow**: http://localhost:7860
+- **MLFlow**: http://localhost:5000
+- **Langfuse**: http://localhost:3000
+
+**Optional: Run AI services locally**
+```bash
 ./scripts/dev-langflow.sh start
 ./scripts/dev-langfuse.sh start
 ./scripts/dev-mlflow.sh start
 ```
 
-Access locally:
-- **App**: http://localhost:8080
-- **LangFlow**: http://localhost:7860
-- **MLFlow**: http://localhost:5000
-- **Langfuse**: http://localhost:3000
-
 ### Deploy to OpenShift
+
+> **Important:** Configure OAuth credentials before deploying. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md#openshift-deployment).
 
 ```bash
 # Login to your cluster
 oc login --server=https://your-cluster
+
+# Configure OAuth secret (required)
+cp k8s/app/overlays/dev/oauth-proxy-secret.env.example k8s/app/overlays/dev/oauth-proxy-secret.env
+# Edit with your OAuth credentials
 
 # Deploy everything
 make deploy

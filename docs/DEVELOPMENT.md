@@ -4,7 +4,7 @@ This guide covers development setup, daily workflows, and best practices for wor
 
 ## Prerequisites
 
-- **Node.js 18+** and npm
+- **Node.js 22+** and npm
 - **Python 3.11+**
 - **UV** (Python package manager): `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Docker** or **Podman** (for PostgreSQL container)
@@ -14,19 +14,24 @@ This guide covers development setup, daily workflows, and best practices for wor
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url>
+git clone https://github.com/cfchase/deep-research
 cd deep-research
 
 # 2. Install all dependencies
 make setup
 
-# 3. Start PostgreSQL database
+# 3. Configure environment
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# Edit backend/.env: set ENVIRONMENT=local to bypass OAuth
+
+# 4. Start PostgreSQL database
 make db-start
 
-# 4. Initialize database schema and seed data
+# 5. Initialize database schema and seed data
 make db-init && make db-seed
 
-# 5. Start development servers
+# 6. Start development servers
 make dev
 ```
 
@@ -108,20 +113,44 @@ git status
 ### Environment Files
 
 ```
-.env                  # Root config (for docker-compose, etc.)
-backend/.env          # Backend-specific
-frontend/.env         # Frontend-specific
+backend/.env          # Backend configuration
+frontend/.env         # Frontend configuration
 ```
 
 Copy from examples:
 ```bash
-make env-setup  # Creates .env files from .env.example
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
+
+### Authentication Modes
+
+**Local Mode (recommended for development):**
+```bash
+# In backend/.env
+ENVIRONMENT=local
+```
+- No OAuth required
+- Uses a default "dev-user" for all requests
+- Simplest setup for local development
+
+**OAuth Mode (production-like):**
+```bash
+# In backend/.env
+ENVIRONMENT=development
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+OAUTH_COOKIE_SECRET=generate-a-random-key
+```
+- Requires Google OAuth credentials
+- Run `make dev` to start with OAuth proxy on port 4180
+- See [AUTHENTICATION.md](AUTHENTICATION.md) for setup
 
 ### Key Variables
 
 **Backend (`backend/.env`):**
 ```bash
+ENVIRONMENT=local              # local (no auth) or development (OAuth)
 POSTGRES_SERVER=localhost
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
