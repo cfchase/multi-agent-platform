@@ -9,7 +9,7 @@ A full-stack application with React frontend (Vite + PatternFly UI) and FastAPI 
 - **Database**: PostgreSQL 15 with container-based local development
 - **Testing**: Vitest for unit tests, Playwright for end-to-end tests
 - **Containerization**: Docker/Podman with multi-stage builds
-- **Deployment**: OpenShift/Kubernetes with Kustomize
+- **Deployment**: OpenShift/Kubernetes with Kustomize and Helm
 - **Developer Experience**: Comprehensive Makefile with 30+ commands
 
 ## Architecture
@@ -46,6 +46,7 @@ A full-stack application with React frontend (Vite + PatternFly UI) and FastAPI 
 - Docker or Podman
 - OpenShift CLI (`oc`) or kubectl
 - Kustomize
+- Helm 3 (for AI/ML services)
 
 ### Local Development
 
@@ -316,13 +317,15 @@ make push-prod
 ### Deployment Architecture
 
 The deployment includes:
-- **PostgreSQL**: StatefulSet with PersistentVolumeClaim (1Gi)
-- **Backend**: Deployment with database connection
-- **Frontend**: Deployment with nginx serving static files
-- **Services**: ClusterIP services for internal communication
-- **Route/Ingress**: External access to frontend
-- **Jobs**: Database migration and seeding jobs
-- **Secret**: Database credentials
+- **PostgreSQL**: Deployment with PersistentVolumeClaim (Kustomize)
+- **Deep Research App**: Combined pod with frontend, backend, and OAuth2 Proxy (Kustomize)
+- **LangFlow**: Visual AI workflow builder (Helm)
+- **MLFlow**: ML experiment tracking with HTTP Basic auth (Helm)
+- **Langfuse**: LLM observability platform (Helm)
+- **Routes**: External access via OpenShift routes
+- **Secrets**: Database credentials, OAuth secrets, admin credentials
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment documentation.
 
 ### CI/CD GitHub Secrets
 

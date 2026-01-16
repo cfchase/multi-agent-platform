@@ -1,0 +1,179 @@
+# Langfuse Helm Chart Values for Development
+# Uses our existing PostgreSQL, deploys Redis/ClickHouse/MinIO via subcharts
+
+# Use existing PostgreSQL from our Kustomize deployment
+postgresql:
+  deploy: false
+  host: "postgres"
+  port: 5432
+  auth:
+    username: "app"
+    database: "langfuse"
+    # Use the existing postgres-secret created by Kustomize
+    existingSecret: "postgres-secret"
+    secretKeys:
+      userPasswordKey: "POSTGRES_PASSWORD"
+
+# Deploy Redis via subchart
+redis:
+  deploy: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: ""  # Set via secrets-dev.yaml
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+    # OpenShift compatibility
+    podSecurityContext:
+      enabled: false
+    containerSecurityContext:
+      enabled: false
+
+# Deploy ClickHouse via subchart
+clickhouse:
+  deploy: true
+  shards: 1
+  replicaCount: 1
+  auth:
+    username: "default"
+    password: ""  # Set via secrets-dev.yaml
+  persistence:
+    enabled: true
+    size: 10Gi
+  # OpenShift compatibility
+  podSecurityContext:
+    enabled: false
+  containerSecurityContext:
+    enabled: false
+
+# Deploy MinIO via subchart for S3-compatible storage
+s3:
+  deploy: true
+  bucket: "langfuse"
+  region: "auto"
+  forcePathStyle: true
+  accessKeyId:
+    value: ""  # Set via secrets-dev.yaml
+  secretAccessKey:
+    value: ""  # Set via secrets-dev.yaml
+
+minio:
+  enabled: true
+  mode: standalone
+  persistence:
+    enabled: true
+    size: 5Gi
+  # OpenShift compatibility
+  podSecurityContext:
+    enabled: false
+  containerSecurityContext:
+    enabled: false
+
+# Langfuse application configuration
+langfuse:
+  # OpenShift compatibility - let SCC assign UIDs
+  podSecurityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # Secrets (values set via secrets-dev.yaml)
+  salt:
+    value: ""  # Set via secrets-dev.yaml
+  encryptionKey:
+    value: ""  # Set via secrets-dev.yaml
+
+  # NextAuth configuration
+  nextauth:
+    url: ""  # Set via secrets-dev.yaml after creating the route
+    secret:
+      value: ""  # Set via secrets-dev.yaml
+
+  # Service account
+  serviceAccount:
+    create: true
+    annotations: {}
+
+  # Disable telemetry and public signup
+  features:
+    telemetryEnabled: false
+    signUpDisabled: true  # Only pre-created users can log in
+
+  # Additional environment variables for initial user setup
+  # Uses shared admin-credentials secret (same as LangFlow)
+  additionalEnv:
+    - name: LANGFUSE_INIT_ORG_ID
+      value: "deep-research"
+    - name: LANGFUSE_INIT_ORG_NAME
+      value: "Deep Research"
+    - name: LANGFUSE_INIT_PROJECT_ID
+      value: "default"
+    - name: LANGFUSE_INIT_PROJECT_NAME
+      value: "Default Project"
+    - name: LANGFUSE_INIT_USER_EMAIL
+      valueFrom:
+        secretKeyRef:
+          name: admin-credentials
+          key: email
+    - name: LANGFUSE_INIT_USER_NAME
+      value: "Admin"
+    - name: LANGFUSE_INIT_USER_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: admin-credentials
+          key: password
+
+  # Web deployment
+  web:
+    replicas: 1
+    image:
+      repository: langfuse/langfuse
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 3000
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    livenessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 5
+    readinessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 10
+    # Autoscaling disabled for dev
+    hpa:
+      enabled: false
+
+  # Worker deployment
+  worker:
+    replicas: 1
+    image:
+      repository: langfuse/langfuse-worker
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    # Autoscaling disabled for dev
+    keda:
+      enabled: false
+
+  # Ingress disabled - we'll use OpenShift Route
+  ingress:
+    enabled: false

@@ -1,0 +1,76 @@
+# MLFlow Helm Chart Values for Development
+# Chart: community-charts/mlflow
+# https://community-charts.github.io/docs/charts/mlflow/usage
+
+replicaCount: 1
+
+# Backend store - PostgreSQL
+backendStore:
+  databaseMigration: true
+  postgres:
+    enabled: true
+    host: postgres
+    port: 5432
+    database: mlflow
+    # user and password set via --set flags from postgres-secret
+
+# Artifact storage - local PVC (simple for dev)
+artifactRoot:
+  proxiedArtifactStorage: true
+
+# Resources
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+# Service
+service:
+  type: ClusterIP
+  port: 5000
+  containerPort: 5000
+
+# Enable auth using shared admin-credentials secret
+auth:
+  enabled: true
+  existingAdminSecret:
+    name: "admin-credentials"
+    usernameKey: "email"
+    passwordKey: "password"
+  defaultPermission: READ
+  # Use PostgreSQL for auth storage (SQLite doesn't work in OpenShift)
+  postgres:
+    enabled: true
+    host: postgres
+    port: 5432
+    database: mlflow
+    driver: "psycopg2"
+    # Credentials injected via deploy script temp file
+
+# Disable ingress - we use OpenShift Route
+ingress:
+  enabled: false
+
+# Allow any host header (required for OpenShift routes)
+# See: https://mlflow.org/docs/latest/self-hosting/
+extraArgs:
+  host: "0.0.0.0"
+
+extraEnvVars:
+  # Allow all hosts for OpenShift route access (required for routes)
+  # See: https://mlflow.org/docs/latest/self-hosting/security/network/
+  MLFLOW_SERVER_ALLOWED_HOSTS: "*"
+  MLFLOW_ALLOW_ORIGINS: "*"
+
+# OpenShift compatibility - do not specify UIDs, let SCC assign them
+podSecurityContext: {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL

@@ -1,5 +1,5 @@
 # Claude Code
-.claude/
+.claude/settings.local.json
 
 # Environment variables
 .env
@@ -45,8 +45,15 @@ temp/
 *.pem
 secrets/
 
-# OAuth2-Proxy secrets (keep .example files, ignore actual secrets)
-k8s/overlays/*/oauth-proxy-secret.env
+# K8s secrets (keep .example files, ignore actual secrets)
+k8s/**/oauth-proxy-secret.env
+k8s/**/langflow-secret.env
+k8s/**/*-secret.env
+!k8s/**/*-secret.env.example
+
+# Helm secrets (keep .example files, ignore actual secrets)
+helm/*/secrets-*.yaml
+!helm/*/secrets-*.yaml.example
 
 # Local development overrides
 .local/

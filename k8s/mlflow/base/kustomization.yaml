@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# MLFlow - Base Configuration
+# Deploy with overlay: kubectl apply -k k8s/mlflow/overlays/dev
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - pvc.yaml
+  - route.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/part-of: deep-research
+
+images:
+  - name: ghcr.io/mlflow/mlflow
+    newTag: v2.19.0

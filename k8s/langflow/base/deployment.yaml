@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langflow
+  labels:
+    app: langflow
+    app.kubernetes.io/name: langflow
+    app.kubernetes.io/component: workflow-builder
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  selector:
+    matchLabels:
+      app: langflow
+  template:
+    metadata:
+      labels:
+        app: langflow
+    spec:
+      # Note: Removed hardcoded runAsUser/runAsGroup/fsGroup (1000) from Helm chart
+      # OpenShift assigns UIDs from namespace range via restricted-v2 SCC
+      initContainers:
+      - name: init-db
+        image: postgres:15-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -c '\q' 2>/dev/null; do
+            echo "PostgreSQL is not ready yet, waiting..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+          echo "Creating langflow database if it doesn't exist..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'langflow'" | grep -q 1 || \
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -c "CREATE DATABASE langflow;"
+          echo "Database ready."
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+      containers:
+      - name: langflow
+        image: docker.io/langflowai/langflow:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 7860
+          name: http
+        env:
+        # Database configuration
+        - name: LANGFLOW_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: langflow-secret
+              key: database-url
+        # Authentication (uses shared admin-credentials secret)
+        - name: LANGFLOW_AUTO_LOGIN
+          value: "false"
+        - name: LANGFLOW_SUPERUSER
+          valueFrom:
+            secretKeyRef:
+              name: admin-credentials
+              key: email
+        - name: LANGFLOW_SUPERUSER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: admin-credentials
+              key: password
+        # Runtime configuration (aligned with IDE Helm chart)
+        - name: LANGFLOW_PORT
+          value: "7860"
+        - name: LANGFLOW_CONFIG_DIR
+          value: "/app/langflow"
+        - name: LANGFLOW_ALEMBIC_LOG_FILE
+          value: "/app/db/alembic.log"
+        - name: LANGFLOW_LOG_LEVEL
+          value: "INFO"
+        - name: LANGFLOW_UPDATE_STARTER_PROJECTS
+          value: "false"
+        volumeMounts:
+        # All persistent data uses single PVC with subPath
+        - name: langflow-data
+          mountPath: /app/langflow
+          subPath: config
+        - name: langflow-data
+          mountPath: /app/db
+          subPath: db
+        - name: langflow-data
+          mountPath: /.mem0
+          subPath: mem0
+        - name: langflow-data
+          mountPath: /.composio
+          subPath: composio
+        # Temp is ephemeral
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7860
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7860
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          # readOnlyRootFilesystem disabled - LangFlow needs write access to various locations
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: langflow-data
+        persistentVolumeClaim:
+          claimName: langflow-pvc
+      - name: tmp
+        emptyDir: {}

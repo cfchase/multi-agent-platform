@@ -4,17 +4,27 @@
 REGISTRY ?= quay.io/cfchase
 TAG ?= latest
 
-# Auto-detect container tool (check which daemon is actually running, podman preferred)
-CONTAINER_TOOL ?= $(shell if podman info >/dev/null 2>&1; then echo podman; elif docker info >/dev/null 2>&1; then echo docker; else echo docker; fi)
+# Auto-detect container tool (docker preferred, then podman)
+CONTAINER_TOOL ?= $(shell ./scripts/lib/detect-container-tool.sh)
+export CONTAINER_TOOL
 
+# Include modular makefiles
+include makefiles/db.mk
+include makefiles/services.mk
+include makefiles/build.mk
+include makefiles/deploy.mk
+include makefiles/helm.mk
+include makefiles/test.mk
 
-.PHONY: help setup dev dev-2 build build-prod test test-frontend test-backend test-e2e test-e2e-ui test-e2e-headed update-tests lint clean push push-prod deploy deploy-prod undeploy undeploy-prod kustomize kustomize-prod db-start db-stop db-reset db-shell db-logs db-status db-init db-seed
+.PHONY: help setup setup-frontend setup-backend dev dev-no-oauth dev-frontend dev-backend dev-2 dev-frontend-2 dev-backend-2
+.PHONY: env-setup sync-version bump-version show-version health-backend health-frontend
+.PHONY: clean clean-all fresh-start quick-start
 
 # Default target
 help: ## Show this help message
 	@echo "Deep Research - Available commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Setup and Installation
 setup: ## Install all dependencies
@@ -31,8 +41,19 @@ setup-backend: ## Install backend dependencies only
 	cd backend && uv sync --extra dev
 
 # Development
-dev: ## Run both frontend and backend in development mode
-	@echo "Starting development servers..."
+dev: ## Run frontend, backend, and OAuth proxy in development mode
+	@echo "Starting development servers with OAuth..."
+	@./scripts/dev-oauth.sh start || echo "OAuth proxy failed to start - check GOOGLE_CLIENT_ID/SECRET in .env"
+	@echo ""
+	@echo "Access your app at: http://localhost:4180"
+	@echo "(Set ENVIRONMENT=local in .env to bypass OAuth)"
+	@echo ""
+	npx concurrently --kill-others-on-fail "make dev-backend" "make dev-frontend"
+	@./scripts/dev-oauth.sh stop || true
+
+dev-no-oauth: ## Run frontend and backend without OAuth (uses dev-user)
+	@echo "Starting development servers without OAuth..."
+	@echo "Note: Set ENVIRONMENT=local in .env to use dev-user"
 	npx concurrently "make dev-backend" "make dev-frontend"
 
 dev-frontend: ## Run frontend development server
@@ -51,141 +72,16 @@ dev-frontend-2: ## Run second frontend instance (port 8081)
 dev-backend-2: ## Run second backend instance (port 8001)
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
-# Database Management
-db-start: ## Start PostgreSQL development database
-	@chmod +x scripts/dev-db.sh
-	@./scripts/dev-db.sh start
-
-db-stop: ## Stop PostgreSQL development database
-	@./scripts/dev-db.sh stop
-
-db-reset: ## Reset PostgreSQL database (removes all data)
-	@./scripts/dev-db.sh reset
-
-db-shell: ## Open PostgreSQL shell
-	@./scripts/dev-db.sh shell
-
-db-logs: ## Show PostgreSQL logs
-	@./scripts/dev-db.sh logs
-
-db-status: ## Check PostgreSQL database status
-	@./scripts/dev-db.sh status
-
-db-init: ## Initialize database schema with Alembic migrations
-	@echo "Running database migrations..."
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic upgrade head
-	@echo "Database initialized!"
-
-db-migrate-create: ## Create a new Alembic migration (usage: make db-migrate-create MSG="description")
-	@if [ -z "$(MSG)" ]; then echo "Error: MSG is required. Usage: make db-migrate-create MSG=\"description\""; exit 1; fi
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic revision --autogenerate -m "$(MSG)"
-	@echo "Migration created! Review the file in backend/alembic/versions/"
-
-db-migrate-upgrade: ## Apply all pending migrations
-	@echo "Applying migrations..."
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic upgrade head
-
-db-migrate-downgrade: ## Rollback one migration
-	@echo "Rolling back one migration..."
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic downgrade -1
-
-db-migrate-history: ## Show migration history
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic history
-
-db-migrate-current: ## Show current migration revision
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run alembic current
-
-db-seed: ## Seed database with test data (users and items)
-	@echo "Seeding database with test data..."
-	@cd backend && POSTGRES_SERVER=localhost POSTGRES_USER=app POSTGRES_PASSWORD=changethis POSTGRES_DB=deep-research uv run python scripts/seed_test_data.py
-	@echo "Test data created!"
-
-# Building
-build-frontend: ## Build frontend for production
-	cd frontend && npm run build
-
-build: build-frontend ## Build frontend and container images
-	@echo "Building container images for $(REGISTRY) with tag $(TAG) using $(CONTAINER_TOOL)..."
-	./scripts/build-images.sh $(TAG) $(REGISTRY) $(CONTAINER_TOOL)
-
-build-prod: build-frontend ## Build frontend and container images for production
-	@echo "Building container images for $(REGISTRY) with tag prod using $(CONTAINER_TOOL)..."
-	./scripts/build-images.sh prod $(REGISTRY) $(CONTAINER_TOOL)
-
-# Testing
-test: test-frontend test-backend ## Run all tests (frontend and backend)
-
-test-frontend: lint ## Run frontend linting, type checking, and tests
-	@echo "Running TypeScript type checking..."
-	cd frontend && npx tsc --noEmit
-	@echo "Running frontend tests..."
-	cd frontend && npm run test
-
-test-backend: ## Run backend tests (use VERBOSE=1, COVERAGE=1, FILE=path as needed)
-	@echo "Syncing backend dependencies..."
-	@cd backend && uv sync --extra dev
-	@echo "Running backend tests..."
-	@PYTEST_ARGS=""; \
-	if [ "$(VERBOSE)" = "1" ]; then PYTEST_ARGS="$$PYTEST_ARGS -v"; fi; \
-	if [ "$(COVERAGE)" = "1" ]; then PYTEST_ARGS="$$PYTEST_ARGS --cov=app --cov-report=term-missing"; fi; \
-	if [ -n "$(FILE)" ]; then PYTEST_ARGS="$$PYTEST_ARGS $(FILE)"; fi; \
-	cd backend && uv run pytest $$PYTEST_ARGS
-
-test-e2e: ## Run end-to-end tests with Playwright
-	@echo "Running E2E tests..."
-	cd frontend && npm run test:e2e
-
-test-e2e-ui: ## Run E2E tests with Playwright UI
-	cd frontend && npm run test:e2e:ui
-
-test-e2e-headed: ## Run E2E tests in headed mode (visible browser)
-	cd frontend && npm run test:e2e:headed
-
-update-tests: ## Update frontend test snapshots
-	@echo "Updating frontend test snapshots..."
-	cd frontend && npm run test -- -u
-	@echo "Test snapshots updated! Remember to commit the updated snapshots."
-
-lint: ## Run linting on frontend
-	cd frontend && npm run lint
-
-push: ## Push container images to registry
-	@echo "Pushing images to $(REGISTRY) with tag $(TAG) using $(CONTAINER_TOOL)..."
-	./scripts/push-images.sh $(TAG) $(REGISTRY) $(CONTAINER_TOOL)
-
-push-prod: ## Push container images to registry with prod tag
-	@echo "Pushing images to $(REGISTRY) with tag prod using $(CONTAINER_TOOL)..."
-	./scripts/push-images.sh prod $(REGISTRY) $(CONTAINER_TOOL)
-
-# OpenShift/Kubernetes Deployment
-kustomize: ## Preview development deployment manifests
-	kustomize build k8s/overlays/dev
-
-kustomize-prod: ## Preview production deployment manifests
-	kustomize build k8s/overlays/prod
-
-deploy: ## Deploy to development environment
-	@echo "Deploying to development..."
-	./scripts/deploy.sh dev
-
-deploy-prod: ## Deploy to production environment
-	@echo "Deploying to production..."
-	./scripts/deploy.sh prod
-
-undeploy: ## Remove development deployment
-	@echo "Removing development deployment..."
-	./scripts/undeploy.sh dev
-
-undeploy-prod: ## Remove production deployment
-	@echo "Removing production deployment..."
-	./scripts/undeploy.sh prod
-
 # Environment Setup
-env-setup: ## Copy environment example files
+env-setup: ## Copy environment example files (backend/.env is source of truth)
 	@echo "Setting up environment files..."
-	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env (root)"; fi
 	@if [ ! -f backend/.env ]; then cp backend/.env.example backend/.env; echo "Created backend/.env"; fi
 	@if [ ! -f frontend/.env ]; then cp frontend/.env.example frontend/.env; echo "Created frontend/.env"; fi
+	@echo ""
+	@echo "Edit backend/.env to configure:"
+	@echo "  - Database credentials"
+	@echo "  - Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
+	@echo "  - Set ENVIRONMENT=local to bypass OAuth"
 
 # Version Management
 sync-version: ## Sync VERSION to pyproject.toml and package.json
@@ -222,4 +118,3 @@ fresh-start: clean setup env-setup ## Clean setup for new development
 	@echo "Fresh development environment ready!"
 
 quick-start: setup env-setup dev ## Quick start for development
-

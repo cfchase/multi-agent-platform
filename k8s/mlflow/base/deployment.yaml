@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  labels:
+    app: mlflow
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/component: experiment-tracking
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      initContainers:
+      - name: init-db
+        image: postgres:15-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -c '\q' 2>/dev/null; do
+            echo "PostgreSQL is not ready yet, waiting..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+          echo "Creating mlflow database if it doesn't exist..."
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'mlflow'" | grep -q 1 || \
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_SERVER -U $POSTGRES_USER -d postgres -c "CREATE DATABASE mlflow;"
+          echo "Database ready."
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.19.0
+        imagePullPolicy: IfNotPresent
+        # Install psycopg2-binary at startup (official image doesn't include it)
+        command:
+        - bash
+        - -c
+        - |
+          pip install --quiet psycopg2-binary && \
+          mlflow server \
+            --host 0.0.0.0 \
+            --port 5000 \
+            --backend-store-uri "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}:5432/mlflow" \
+            --default-artifact-root /mlflow/artifacts \
+            --serve-artifacts
+        env:
+        - name: HOME
+          value: /tmp
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_SERVER
+        ports:
+        - containerPort: 5000
+          name: http
+        volumeMounts:
+        - name: mlflow-data
+          mountPath: /mlflow
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: mlflow-data
+        persistentVolumeClaim:
+          claimName: mlflow-pvc
+      - name: tmp
+        emptyDir: {}

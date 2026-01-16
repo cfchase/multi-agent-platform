@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Deep Research application deployment
+# Requires: postgres-secret (from postgres component)
+# Optional: langfuse-credentials, langflow-credentials, mlflow-credentials
+
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+
+# Note: oauth-proxy-config ConfigMap is created by overlays via configMapGenerator
+# Note: oauth-proxy-secret Secret is created by overlays via secretGenerator
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: deep-research
+      app.kubernetes.io/component: application
+      app.kubernetes.io/part-of: deep-research
+
+images:
+  - name: quay.io/cfchase/deep-research-backend
+    newTag: latest
+  - name: quay.io/cfchase/deep-research-frontend
+    newTag: latest

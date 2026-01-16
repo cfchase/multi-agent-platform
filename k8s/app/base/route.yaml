@@ -1,0 +1,15 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: deep-research
+  labels:
+    app: deep-research
+spec:
+  to:
+    kind: Service
+    name: deep-research
+  port:
+    targetPort: public
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

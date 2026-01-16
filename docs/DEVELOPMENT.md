@@ -147,6 +147,61 @@ make db-logs       # View container logs
 make db-reset      # DESTRUCTIVE: Delete all data
 ```
 
+## AI/ML Infrastructure Services
+
+The project includes three AI/ML services for local development:
+
+| Service | Purpose | Port | UI |
+|---------|---------|------|-----|
+| **LangFlow** | Visual workflow builder for LLM apps | 7860 | http://localhost:7860 |
+| **Langfuse** | LLM observability and tracing | 3000 | http://localhost:3000 |
+| **MLFlow** | Experiment tracking and model registry | 5000 | http://localhost:5000 |
+
+### Starting AI/ML Services
+
+```bash
+# Start all AI/ML services (requires db-start first)
+make services-start
+
+# Or start individually:
+make langflow-start    # LangFlow on port 7860
+make langfuse-start    # Langfuse on port 3000
+make mlflow-start      # MLFlow on port 5000
+
+# Check status
+make langflow-status
+make langfuse-status
+make mlflow-status
+
+# View logs
+make langflow-logs
+make langfuse-logs
+make mlflow-logs
+
+# Stop services
+make services-stop     # Stop all
+make langflow-stop
+make langfuse-stop
+make mlflow-stop
+```
+
+### Service Details
+
+**LangFlow** - Visual workflow builder
+- Connects to PostgreSQL for persistence
+- Default credentials: Set via environment
+- Useful for prototyping LLM pipelines
+
+**Langfuse** - LLM observability
+- Full stack: Redis, ClickHouse, MinIO, PostgreSQL
+- Access at http://localhost:3000
+- Create account on first visit
+
+**MLFlow** - Experiment tracking
+- PostgreSQL backend for metadata
+- Local volume for artifact storage
+- No authentication (development mode)
+
 ### Migrations
 
 ```bash
