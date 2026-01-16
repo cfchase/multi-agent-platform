@@ -184,6 +184,10 @@ make helm-langfuse-status     # Langfuse status
 ```
 ├── backend/              # FastAPI backend
 ├── frontend/             # React + PatternFly frontend
+├── langflow-flows/       # LangFlow flow definitions and docs
+│   ├── docs/            # Flow architecture documentation
+│   ├── flows/           # Exported flow JSON files
+│   └── prompts/         # Prompt templates
 ├── k8s/
 │   ├── app/             # App deployment (Kustomize)
 │   ├── postgres/        # Database deployment (Kustomize)
@@ -197,12 +201,25 @@ make helm-langfuse-status     # Langfuse status
 └── docs/                # Detailed documentation
 ```
 
+## LangFlow Flows
+
+The platform supports multiple flows for different use cases:
+
+| Flow | Description | Status |
+|------|-------------|--------|
+| [Basic Chat](langflow-flows/docs/basic-flow.md) | Simple Q&A with Gemini model | Phase 2A |
+| [Analyze](langflow-flows/docs/analyze-flow.md) | Enterprise data analysis (agents-python port) | Phase 3 |
+| [Deep Research](langflow-flows/docs/deep-research-flow.md) | Multi-agent research with validation | Future |
+
+See [langflow-flows/README.md](langflow-flows/README.md) for full flow documentation.
+
 ## Documentation
 
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Detailed deployment guide
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Local development setup
 - [AUTHENTICATION.md](docs/AUTHENTICATION.md) - OAuth2 configuration
 - [CLAUDE.md](CLAUDE.md) - AI assistant development guide
+- [langflow-flows/](langflow-flows/) - Flow architecture documentation
 
 ## Authentication
 
