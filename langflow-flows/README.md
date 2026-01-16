@@ -1,97 +1,176 @@
 # LangFlow Flows
 
-This directory contains LangFlow flow definitions and documentation for the Deep Research platform.
-
-## Available Flows
-
-| Flow | Status | Complexity | Use Case |
-|------|--------|------------|----------|
-| [Basic Chat](docs/basic-flow.md) | Phase 2A | Minimal | Simple Q&A, testing |
-| [Analyze](docs/analyze-flow.md) | Phase 3 | High | Enterprise data analysis |
-| [Deep Research](docs/deep-research-flow.md) | Future | High | Open-ended research with validation |
+This directory contains example LangFlow flows bundled with the platform. The platform supports loading flows from multiple sources including local directories and git repositories.
 
 ## Directory Structure
 
 ```
 langflow-flows/
-├── README.md                 # This file
-├── docs/                     # Flow architecture documentation
-│   ├── basic-flow.md        # Basic Chat flow design
-│   ├── analyze-flow.md      # Analyze flow (agents-python port)
-│   └── deep-research-flow.md # Deep Research flow design
-├── flows/                    # Exported flow JSON files (Phase 2A+)
-│   ├── hello-gemini.json    # Basic Chat flow
-│   ├── analyze-v1.json      # Analyze flow
-│   └── deep-research-v1.json # Deep Research flow
-└── prompts/                  # Prompt templates (Phase 3+)
-    ├── analyze/             # Analyze flow prompts
-    └── deep-research/       # Deep Research flow prompts
+├── README.md              # This file
+└── examples/              # Built-in example flows
+    ├── hello-gemini.json          # Flow definition (LangFlow export)
+    └── hello-gemini.metadata.yaml # Flow metadata
 ```
 
-## Flow Comparison
+## Flow Sources
 
-### When to Use Each Flow
+The platform can load flows from multiple sources:
 
-| Question | Basic | Analyze | Deep Research |
-|----------|-------|---------|---------------|
-| Simple Q&A? | ✅ | | |
-| Enterprise data? | | ✅ | |
-| Web research? | | | ✅ |
-| Need citations? | | ✅ | ✅ |
-| Need validation? | | | ✅ |
-| Report output? | | | ✅ |
+| Source Type | Description | Use Case |
+|-------------|-------------|----------|
+| **Local** | Directory on filesystem | Development, bundled examples |
+| **Git (Public)** | Public git repository | Community flows, open source |
+| **Git (Private)** | Private git repository | Enterprise, proprietary flows |
 
-### Architecture Patterns
+### Configuration
 
-| Pattern | Basic | Analyze | Deep Research |
-|---------|-------|---------|---------------|
-| Single LLM | ✅ | | |
-| Supervisor-Worker | | ✅ | ✅ |
-| Reflection Loop | | | ✅ |
-| Tool Mode Agents | | ✅ | ✅ |
-| Data Isolation | | ✅ | |
+Configure flow sources via environment variable or YAML config file.
+
+**Simple (single local path):**
+```bash
+FLOW_SOURCE_PATH=./langflow-flows/examples
+```
+
+**Advanced (config file):**
+```bash
+FLOW_SOURCES_CONFIG=./config/flow-sources.yaml
+```
+
+**Example config file:**
+```yaml
+# config/flow-sources.yaml
+flow_sources:
+  # Built-in examples
+  - name: examples
+    type: local
+    path: ./langflow-flows/examples
+    description: "Built-in example flows"
+
+  # Public git repo
+  - name: community
+    type: git
+    url: https://github.com/org/langflow-flows-public.git
+    branch: main
+    path: flows/
+    description: "Community flows"
+
+  # Private git repo (requires token)
+  - name: enterprise
+    type: git
+    url: https://github.com/org/langflow-flows-private.git
+    branch: main
+    path: flows/
+    auth:
+      type: token
+      env_var: GITHUB_FLOW_TOKEN
+    description: "Enterprise flows"
+```
+
+## Flow File Format
+
+Each flow consists of two files:
+
+### 1. Flow Definition (`*.json`)
+
+The LangFlow export JSON file containing the flow graph:
+
+```json
+{
+  "name": "Flow Name",
+  "description": "Flow description",
+  "data": {
+    "nodes": [...],
+    "edges": [...],
+    "viewport": {...}
+  }
+}
+```
+
+### 2. Flow Metadata (`*.metadata.yaml`) - Optional
+
+Additional metadata for the platform:
+
+```yaml
+name: Flow Name
+description: Flow description
+version: 1.0.0
+author: Team Name
+tags:
+  - tag1
+  - tag2
+requires:
+  - API_KEY_NAME
+icon: comments  # PatternFly icon
+complexity: minimal  # minimal, low, medium, high
+use_cases:
+  - Use case 1
+  - Use case 2
+```
 
 ## Working with Flows
 
-### Importing a Flow
+### Creating a Flow
 
 1. Open LangFlow UI (http://localhost:7860)
+2. Create your flow using the visual builder
+3. Test in LangFlow playground
+4. Export: Click "Export" → "Download JSON"
+5. Save to appropriate directory
+6. Create metadata YAML file (optional)
+7. Commit to version control
+
+### Importing a Flow
+
+1. Open LangFlow UI
 2. Click "Import" or drag JSON file
-3. Configure credentials (API keys)
+3. Configure required credentials (API keys)
 4. Test in playground
-
-### Exporting a Flow
-
-1. Open flow in LangFlow UI
-2. Click "Export" → "Download JSON"
-3. Save to `flows/` directory
-4. Commit to version control
 
 ### API Usage
 
 ```bash
-# Execute a flow
+# List available flows
+curl http://localhost:8000/api/v1/flows
+
+# Execute a flow via LangFlow API
 curl -X POST "http://localhost:7860/api/v1/run/{flow_id}" \
   -H "Content-Type: application/json" \
   -d '{
-    "input_value": "Your query here",
+    "input_value": "Your message here",
     "input_type": "chat",
     "output_type": "chat",
     "session_id": "optional-session-id"
   }'
 ```
 
-## Development Workflow
+## Available Example Flows
 
-1. **Design** flow architecture in docs
-2. **Build** flow in LangFlow UI
-3. **Test** in LangFlow playground
-4. **Export** JSON to `flows/`
-5. **Document** prompts and decisions
-6. **Commit** to version control
+| Flow | Description | Complexity |
+|------|-------------|------------|
+| [Hello Gemini](examples/hello-gemini.json) | Simple chat with Gemini model | Minimal |
+
+## Creating Your Own Flow Repository
+
+To create a separate repository for your flows:
+
+1. Create a new git repository
+2. Add a `flows/` directory
+3. Add your flow JSON and metadata files
+4. Configure the platform to use your repo as a source
+
+**Example structure:**
+```
+your-flows-repo/
+├── README.md
+└── flows/
+    ├── my-flow.json
+    ├── my-flow.metadata.yaml
+    ├── another-flow.json
+    └── another-flow.metadata.yaml
+```
 
 ## See Also
 
-- [Development Plan](../.tmp/DEVELOPMENT-PLAN.md) - Project phases and tasks
-- [Architecture](../docs/ARCHITECTURE.md) - Platform architecture
 - [Development Guide](../docs/DEVELOPMENT.md) - Local development setup
+- [Architecture](../docs/ARCHITECTURE.md) - Platform architecture
+- [Phase 2A Plan](../.tmp/PHASE-2A-FLOW-SOURCES.md) - Detailed implementation plan

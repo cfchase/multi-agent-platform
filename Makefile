@@ -1,4 +1,4 @@
-# Deep Research Makefile
+# Multi-Agent Platform Makefile
 
 # Container Registry Operations
 REGISTRY ?= quay.io/cfchase
@@ -22,7 +22,7 @@ include makefiles/test.mk
 
 # Default target
 help: ## Show this help message
-	@echo "Deep Research - Available commands:"
+	@echo "Multi-Agent Platform - Available commands:"
 	@echo ""
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 

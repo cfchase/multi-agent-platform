@@ -1,6 +1,6 @@
 # Service Management Targets (LangFlow, Langfuse, MLFlow, OAuth)
 
-.PHONY: langflow-start langflow-stop langflow-status langflow-logs
+.PHONY: langflow-start langflow-stop langflow-status langflow-logs langflow-import
 .PHONY: langfuse-start langfuse-stop langfuse-status langfuse-logs
 .PHONY: mlflow-start mlflow-stop mlflow-status mlflow-logs
 .PHONY: oauth-start oauth-stop oauth-status oauth-logs
@@ -19,6 +19,10 @@ langflow-status: ## Check LangFlow status
 
 langflow-logs: ## Show LangFlow logs
 	@./scripts/dev-langflow.sh logs
+
+langflow-import: ## Import flows from configured sources into LangFlow
+	@chmod +x scripts/import-flows.sh
+	@./scripts/import-flows.sh
 
 # Langfuse
 langfuse-start: ## Start Langfuse development stack
