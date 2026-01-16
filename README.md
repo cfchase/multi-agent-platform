@@ -16,80 +16,80 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Deep Research                             │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │  LangFlow   │  │  Langfuse   │  │   MLFlow    │              │
-│  │  Workflow   │  │ Observability│  │ Experiments │              │
-│  │  Builder    │  │  & Tracing  │  │  Tracking   │              │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
-│         │                │                │                      │
-│         └────────────────┴────────────────┘                      │
-│                          │                                       │
-│  ┌───────────────────────┴───────────────────────┐              │
-│  │              PostgreSQL Database               │              │
-│  │         (Shared state & persistence)           │              │
-│  └────────────────────────────────────────────────┘              │
-│                                                                  │
-│  ┌────────────────────────────────────────────────┐              │
-│  │           Deep Research Application            │              │
-│  │     React Frontend + FastAPI Backend           │              │
-│  │          (OAuth2 Proxy for auth)               │              │
-│  └────────────────────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────────┘
+    ┌───────────┐                                                        
+    │           │                                                        
+    │   Users   │                                                        
+    │           │                                                        
+    └─────┬─────┘                                                        
+          │                                                              
+          │                                                              
+          │                                                              
+┌─────────┼──────────────────────────┐                    ┌────────────┐ 
+│         │                          │                    │            │ 
+│         │                          │                    │            │ 
+│         │                          │                    │            │ 
+│   ┌─────▼────┐   ┌──────────┐      │                    │            │ 
+│   │          │   │          │      │                    │ PostgreSQL │ 
+│   │ Frontend ┼───► Backend  ┼──────┼────────────────────►            │ 
+│   │          │   │          │      │                    │            │ 
+│   └──────────┘   └────┬─────┘      │                    │            │ 
+│                       │            │                    │            │ 
+│                       │            │                    │     ▲      │ 
+└───────────────────────┼────────────┘                    └─────┼──────┘ 
+                        │                                       │        
+                        │                                       │        
+                        │                                       │        
+      ┌─────────────────┼─────────────────┐                     │        
+      │                 │                 │                     │        
+┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐               │        
+│           │     │           │     │           │               │        
+│           │     │           │     │           │               │        
+│ LangFlow  │     │  LangFuse │     │  MLflow   │               │        
+│           │     │           │     │           │               │        
+│           │     │           │     │           │               │        
+└─────┬─────┘     └─────┬─────┘     └─────┬─────┘               │        
+      │                 │                 │                     │        
+      └─────────────────┴─────────────────┴─────────────────────┘                             
+
 ```
+
+**User Flow**: Users interact with the Deep Research App, which executes LangFlow workflows via API to perform multi-agent research tasks.
+
+**Observability**: Workflow executions send traces to Langfuse (LLM tracing) and MLFlow (experiment tracking) for monitoring and evaluation.
+
+**Shared Database**: All components use PostgreSQL with separate databases for isolation.
+
+**Developer/Admin Tools**: LangFlow, Langfuse, and MLFlow are accessible only to developers and administrators.
 
 ## Components
 
-| Component | Purpose | Technology |
-|-----------|---------|------------|
-| **LangFlow** | Visual workflow builder for multi-agent orchestration | Helm chart |
-| **Langfuse** | LLM observability, tracing, and evaluation | Helm chart |
-| **MLFlow** | Experiment tracking and model registry | Helm chart |
-| **PostgreSQL** | Shared database for all services | Kustomize |
-| **Deep Research App** | Frontend UI and API backend | Kustomize |
+| Component | Purpose | Access |
+|-----------|---------|--------|
+| **Deep Research App** | User-facing UI that executes research workflows | Users |
+| **LangFlow** | Visual workflow builder for multi-agent orchestration | Developers/Admins |
+| **Langfuse** | LLM observability, tracing, and evaluation | Developers/Admins |
+| **MLFlow** | Experiment tracking and model registry | Developers/Admins |
+| **PostgreSQL** | Shared database for all services | Internal |
 
 ## Quick Start
 
 ### Prerequisites
 
 - Docker or Podman
-- OpenShift CLI (`oc`) or kubectl
-- Helm 3
-- Node.js 22+ and Python 3.11+ (for local development)
-
-### Deploy to OpenShift
+- Node.js 22+ and Python 3.11+
+- OpenShift CLI (`oc`) and Helm 3 (for cluster deployment)
 
 ```bash
-# Clone the repository
 git clone https://github.com/cfchase/deep-research
 cd deep-research
-
-# Login to your cluster
-oc login --server=https://your-cluster
-
-# Deploy everything
-make deploy
-```
-
-This deploys PostgreSQL, LangFlow, MLFlow, Langfuse, and the Deep Research app.
-
-**Get credentials and URLs:**
-```bash
-make get-admin-credentials
+make setup
 ```
 
 ### Local Development
 
 ```bash
-# Install dependencies
-make setup
-
-# Start database
+# Start database and run app
 make db-start && make db-init
-
-# Run the app
 make dev
 
 # Run AI services locally (optional)
@@ -103,6 +103,23 @@ Access locally:
 - **LangFlow**: http://localhost:7860
 - **MLFlow**: http://localhost:5000
 - **Langfuse**: http://localhost:3000
+
+### Deploy to OpenShift
+
+```bash
+# Login to your cluster
+oc login --server=https://your-cluster
+
+# Deploy everything
+make deploy
+```
+
+This deploys PostgreSQL, LangFlow, MLFlow, Langfuse, and the Deep Research app.
+
+**Get credentials and URLs:**
+```bash
+make get-admin-credentials
+```
 
 ## Deployment Commands
 
@@ -152,12 +169,12 @@ make helm-langfuse-status     # Langfuse status
 
 ## Authentication
 
-| Service | Method | Credentials |
-|---------|--------|-------------|
-| Deep Research App | OAuth2 (Google/GitHub) | Configure in OAuth provider |
-| LangFlow | Built-in | `admin-credentials` secret |
-| MLFlow | HTTP Basic | `admin-credentials` secret |
-| Langfuse | Email/Password | Self-registration |
+| Service | Access | Method | Credentials |
+|---------|--------|--------|-------------|
+| Deep Research App | Users | OAuth2 (Google/GitHub) | Configure in OAuth provider |
+| LangFlow | Developers/Admins | Built-in auth | `admin-credentials` secret |
+| MLFlow | Developers/Admins | HTTP Basic | `admin-credentials` secret |
+| Langfuse | Developers/Admins | Email/Password | Self-registration |
 
 ## Technology Stack
 
