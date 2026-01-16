@@ -1,4 +1,4 @@
-# GitHub Actions CI for Deep Research
+# GitHub Actions CI for Multi-Agent Platform
 name: CI
 
 on:
@@ -11,8 +11,8 @@ on:
 
 env:
   REGISTRY: quay.io/cfchase
-  BACKEND_IMAGE: deep-research-backend
-  FRONTEND_IMAGE: deep-research-frontend
+  BACKEND_IMAGE: multi-agent-platform-backend
+  FRONTEND_IMAGE: multi-agent-platform-frontend
 
 jobs:
   # Validate that VERSION, pyproject.toml, uv.lock, and package.json are in sync
@@ -55,7 +55,7 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_DB: deep-research
+          POSTGRES_DB: app
           POSTGRES_USER: app
           POSTGRES_PASSWORD: changethis
         ports:
@@ -95,7 +95,7 @@ jobs:
           POSTGRES_PORT: "5432"
           POSTGRES_USER: app
           POSTGRES_PASSWORD: changethis
-          POSTGRES_DB: deep-research
+          POSTGRES_DB: app
         run: make test
 
   # Build and push container images (only on main branch push)

@@ -70,7 +70,7 @@ wheels = [
 ]
 
 [[package]]
-name = "deep-research-backend"
+name = "multi-agent-platform-backend"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

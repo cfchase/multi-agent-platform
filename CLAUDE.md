@@ -376,4 +376,4 @@ This project follows [Conventional Commits v1.0.0](https://www.conventionalcommi
 **Examples**:
 - `feat: add user authentication with OAuth2`
 - `fix: resolve race condition in data fetching`
-- `refactor: rename project to deep-research`
+- `refactor: extract auth module from user service`

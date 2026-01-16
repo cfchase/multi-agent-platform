@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: deep-research
+  name: multi-agent-platform
   labels:
-    app: deep-research
+    app: multi-agent-platform
 spec:
   selector:
-    app: deep-research
+    app: multi-agent-platform
   ports:
   - name: public
     port: 4180

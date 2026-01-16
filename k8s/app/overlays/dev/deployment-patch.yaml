@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: deep-research
+  name: multi-agent-platform
 spec:
   template:
     spec:

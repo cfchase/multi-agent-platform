@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-deep-research-${ENVIRONMENT}}
+NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -152,4 +152,4 @@ echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=langfuse"
 echo ""
 echo "NOTE: Restart the app to pick up langfuse-credentials:"
-echo "  oc rollout restart deployment/deep-research -n $NAMESPACE"
+echo "  oc rollout restart deployment/multi-agent-platform -n $NAMESPACE"

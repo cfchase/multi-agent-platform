@@ -13,4 +13,4 @@ labels:
   - pairs:
       app.kubernetes.io/name: postgres
       app.kubernetes.io/component: database
-      app.kubernetes.io/part-of: deep-research
+      app.kubernetes.io/part-of: multi-agent-platform

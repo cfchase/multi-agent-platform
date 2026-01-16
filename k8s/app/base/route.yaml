@@ -1,13 +1,13 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: deep-research
+  name: multi-agent-platform
   labels:
-    app: deep-research
+    app: multi-agent-platform
 spec:
   to:
     kind: Service
-    name: deep-research
+    name: multi-agent-platform
   port:
     targetPort: public
   tls:

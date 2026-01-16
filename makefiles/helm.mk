@@ -3,7 +3,7 @@
 .PHONY: helm-repos helm-langfuse-install helm-langfuse-upgrade helm-langfuse-uninstall helm-langfuse-status
 .PHONY: helm-langflow-status helm-langflow-logs helm-mlflow-status helm-mlflow-logs
 
-HELM_NAMESPACE ?= deep-research-dev
+HELM_NAMESPACE ?= multi-agent-platform-dev
 LANGFUSE_RELEASE ?= langfuse
 LANGFLOW_RELEASE ?= langflow
 MLFLOW_RELEASE ?= mlflow

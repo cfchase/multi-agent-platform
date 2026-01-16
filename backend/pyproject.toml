@@ -3,11 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "deep-research-backend"
+name = "multi-agent-platform-backend"
 version = "0.1.0"
-description = "FastAPI backend for Deep Research"
+description = "FastAPI backend for Multi-Agent Platform"
 authors = [
-    {name = "Deep Research Team"},
+    {name = "Multi-Agent Platform Team"},
 ]
 requires-python = ">=3.11"
 classifiers = [

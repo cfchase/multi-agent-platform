@@ -11,7 +11,7 @@ set -e
 TAG=${1:-latest}
 REGISTRY=${2:-quay.io/cfchase}
 CONTAINER_TOOL=${3:-${CONTAINER_TOOL:-docker}}
-PROJECT_NAME="deep-research"
+PROJECT_NAME="multi-agent-platform"
 
 # Validate container tool
 if [[ "$CONTAINER_TOOL" != "podman" && "$CONTAINER_TOOL" != "docker" ]]; then

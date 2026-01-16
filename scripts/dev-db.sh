@@ -19,7 +19,7 @@ CONTAINER_NAME="app-postgres-dev"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${POSTGRES_USER:-app}"
 DB_PASS="${POSTGRES_PASSWORD:-changethis}"
-DB_NAME="${POSTGRES_DB:-deep-research}"
+DB_NAME="${POSTGRES_DB:-app}"
 VOLUME_NAME="app-db-data"
 
 # Additional databases for supporting services
@@ -183,7 +183,7 @@ case "$1" in
         echo "  DB_PORT           - Database port (default: 5432)"
         echo "  POSTGRES_USER     - Database user (default: app)"
         echo "  POSTGRES_PASSWORD - Database password (default: changethis)"
-        echo "  POSTGRES_DB       - Primary database name (default: deep-research)"
+        echo "  POSTGRES_DB       - Primary database name (default: app)"
         echo "  ADDITIONAL_DBS    - Space-separated additional databases (default: langflow langfuse mlflow)"
         exit 1
         ;;

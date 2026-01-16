@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "Deep Research"
+    PROJECT_NAME: str = "Multi-Agent Platform"
     APP_VERSION: str = _load_app_version_from_pyproject()
     PORT: int = 8000
 
@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "app"
     POSTGRES_PASSWORD: str = "changethis"
-    POSTGRES_DB: str = "deep-research"
+    POSTGRES_DB: str = "app"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -179,8 +179,8 @@ start_langfuse_web() {
             -e LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID="$MINIO_ROOT_USER" \
             -e LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY="$MINIO_ROOT_PASSWORD" \
             -e LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE="true" \
-            -e LANGFUSE_INIT_ORG_ID="deep-research" \
-            -e LANGFUSE_INIT_ORG_NAME="Deep Research" \
+            -e LANGFUSE_INIT_ORG_ID="multi-agent-platform" \
+            -e LANGFUSE_INIT_ORG_NAME="Multi-Agent Platform" \
             -e LANGFUSE_INIT_PROJECT_ID="default" \
             -e LANGFUSE_INIT_PROJECT_NAME="Default Project" \
             -e LANGFUSE_INIT_PROJECT_PUBLIC_KEY="pk-dev-public-key" \

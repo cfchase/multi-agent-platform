@@ -14,8 +14,8 @@ This guide covers development setup, daily workflows, and best practices for wor
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/cfchase/deep-research
-cd deep-research
+git clone https://github.com/cfchase/multi-agent-platform
+cd multi-agent-platform
 
 # 2. Install all dependencies
 make setup
@@ -154,7 +154,7 @@ ENVIRONMENT=local              # local (no auth) or development (OAuth)
 POSTGRES_SERVER=localhost
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
-POSTGRES_DB=deep-research
+POSTGRES_DB=app
 POSTGRES_PORT=5432
 ```
 

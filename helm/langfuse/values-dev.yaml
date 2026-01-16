@@ -107,9 +107,9 @@ langfuse:
   # Uses shared admin-credentials secret (same as LangFlow)
   additionalEnv:
     - name: LANGFUSE_INIT_ORG_ID
-      value: "deep-research"
+      value: "multi-agent-platform"
     - name: LANGFUSE_INIT_ORG_NAME
-      value: "Deep Research"
+      value: "Multi-Agent Platform"
     - name: LANGFUSE_INIT_PROJECT_ID
       value: "default"
     - name: LANGFUSE_INIT_PROJECT_NAME

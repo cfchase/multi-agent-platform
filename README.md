@@ -1,10 +1,10 @@
-# Deep Research
+# Multi-Agent Platform
 
-A multi-agent system for deep research workflows, built on Red Hat technologies. This project experiments with agentic AI patterns that iteratively plan, gather, critique, and synthesize information—mimicking how a human researcher works.
+A platform for hosting and orchestrating multiple LangFlow workflows, built on Red Hat technologies. This project experiments with agentic AI patterns that iteratively plan, gather, critique, and synthesize information—mimicking how a human researcher works.
 
 ## Vision
 
-Unlike a standard RAG chatbot that retrieves once and answers, Deep Research uses a **System of Agents** orchestrated to perform long-horizon tasks:
+Unlike a standard RAG chatbot that retrieves once and answers, Multi-Agent Platform uses a **System of Agents** orchestrated to perform long-horizon tasks:
 
 1. **Planner** decomposes complex queries into sub-questions
 2. **Researcher** gathers evidence using search and vector stores
@@ -53,7 +53,7 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 
 ```
 
-**User Flow**: Users interact with the Deep Research App, which executes LangFlow workflows via API to perform multi-agent research tasks.
+**User Flow**: Users interact with the Multi-Agent Platform, which executes LangFlow workflows via API to perform multi-agent research tasks.
 
 **Observability**: Workflow executions send traces to Langfuse (LLM tracing) and MLFlow (experiment tracking) for monitoring and evaluation.
 
@@ -65,7 +65,7 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 
 | Component | Purpose | Access |
 |-----------|---------|--------|
-| **Deep Research App** | User-facing UI that executes research workflows | Users |
+| **Multi-Agent Platform** | User-facing UI that executes research workflows | Users |
 | **LangFlow** | Visual workflow builder for multi-agent orchestration | Developers/Admins |
 | **Langfuse** | LLM observability, tracing, and evaluation | Developers/Admins |
 | **MLFlow** | Experiment tracking and model registry | Developers/Admins |
@@ -80,8 +80,8 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 - OpenShift CLI (`oc`) and Helm 3 (for cluster deployment)
 
 ```bash
-git clone https://github.com/cfchase/deep-research
-cd deep-research
+git clone https://github.com/cfchase/multi-agent-platform
+cd multi-agent-platform
 make setup
 
 # Configure environment
@@ -151,7 +151,7 @@ cp k8s/app/overlays/dev/oauth-proxy-secret.env.example k8s/app/overlays/dev/oaut
 make deploy
 ```
 
-This deploys PostgreSQL, LangFlow, MLFlow, Langfuse, and the Deep Research app.
+This deploys PostgreSQL, LangFlow, MLFlow, Langfuse, and the Multi-Agent Platform app.
 
 **Get credentials and URLs:**
 ```bash
@@ -167,7 +167,7 @@ make undeploy            # Remove all components
 
 # Individual components
 make deploy-db           # PostgreSQL only
-make deploy-app          # Deep Research app only
+make deploy-app          # Multi-Agent Platform app only
 make deploy-langflow     # LangFlow only
 make deploy-mlflow       # MLFlow only
 make deploy-langfuse     # Langfuse only
@@ -225,7 +225,7 @@ See [langflow-flows/README.md](langflow-flows/README.md) for full flow documenta
 
 | Service | Access | Method | Credentials |
 |---------|--------|--------|-------------|
-| Deep Research App | Users | OAuth2 (Google/GitHub) | Configure in OAuth provider |
+| Multi-Agent Platform | Users | OAuth2 (Google/GitHub) | Configure in OAuth provider |
 | LangFlow | Developers/Admins | Built-in auth | `admin-credentials` secret |
 | MLFlow | Developers/Admins | HTTP Basic | `admin-credentials` secret |
 | Langfuse | Developers/Admins | Email/Password | Self-registration |

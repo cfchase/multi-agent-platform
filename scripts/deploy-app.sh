@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deploy Deep Research App to OpenShift
+# Deploy Multi-Agent Platform App to OpenShift
 # Usage: ./scripts/deploy-app.sh [environment] [namespace]
 # Requires: postgres-secret must exist (run deploy-db.sh first)
 
@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-deep-research-${ENVIRONMENT}}
+NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -18,7 +18,7 @@ if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
 fi
 
 echo "==================================="
-echo "Deploying Deep Research App"
+echo "Deploying Multi-Agent Platform App"
 echo "==================================="
 echo "Environment: $ENVIRONMENT"
 echo "Namespace: $NAMESPACE"
@@ -56,15 +56,15 @@ echo "Creating namespace if it doesn't exist..."
 oc create namespace "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 
 # Apply app kustomize configuration
-echo "Applying Deep Research App configuration..."
+echo "Applying Multi-Agent Platform App configuration..."
 oc apply -k "$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT" -n "$NAMESPACE"
 
 # Wait for app to be ready
 echo "Waiting for app to be ready..."
-oc rollout status deployment/deep-research -n "$NAMESPACE" --timeout=180s || true
+oc rollout status deployment/multi-agent-platform -n "$NAMESPACE" --timeout=180s || true
 
 # Get route URL
-ROUTE_URL=$(oc get route deep-research -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+ROUTE_URL=$(oc get route multi-agent-platform -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
 
 echo ""
 echo "==================================="
@@ -74,7 +74,7 @@ if [[ -n "$ROUTE_URL" ]]; then
     echo "App URL: https://$ROUTE_URL"
 fi
 echo ""
-echo "Check status: oc get pods -n $NAMESPACE -l app=deep-research"
+echo "Check status: oc get pods -n $NAMESPACE -l app=multi-agent-platform"
 echo ""
 echo "Optional components (deploy to enable features):"
 echo "  - deploy-langflow.sh  (workflow builder)"

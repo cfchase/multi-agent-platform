@@ -13,7 +13,7 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/name: mlflow
-      app.kubernetes.io/part-of: deep-research
+      app.kubernetes.io/part-of: multi-agent-platform
 
 images:
   - name: ghcr.io/mlflow/mlflow

@@ -1,8 +1,8 @@
-# Deep Research - System Architecture
+# Multi-Agent Platform - System Architecture
 
 ## Overview
 
-Deep Research is a hosted research application that provides AI-powered comprehensive research capabilities through a conversational interface. The system integrates:
+Multi-Agent Platform is a hosted platform for orchestrating LangFlow workflows that provides AI-powered comprehensive research capabilities through a conversational interface. The system integrates:
 
 - **LangFlow**: Visual agent orchestration layer
 - **Langfuse**: LLM tracing and observability
@@ -34,7 +34,7 @@ Users submit research queries through a chat interface, and the system executes 
 |                             v                                                      |
 |  +-------------------------------------------------------------------------------+ |
 |  |                         POSTGRESQL DATABASES                                   | |
-|  |   deep-research | langflow | langfuse | mlflow                                 | |
+|  |   app | langflow | langfuse | mlflow                                 | |
 |  +-------------------------------------------------------------------------------+ |
 +-----------------------------------------------------------------------------------+
 ```
@@ -240,8 +240,8 @@ created_at      TIMESTAMP
 
 | Container | Image | Port | Resources |
 |-----------|-------|------|-----------|
-| frontend | deep-research-frontend | 8080 | 256Mi / 200m |
-| backend | deep-research-backend | 8000 | 512Mi / 500m |
+| frontend | app-frontend | 8080 | 256Mi / 200m |
+| backend | app-backend | 8000 | 512Mi / 500m |
 | langflow | langflowai/langflow:1.7.1 | 7860 | 2Gi / 1000m |
 | langfuse | langfuse/langfuse:latest | 3000 | 1Gi / 500m |
 | mlflow | ghcr.io/mlflow/mlflow:v2.16.0 | 5000 | 1Gi / 500m |
@@ -251,7 +251,7 @@ created_at      TIMESTAMP
 
 | Database | Purpose | Size Estimate |
 |----------|---------|---------------|
-| deep-research | Application data (sessions, messages, reports) | 10Gi |
+| app | Application data (sessions, messages, reports) | 10Gi |
 | langflow | Flow definitions, run history | 5Gi |
 | langfuse | Traces, evaluations | 20Gi |
 | mlflow | Experiments, metrics | 5Gi |
@@ -308,7 +308,7 @@ LANGFUSE_HOST=http://langfuse:3000
 
 # MLFlow
 MLFLOW_TRACKING_URI=http://mlflow:5000
-MLFLOW_EXPERIMENT_NAME=deep-research
+MLFLOW_EXPERIMENT_NAME=app
 
 # LLM Providers (configured in LangFlow)
 ANTHROPIC_API_KEY=<secret>

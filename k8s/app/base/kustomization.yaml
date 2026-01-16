@@ -16,12 +16,12 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/name: deep-research
+      app.kubernetes.io/name: multi-agent-platform
       app.kubernetes.io/component: application
-      app.kubernetes.io/part-of: deep-research
+      app.kubernetes.io/part-of: multi-agent-platform
 
 images:
-  - name: quay.io/cfchase/deep-research-backend
+  - name: quay.io/cfchase/multi-agent-platform-backend
     newTag: latest
-  - name: quay.io/cfchase/deep-research-frontend
+  - name: quay.io/cfchase/multi-agent-platform-frontend
     newTag: latest

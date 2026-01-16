@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-deep-research-${ENVIRONMENT}}
+NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -58,7 +58,7 @@ oc delete -k "$PROJECT_ROOT/k8s/langflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" 
 oc delete secret langflow-credentials -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
-echo "Step 4/5: Removing Deep Research App..."
+echo "Step 4/5: Removing Multi-Agent Platform App..."
 oc delete -k "$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 echo ""
 

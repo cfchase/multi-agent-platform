@@ -183,16 +183,16 @@ After creating Google OAuth credentials, configure them for cluster deployment.
 Get your route URL first:
 ```bash
 # After initial deploy, or estimate based on cluster:
-# https://deep-research-<namespace>.apps.<cluster-domain>
+# https://multi-agent-platform-<namespace>.apps.<cluster-domain>
 ```
 
 Then add to Google Console:
 ```
 Authorized JavaScript origins:
-  https://deep-research-deep-research-dev.apps.your-cluster.com
+  https://multi-agent-platform-multi-agent-platform-dev.apps.your-cluster.com
 
 Authorized redirect URIs:
-  https://deep-research-deep-research-dev.apps.your-cluster.com/oauth2/callback
+  https://multi-agent-platform-multi-agent-platform-dev.apps.your-cluster.com/oauth2/callback
 ```
 
 **Configure the OAuth Secret:**
@@ -224,7 +224,7 @@ make deploy
 **Update Google Console** (if redirect URL changed):
 - After deployment, get the actual route URL:
   ```bash
-  oc get route deep-research -n deep-research-dev -o jsonpath='{.spec.host}'
+  oc get route multi-agent-platform -n multi-agent-platform-dev -o jsonpath='{.spec.host}'
   ```
 - Update the authorized redirect URI in Google Console if needed
 

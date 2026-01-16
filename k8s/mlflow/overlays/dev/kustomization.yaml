@@ -8,7 +8,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-namespace: deep-research-dev
+namespace: multi-agent-platform-dev
 
 labels:
   - pairs:

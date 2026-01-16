@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-deep-research-${ENVIRONMENT}}
+NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -124,7 +124,7 @@ echo "Creating mlflow-credentials secret for app..."
 if ! oc get secret mlflow-credentials -n "$NAMESPACE" &> /dev/null; then
     oc create secret generic mlflow-credentials \
         --from-literal=MLFLOW_TRACKING_URI="http://${RELEASE_NAME}:5000" \
-        --from-literal=MLFLOW_EXPERIMENT_NAME="deep-research" \
+        --from-literal=MLFLOW_EXPERIMENT_NAME="multi-agent-platform" \
         -n "$NAMESPACE"
     echo "Created mlflow-credentials secret"
 else
@@ -149,4 +149,4 @@ echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=mlflow"
 echo ""
 echo "NOTE: Restart the app to pick up mlflow-credentials:"
-echo "  oc rollout restart deployment/deep-research -n $NAMESPACE"
+echo "  oc rollout restart deployment/multi-agent-platform -n $NAMESPACE"

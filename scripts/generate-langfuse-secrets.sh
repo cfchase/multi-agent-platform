@@ -5,7 +5,7 @@
 set -e
 
 SECRETS_FILE="helm/langfuse/secrets-dev.yaml"
-NAMESPACE="${HELM_NAMESPACE:-deep-research-dev}"
+NAMESPACE="${HELM_NAMESPACE:-multi-agent-platform-dev}"
 ROUTE_NAME="langfuse"
 
 if [ -f "$SECRETS_FILE" ]; then

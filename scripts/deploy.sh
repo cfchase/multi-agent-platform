@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-deep-research-${ENVIRONMENT}}
+NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -58,7 +58,7 @@ echo "Step 4/5: Deploying Langfuse..."
 "$SCRIPT_DIR/deploy-langfuse.sh" "$ENVIRONMENT" "$NAMESPACE"
 echo ""
 
-echo "Step 5/5: Deploying Deep Research App..."
+echo "Step 5/5: Deploying Multi-Agent Platform App..."
 "$SCRIPT_DIR/deploy-app.sh" "$ENVIRONMENT" "$NAMESPACE"
 echo ""
 

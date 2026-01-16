@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: deep-research
+  name: multi-agent-platform
   labels:
-    app: deep-research
+    app: multi-agent-platform
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: deep-research
+      app: multi-agent-platform
   template:
     metadata:
       labels:
-        app: deep-research
+        app: multi-agent-platform
     spec:
-      serviceAccountName: deep-research-proxy
+      serviceAccountName: multi-agent-platform-proxy
       initContainers:
       - name: db-migration
-        image: quay.io/cfchase/deep-research-backend:latest
+        image: quay.io/cfchase/multi-agent-platform-backend:latest
         imagePullPolicy: Always
         command:
         - /bin/sh
@@ -36,7 +36,7 @@ spec:
             cpu: "250m"
       containers:
       - name: frontend
-        image: quay.io/cfchase/deep-research-frontend:latest
+        image: quay.io/cfchase/multi-agent-platform-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -66,7 +66,7 @@ spec:
             drop:
             - ALL
       - name: backend
-        image: quay.io/cfchase/deep-research-backend:latest
+        image: quay.io/cfchase/multi-agent-platform-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

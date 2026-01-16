@@ -8,7 +8,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-namespace: deep-research-dev
+namespace: multi-agent-platform-dev
 
 labels:
   - pairs:
@@ -31,7 +31,7 @@ generatorOptions:
   disableNameSuffixHash: true
 
 images:
-  - name: quay.io/cfchase/deep-research-backend
+  - name: quay.io/cfchase/multi-agent-platform-backend
     newTag: latest
-  - name: quay.io/cfchase/deep-research-frontend
+  - name: quay.io/cfchase/multi-agent-platform-frontend
     newTag: latest

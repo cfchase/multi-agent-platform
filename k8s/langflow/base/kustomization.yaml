@@ -13,7 +13,7 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/name: langflow
-      app.kubernetes.io/part-of: deep-research
+      app.kubernetes.io/part-of: multi-agent-platform
 
 images:
   - name: docker.io/langflowai/langflow
