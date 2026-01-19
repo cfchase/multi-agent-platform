@@ -97,18 +97,8 @@ def check_langflow() -> bool:
     return False
 
 
-def import_flow(json_file: Path) -> bool:
-    """Import a single flow JSON file to LangFlow."""
-    flow_name = json_file.stem
-    log_info(f"Importing flow: {flow_name}")
-
-    try:
-        with open(json_file) as f:
-            flow_data = json.load(f)
-    except json.JSONDecodeError as e:
-        log_error(f"  Invalid JSON in {json_file}: {e}")
-        return False
-
+def import_flow_data(flow_data: dict, flow_name: str) -> bool:
+    """Import flow data to LangFlow."""
     headers = {"Content-Type": "application/json"}
     if ACCESS_TOKEN:
         headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
@@ -130,6 +120,41 @@ def import_flow(json_file: Path) -> bool:
     except requests.RequestException as e:
         log_error(f"  Request failed: {e}")
         return False
+
+
+def import_flow(json_file: Path) -> bool:
+    """Import a single flow JSON file to LangFlow."""
+    flow_name = json_file.stem
+    log_info(f"Importing flow: {flow_name}")
+
+    try:
+        with open(json_file) as f:
+            flow_data = json.load(f)
+    except json.JSONDecodeError as e:
+        log_error(f"  Invalid JSON in {json_file}: {e}")
+        return False
+
+    return import_flow_data(flow_data, flow_name)
+
+
+def import_from_url(url: str, name: str) -> bool:
+    """Import a flow from a URL."""
+    log_info(f"Fetching flow from: {url}")
+
+    try:
+        resp = requests.get(url, timeout=30)
+        if not resp.ok:
+            log_error(f"  Failed to fetch {url}: {resp.status_code}")
+            return False
+        flow_data = resp.json()
+    except requests.RequestException as e:
+        log_error(f"  Request failed: {e}")
+        return False
+    except json.JSONDecodeError as e:
+        log_error(f"  Invalid JSON from {url}: {e}")
+        return False
+
+    return import_flow_data(flow_data, name)
 
 
 def import_from_directory(directory: Path, source_name: str) -> int:
@@ -212,7 +237,21 @@ def import_from_config(config_file: Path) -> None:
 
         log_info(f"Processing source: {name} (type: {source_type})")
 
-        if source_type == "git":
+        if source_type == "file":
+            # Single file: local path or URL
+            path = source.get("path", "")
+            if path.startswith(("http://", "https://")):
+                import_from_url(path, name)
+            else:
+                file_path = Path(path)
+                if not file_path.is_absolute():
+                    file_path = PROJECT_ROOT / file_path
+                if file_path.is_file():
+                    import_flow(file_path)
+                else:
+                    log_error(f"File not found: {file_path}")
+
+        elif source_type == "git":
             url = source.get("url")
             branch = source.get("branch", "main")
             path = source.get("path", "flows")
