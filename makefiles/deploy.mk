@@ -8,37 +8,7 @@
 
 # Generate K8s secrets from backend/.env (if they don't exist)
 generate-k8s-secrets-dev:
-	@# OAuth Proxy Secret for App
-	@if [ ! -f k8s/app/overlays/dev/oauth-proxy-secret.env ]; then \
-		if [ -f backend/.env ]; then \
-			echo "Generating k8s/app/overlays/dev/oauth-proxy-secret.env from backend/.env..."; \
-			CLIENT_ID=$$(grep -E '^GOOGLE_CLIENT_ID=' backend/.env | cut -d'=' -f2- | tr -d '"'); \
-			CLIENT_SECRET=$$(grep -E '^GOOGLE_CLIENT_SECRET=' backend/.env | cut -d'=' -f2- | tr -d '"'); \
-			COOKIE_SECRET=$$(grep -E '^OAUTH_COOKIE_SECRET=' backend/.env | cut -d'=' -f2- | tr -d '"'); \
-			echo "client-id=$$CLIENT_ID" > k8s/app/overlays/dev/oauth-proxy-secret.env; \
-			echo "client-secret=$$CLIENT_SECRET" >> k8s/app/overlays/dev/oauth-proxy-secret.env; \
-			echo "cookie-secret=$$COOKIE_SECRET" >> k8s/app/overlays/dev/oauth-proxy-secret.env; \
-			echo "Created k8s/app/overlays/dev/oauth-proxy-secret.env"; \
-		else \
-			echo "Warning: backend/.env not found, cannot generate K8s secrets"; \
-		fi \
-	else \
-		echo "k8s/app/overlays/dev/oauth-proxy-secret.env already exists, skipping"; \
-	fi
-	@# LangFlow Secret (database URL only - admin creds come from admin-credentials secret)
-	@if [ ! -f k8s/langflow/overlays/dev/langflow-secret.env ]; then \
-		if [ -f backend/.env ]; then \
-			echo "Generating k8s/langflow/overlays/dev/langflow-secret.env from backend/.env..."; \
-			PG_USER=$$(grep -E '^POSTGRES_USER=' backend/.env | cut -d'=' -f2- | tr -d '"'); \
-			PG_PASS=$$(grep -E '^POSTGRES_PASSWORD=' backend/.env | cut -d'=' -f2- | tr -d '"'); \
-			echo "database-url=postgresql://$$PG_USER:$$PG_PASS@postgres:5432/langflow" > k8s/langflow/overlays/dev/langflow-secret.env; \
-			echo "Created k8s/langflow/overlays/dev/langflow-secret.env"; \
-		else \
-			echo "Warning: backend/.env not found, cannot generate K8s secrets"; \
-		fi \
-	else \
-		echo "k8s/langflow/overlays/dev/langflow-secret.env already exists, skipping"; \
-	fi
+	@./scripts/generate-k8s-secrets.sh
 
 generate-k8s-secrets-prod:
 	@if [ ! -f k8s/app/overlays/prod/oauth-proxy-secret.env ]; then \

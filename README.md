@@ -70,7 +70,20 @@ Access locally:
 
 ### Authentication
 
-By default, the app runs in local mode with a "dev-user" for all requests. For full OAuth authentication, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
+OAuth is always enabled. Access app at <http://localhost:4180>.
+
+- **No OAuth credentials**: Uses mock OAuth server (any username/password works)
+- **With OAuth credentials**: Uses configured provider (Google, GitHub, Keycloak)
+
+Configure OAuth in `backend/.env`:
+
+```bash
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-secret
+OAUTH_ISSUER_URL=https://...       # Optional: set for OIDC providers (Keycloak, etc.)
+```
+
+For setup details, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 ### Deploy to OpenShift
 

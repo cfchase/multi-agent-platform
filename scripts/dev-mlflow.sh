@@ -17,7 +17,8 @@ init_container_tool || exit 1
 MLFLOW_VERSION="${MLFLOW_VERSION:-latest}"
 CONTAINER_NAME="app-mlflow-dev"
 MLFLOW_PORT="${MLFLOW_PORT:-5000}"
-VOLUME_NAME="app-mlflow-artifacts"
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+DATA_DIR="${PROJECT_ROOT}/.local/mlflow"
 
 # Database connection (connects to shared PostgreSQL)
 DB_USER="${POSTGRES_USER:-app}"
@@ -56,14 +57,19 @@ case "$1" in
             $CONTAINER_TOOL start $CONTAINER_NAME
         else
             log_info "Creating new MLFlow container..."
+
+            # Create data directory
+            mkdir -p "$DATA_DIR"
+
             # MLFlow server with PostgreSQL backend and local artifact storage
             # Install psycopg2-binary at startup (official image doesn't include it)
             # Then run mlflow server with PostgreSQL backend
             $CONTAINER_TOOL run -d \
                 --name $CONTAINER_NAME \
                 -p $MLFLOW_PORT:5000 \
-                -v $VOLUME_NAME:/mlflow/artifacts \
+                -v "${DATA_DIR}:/mlflow/artifacts" \
                 --add-host=host.docker.internal:host-gateway \
+                --add-host=host.containers.internal:host-gateway \
                 ghcr.io/mlflow/mlflow:v2.19.0 \
                 bash -c "pip install --quiet psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri '$BACKEND_STORE_URI' --default-artifact-root /mlflow/artifacts"
         fi
@@ -103,7 +109,7 @@ case "$1" in
         if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing container and data..."
             $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-            $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+            rm -rf "$DATA_DIR" 2>/dev/null || true
             log_info "MLFlow completely reset"
         else
             log_warn "This will delete all MLFlow data including artifacts. Are you sure? (y/N)"
@@ -111,7 +117,7 @@ case "$1" in
             if [[ "$response" == "y" || "$response" == "Y" ]]; then
                 log_info "Removing container and data..."
                 $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-                $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+                rm -rf "$DATA_DIR" 2>/dev/null || true
                 log_info "MLFlow completely reset"
             else
                 log_info "Reset cancelled"

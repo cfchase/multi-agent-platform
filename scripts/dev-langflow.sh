@@ -17,7 +17,8 @@ init_container_tool || exit 1
 LANGFLOW_VERSION="${LANGFLOW_VERSION:-latest}"
 CONTAINER_NAME="app-langflow-dev"
 LANGFLOW_PORT="${LANGFLOW_PORT:-7860}"
-VOLUME_NAME="app-langflow-data"
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+DATA_DIR="${PROJECT_ROOT}/.local/langflow"
 
 # Database connection (connects to shared PostgreSQL)
 DB_USER="${POSTGRES_USER:-app}"
@@ -58,16 +59,25 @@ case "$1" in
             $CONTAINER_TOOL start $CONTAINER_NAME
         else
             log_info "Creating new LangFlow container..."
+
+            # Create data directory with write permissions
+            mkdir -p "$DATA_DIR"
+
+            # Generate a secret key to avoid file permission issues
+            SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
+
             $CONTAINER_TOOL run -d \
                 --name $CONTAINER_NAME \
                 -e LANGFLOW_DATABASE_URL="$DATABASE_URL" \
                 -e LANGFLOW_CONFIG_DIR=/app/langflow \
+                -e LANGFLOW_SECRET_KEY="$SECRET_KEY" \
                 -e LANGFLOW_AUTO_LOGIN=true \
                 -e LANGFLOW_LOG_LEVEL=info \
                 -e LANGFLOW_PORT=7860 \
                 -p $LANGFLOW_PORT:7860 \
-                -v $VOLUME_NAME:/app/langflow \
+                -v "${DATA_DIR}:/app/langflow" \
                 --add-host=host.docker.internal:host-gateway \
+                --add-host=host.containers.internal:host-gateway \
                 docker.io/langflowai/langflow:$LANGFLOW_VERSION
         fi
 
@@ -97,7 +107,7 @@ case "$1" in
         ;;
 
     remove)
-        log_warn "Removing LangFlow container (data will be preserved in volume)..."
+        log_warn "Removing LangFlow container (data will be preserved in .local/langflow)..."
         $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
         log_info "Container removed"
         ;;
@@ -106,7 +116,7 @@ case "$1" in
         if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing container and data..."
             $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-            $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+            rm -rf "$DATA_DIR" 2>/dev/null || true
             log_info "LangFlow completely reset"
         else
             log_warn "This will delete all LangFlow data. Are you sure? (y/N)"
@@ -114,7 +124,7 @@ case "$1" in
             if [[ "$response" == "y" || "$response" == "Y" ]]; then
                 log_info "Removing container and data..."
                 $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-                $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+                rm -rf "$DATA_DIR" 2>/dev/null || true
                 log_info "LangFlow completely reset"
             else
                 log_info "Reset cancelled"
@@ -156,7 +166,7 @@ case "$1" in
         echo "Commands:"
         echo "  start  - Start the LangFlow container"
         echo "  stop   - Stop the LangFlow container"
-        echo "  remove - Remove container (keeps data volume)"
+        echo "  remove - Remove container (keeps data in .local/langflow)"
         echo "  reset  - Remove container and all data"
         echo "  logs   - Show LangFlow logs (use -f to follow)"
         echo "  status - Check if LangFlow is running"

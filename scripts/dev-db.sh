@@ -20,7 +20,8 @@ DB_PORT="${DB_PORT:-5432}"
 DB_USER="${POSTGRES_USER:-app}"
 DB_PASS="${POSTGRES_PASSWORD:-changethis}"
 DB_NAME="${POSTGRES_DB:-app}"
-VOLUME_NAME="app-db-data"
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+DATA_DIR="${PROJECT_ROOT}/.local/postgres"
 
 # Additional databases for supporting services
 # These are created automatically on startup
@@ -71,13 +72,17 @@ case "$1" in
             $CONTAINER_TOOL start $CONTAINER_NAME
         else
             log_info "Creating new PostgreSQL container..."
+
+            # Create data directory
+            mkdir -p "$DATA_DIR"
+
             $CONTAINER_TOOL run -d \
                 --name $CONTAINER_NAME \
                 -e POSTGRES_USER=$DB_USER \
                 -e POSTGRES_PASSWORD=$DB_PASS \
                 -e POSTGRES_DB=$DB_NAME \
                 -p $DB_PORT:5432 \
-                -v $VOLUME_NAME:/var/lib/postgresql/data \
+                -v "${DATA_DIR}:/var/lib/postgresql/data" \
                 --health-cmd="pg_isready -U $DB_USER" \
                 --health-interval=10s \
                 --health-timeout=5s \
@@ -114,7 +119,7 @@ case "$1" in
         if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing container and data..."
             $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-            $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+            rm -rf "$DATA_DIR" 2>/dev/null || true
             log_info "Database completely reset"
         else
             log_warn "This will delete all database data. Are you sure? (y/N)"
@@ -122,7 +127,7 @@ case "$1" in
             if [[ "$response" == "y" || "$response" == "Y" ]]; then
                 log_info "Removing container and data..."
                 $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
-                $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+                rm -rf "$DATA_DIR" 2>/dev/null || true
                 log_info "Database completely reset"
             else
                 log_info "Reset cancelled"

@@ -1,4 +1,4 @@
-# Deep Research Makefile
+# Multi-Agent Platform Makefile
 
 # Container Registry Operations
 REGISTRY ?= quay.io/cfchase
@@ -16,13 +16,13 @@ include makefiles/deploy.mk
 include makefiles/helm.mk
 include makefiles/test.mk
 
-.PHONY: help setup setup-frontend setup-backend dev dev-no-oauth dev-frontend dev-backend dev-2 dev-frontend-2 dev-backend-2
+.PHONY: help setup setup-frontend setup-backend dev dev-frontend dev-backend dev-2 dev-frontend-2 dev-backend-2
 .PHONY: env-setup sync-version bump-version show-version health-backend health-frontend
 .PHONY: clean clean-all fresh-start quick-start
 
 # Default target
 help: ## Show this help message
-	@echo "Deep Research - Available commands:"
+	@echo "Multi-Agent Platform - Available commands:"
 	@echo ""
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
@@ -41,20 +41,14 @@ setup-backend: ## Install backend dependencies only
 	cd backend && uv sync --extra dev
 
 # Development
-dev: ## Run frontend, backend, and OAuth proxy in development mode
-	@echo "Starting development servers with OAuth..."
-	@./scripts/dev-oauth.sh start || echo "OAuth proxy failed to start - check GOOGLE_CLIENT_ID/SECRET in .env"
-	@echo ""
-	@echo "Access your app at: http://localhost:4180"
-	@echo "(Set ENVIRONMENT=local in .env to bypass OAuth)"
+dev: ## Run frontend and backend (run services-start first)
+	@if ./scripts/dev-oauth.sh status >/dev/null 2>&1; then \
+		echo "OAuth running - access app at: http://localhost:4180"; \
+	else \
+		echo "WARNING: Services not running. Run 'make services-start' first."; \
+	fi
 	@echo ""
 	npx concurrently --kill-others-on-fail "make dev-backend" "make dev-frontend"
-	@./scripts/dev-oauth.sh stop || true
-
-dev-no-oauth: ## Run frontend and backend without OAuth (uses dev-user)
-	@echo "Starting development servers without OAuth..."
-	@echo "Note: Set ENVIRONMENT=local in .env to use dev-user"
-	npx concurrently "make dev-backend" "make dev-frontend"
 
 dev-frontend: ## Run frontend development server
 	cd frontend && npm run dev
@@ -80,7 +74,7 @@ env-setup: ## Copy environment example files (backend/.env is source of truth)
 	@echo ""
 	@echo "Edit backend/.env to configure:"
 	@echo "  - Database credentials"
-	@echo "  - Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
+	@echo "  - OAuth credentials (OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET)"
 	@echo "  - Set ENVIRONMENT=local to bypass OAuth"
 
 # Version Management

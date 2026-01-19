@@ -18,6 +18,8 @@ init_container_tool || exit 1
 LANGFUSE_VERSION="${LANGFUSE_VERSION:-3}"
 LANGFUSE_WEB_PORT="${LANGFUSE_WEB_PORT:-3000}"
 LANGFUSE_WORKER_PORT="${LANGFUSE_WORKER_PORT:-3030}"
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+DATA_DIR="${PROJECT_ROOT}/.local/langfuse"
 
 # Container names
 CLICKHOUSE_CONTAINER="app-langfuse-clickhouse"
@@ -26,10 +28,10 @@ MINIO_CONTAINER="app-langfuse-minio"
 WEB_CONTAINER="app-langfuse-web"
 WORKER_CONTAINER="app-langfuse-worker"
 
-# Volumes
-CLICKHOUSE_VOLUME="app-langfuse-clickhouse-data"
-MINIO_VOLUME="app-langfuse-minio-data"
-REDIS_VOLUME="app-langfuse-redis-data"
+# Data directories
+CLICKHOUSE_DATA="${DATA_DIR}/clickhouse"
+MINIO_DATA="${DATA_DIR}/minio"
+REDIS_DATA="${DATA_DIR}/redis"
 
 # Credentials (development only - change for production)
 CLICKHOUSE_USER="${CLICKHOUSE_USER:-default}"
@@ -80,12 +82,13 @@ start_clickhouse() {
         $CONTAINER_TOOL start $CLICKHOUSE_CONTAINER
     else
         log_info "Creating ClickHouse container..."
+        mkdir -p "$CLICKHOUSE_DATA"
         $CONTAINER_TOOL run -d \
             --name $CLICKHOUSE_CONTAINER \
             --network $NETWORK_NAME \
             -e CLICKHOUSE_USER=$CLICKHOUSE_USER \
             -e CLICKHOUSE_PASSWORD=$CLICKHOUSE_PASSWORD \
-            -v $CLICKHOUSE_VOLUME:/var/lib/clickhouse \
+            -v "${CLICKHOUSE_DATA}:/var/lib/clickhouse" \
             -p 127.0.0.1:8123:8123 \
             -p 127.0.0.1:9000:9000 \
             docker.io/clickhouse/clickhouse-server
@@ -103,10 +106,11 @@ start_redis() {
         $CONTAINER_TOOL start $REDIS_CONTAINER
     else
         log_info "Creating Redis container..."
+        mkdir -p "$REDIS_DATA"
         $CONTAINER_TOOL run -d \
             --name $REDIS_CONTAINER \
             --network $NETWORK_NAME \
-            -v $REDIS_VOLUME:/data \
+            -v "${REDIS_DATA}:/data" \
             -p 127.0.0.1:6379:6379 \
             docker.io/redis:7 \
             redis-server --requirepass $REDIS_PASSWORD
@@ -124,12 +128,13 @@ start_minio() {
         $CONTAINER_TOOL start $MINIO_CONTAINER
     else
         log_info "Creating MinIO container..."
+        mkdir -p "$MINIO_DATA"
         $CONTAINER_TOOL run -d \
             --name $MINIO_CONTAINER \
             --network $NETWORK_NAME \
             -e MINIO_ROOT_USER=$MINIO_ROOT_USER \
             -e MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD \
-            -v $MINIO_VOLUME:/data \
+            -v "${MINIO_DATA}:/data" \
             -p 9090:9000 \
             -p 127.0.0.1:9091:9001 \
             docker.io/minio/minio:latest \
@@ -158,6 +163,7 @@ start_langfuse_web() {
             --name $WEB_CONTAINER \
             --network $NETWORK_NAME \
             --add-host=host.docker.internal:host-gateway \
+            --add-host=host.containers.internal:host-gateway \
             -e DATABASE_URL="$DATABASE_URL" \
             -e NEXTAUTH_URL="http://localhost:${LANGFUSE_WEB_PORT}" \
             -e NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
@@ -208,6 +214,7 @@ start_langfuse_worker() {
             --name $WORKER_CONTAINER \
             --network $NETWORK_NAME \
             --add-host=host.docker.internal:host-gateway \
+            --add-host=host.containers.internal:host-gateway \
             -e DATABASE_URL="$DATABASE_URL" \
             -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             -e CLICKHOUSE_URL="http://${CLICKHOUSE_CONTAINER}:8123" \
@@ -302,7 +309,7 @@ case "$1" in
         ;;
 
     remove)
-        log_warn "Removing Langfuse containers (data will be preserved in volumes)..."
+        log_warn "Removing Langfuse containers (data will be preserved in .local/langfuse)..."
         remove_container $WORKER_CONTAINER
         remove_container $WEB_CONTAINER
         remove_container $MINIO_CONTAINER
@@ -319,9 +326,7 @@ case "$1" in
             remove_container $MINIO_CONTAINER
             remove_container $REDIS_CONTAINER
             remove_container $CLICKHOUSE_CONTAINER
-            $CONTAINER_TOOL volume rm $CLICKHOUSE_VOLUME 2>/dev/null || true
-            $CONTAINER_TOOL volume rm $MINIO_VOLUME 2>/dev/null || true
-            $CONTAINER_TOOL volume rm $REDIS_VOLUME 2>/dev/null || true
+            rm -rf "$DATA_DIR" 2>/dev/null || true
             $CONTAINER_TOOL network rm $NETWORK_NAME 2>/dev/null || true
             log_info "Langfuse completely reset"
         else
@@ -334,9 +339,7 @@ case "$1" in
                 remove_container $MINIO_CONTAINER
                 remove_container $REDIS_CONTAINER
                 remove_container $CLICKHOUSE_CONTAINER
-                $CONTAINER_TOOL volume rm $CLICKHOUSE_VOLUME 2>/dev/null || true
-                $CONTAINER_TOOL volume rm $MINIO_VOLUME 2>/dev/null || true
-                $CONTAINER_TOOL volume rm $REDIS_VOLUME 2>/dev/null || true
+                rm -rf "$DATA_DIR" 2>/dev/null || true
                 $CONTAINER_TOOL network rm $NETWORK_NAME 2>/dev/null || true
                 log_info "Langfuse completely reset"
             else

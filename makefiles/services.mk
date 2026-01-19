@@ -24,8 +24,8 @@ langflow-import: ## Import flows from configured sources into LangFlow
 	@chmod +x scripts/import-flows.sh
 	@./scripts/import-flows.sh
 
-langflow-reset: ## Reset LangFlow (removes all data, use FORCE=y to skip prompt)
-	@./scripts/dev-langflow.sh reset $(if $(FORCE),-y,)
+langflow-reset: ## Reset LangFlow (removes all data, use FORCE=1 to skip prompt)
+	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 
 # Langfuse
 langfuse-start: ## Start Langfuse development stack
@@ -41,8 +41,8 @@ langfuse-status: ## Check Langfuse status
 langfuse-logs: ## Show Langfuse logs (use CONTAINER=web|worker|clickhouse|redis|minio)
 	@./scripts/dev-langfuse.sh logs $(CONTAINER)
 
-langfuse-reset: ## Reset Langfuse (removes all data, use FORCE=y to skip prompt)
-	@./scripts/dev-langfuse.sh reset $(if $(FORCE),-y,)
+langfuse-reset: ## Reset Langfuse (removes all data, use FORCE=1 to skip prompt)
+	@./scripts/dev-langfuse.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 
 # MLFlow
 mlflow-start: ## Start MLFlow development server
@@ -58,8 +58,8 @@ mlflow-status: ## Check MLFlow status
 mlflow-logs: ## Show MLFlow logs
 	@./scripts/dev-mlflow.sh logs
 
-mlflow-reset: ## Reset MLFlow (removes all data, use FORCE=y to skip prompt)
-	@./scripts/dev-mlflow.sh reset $(if $(FORCE),-y,)
+mlflow-reset: ## Reset MLFlow (removes all data, use FORCE=1 to skip prompt)
+	@./scripts/dev-mlflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 
 # OAuth (local development)
 oauth-start: ## Start local OAuth2 Proxy (requires Google credentials in .env)
@@ -76,15 +76,17 @@ oauth-logs: ## Show OAuth2 Proxy logs
 	@./scripts/dev-oauth.sh logs
 
 # All Services
-services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow)
+services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow, oauth)
 	@echo "Starting all services..."
 	@./scripts/dev-langflow.sh start
 	@./scripts/dev-langfuse.sh start
 	@./scripts/dev-mlflow.sh start
+	@./scripts/dev-oauth.sh start
 	@echo "All services started!"
 
 services-stop: ## Stop all services
 	@echo "Stopping all services..."
+	@./scripts/dev-oauth.sh stop || true
 	@./scripts/dev-mlflow.sh stop || true
 	@./scripts/dev-langfuse.sh stop || true
 	@./scripts/dev-langflow.sh stop || true
@@ -102,10 +104,10 @@ services-status: ## Check status of all services
 	@echo ""
 	@echo "=== OAuth Proxy ===" && ./scripts/dev-oauth.sh status || true
 
-services-reset: ## Reset all services (removes all data, use FORCE=y to skip prompts)
+services-reset: ## Reset all services (removes all data, use FORCE=1 to skip prompts)
 	@echo "Resetting all services..."
-	@./scripts/dev-mlflow.sh reset $(if $(FORCE),-y,)
-	@./scripts/dev-langfuse.sh reset $(if $(FORCE),-y,)
-	@./scripts/dev-langflow.sh reset $(if $(FORCE),-y,)
-	@./scripts/dev-db.sh reset $(if $(FORCE),-y,)
+	@./scripts/dev-mlflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
+	@./scripts/dev-langfuse.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
+	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
+	@./scripts/dev-db.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 	@echo "All services reset!"
