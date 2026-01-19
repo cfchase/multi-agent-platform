@@ -61,8 +61,8 @@ mlflow-logs: ## Show MLFlow logs
 mlflow-reset: ## Reset MLFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-mlflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 
-# OAuth (local development)
-oauth-start: ## Start local OAuth2 Proxy (requires Google credentials in .env)
+# OAuth (optional - requires OAUTH_CLIENT_ID/SECRET in .env)
+oauth-start: ## Start OAuth2 Proxy (requires OAuth credentials in backend/.env)
 	@chmod +x scripts/dev-oauth.sh
 	@./scripts/dev-oauth.sh start
 
@@ -76,7 +76,7 @@ oauth-logs: ## Show OAuth2 Proxy logs
 	@./scripts/dev-oauth.sh logs
 
 # All Services
-services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow, oauth)
+services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow, oauth if configured)
 	@echo "Starting all services..."
 	@./scripts/dev-langflow.sh start
 	@./scripts/dev-langfuse.sh start
@@ -88,13 +88,12 @@ services-start: db-start db-init ## Start all services (db, langflow, langfuse, 
 	@echo "=============================================="
 	@echo ""
 	@echo "Service URLs:"
-	@echo "  App (via OAuth):  http://localhost:4180"
-	@echo "  LangFlow:         http://localhost:7860"
-	@echo "  Langfuse:         http://localhost:3000"
-	@echo "  MLFlow:           http://localhost:5000"
+	@echo "  App:      http://localhost:8080 (after 'make dev')"
+	@echo "  LangFlow: http://localhost:7860"
+	@echo "  Langfuse: http://localhost:3000"
+	@echo "  MLFlow:   http://localhost:5000"
 	@echo ""
 	@echo "Credentials:"
-	@echo "  OAuth:    Any username/password (mock server)"
 	@echo "  Langfuse: dev@localhost.local / devpassword123"
 	@echo ""
 	@echo "Run 'make dev' to start the frontend and backend."
