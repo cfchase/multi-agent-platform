@@ -82,7 +82,22 @@ services-start: db-start db-init ## Start all services (db, langflow, langfuse, 
 	@./scripts/dev-langfuse.sh start
 	@./scripts/dev-mlflow.sh start
 	@./scripts/dev-oauth.sh start
+	@echo ""
+	@echo "=============================================="
 	@echo "All services started!"
+	@echo "=============================================="
+	@echo ""
+	@echo "Service URLs:"
+	@echo "  App (via OAuth):  http://localhost:4180"
+	@echo "  LangFlow:         http://localhost:7860"
+	@echo "  Langfuse:         http://localhost:3000"
+	@echo "  MLFlow:           http://localhost:5000"
+	@echo ""
+	@echo "Credentials:"
+	@echo "  OAuth:    Any username/password (mock server)"
+	@echo "  Langfuse: dev@localhost.local / devpassword123"
+	@echo ""
+	@echo "Run 'make dev' to start the frontend and backend."
 
 services-stop: ## Stop all services
 	@echo "Stopping all services..."
