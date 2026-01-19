@@ -21,8 +21,7 @@ langflow-logs: ## Show LangFlow logs
 	@./scripts/dev-langflow.sh logs
 
 langflow-import: ## Import flows from configured sources into LangFlow
-	@chmod +x scripts/import-flows.sh
-	@./scripts/import-flows.sh
+	@uv run --with requests --with pyyaml python scripts/import_flows.py
 
 langflow-reset: ## Reset LangFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)

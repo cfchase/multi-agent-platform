@@ -1,0 +1,34 @@
+# Flow Sources Configuration
+# Copy to flow-sources.yaml and customize for your environment
+#
+# The import-flows.sh script reads this file to discover and import
+# flows from various sources into LangFlow.
+
+flow_sources:
+  # Example flows from GitHub (recommended starting point)
+  - name: examples
+    type: git
+    url: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: flows
+    description: "Official example flows"
+    enabled: true
+
+  # Example: Your organization's flows (private repo)
+  # - name: enterprise
+  #   type: git
+  #   url: https://github.com/your-org/your-langflow-flows
+  #   branch: main
+  #   path: flows
+  #   description: "Enterprise flows"
+  #   auth:
+  #     type: token
+  #     env_var: GITHUB_FLOW_TOKEN
+  #   enabled: true
+
+  # Example: Local development flows
+  # - name: local-dev
+  #   type: local
+  #   path: ./langflow-flows/dev
+  #   description: "Local development flows"
+  #   enabled: true
