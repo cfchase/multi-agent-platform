@@ -5,30 +5,30 @@
 # flows from various sources into LangFlow.
 
 flow_sources:
-  # Built-in examples (always available)
+  # Example flows from GitHub (recommended starting point)
   - name: examples
-    type: local
-    path: ./langflow-flows/examples
-    description: "Built-in example flows"
+    type: git
+    url: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: flows
+    description: "Official example flows"
     enabled: true
 
-  # Example: Public git repository
-  # - name: community
-  #   type: git
-  #   url: https://github.com/org/langflow-flows-public.git
-  #   branch: main
-  #   path: flows/           # subdirectory within repo containing .json files
-  #   description: "Community example flows"
-  #   enabled: true
-
-  # Example: Private git repository (requires GITHUB_FLOW_TOKEN env var)
+  # Example: Your organization's flows (private repo)
   # - name: enterprise
   #   type: git
-  #   url: https://github.com/org/langflow-flows-private.git
+  #   url: https://github.com/your-org/your-langflow-flows
   #   branch: main
-  #   path: flows/
+  #   path: flows
   #   description: "Enterprise flows"
   #   auth:
   #     type: token
   #     env_var: GITHUB_FLOW_TOKEN
+  #   enabled: true
+
+  # Example: Local development flows
+  # - name: local-dev
+  #   type: local
+  #   path: ./langflow-flows/dev
+  #   description: "Local development flows"
   #   enabled: true
