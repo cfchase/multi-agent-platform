@@ -63,9 +63,11 @@ case "$1" in
         log_info "Starting PostgreSQL development database..."
         log_info "Using container tool: $CONTAINER_TOOL"
 
-        # Check if container already exists (exact match)
-        if container_exists "$CONTAINER_NAME"; then
-            log_warn "Container $CONTAINER_NAME already exists. Starting it..."
+        # Check if container is already running
+        if container_running "$CONTAINER_NAME"; then
+            log_info "Container $CONTAINER_NAME is already running"
+        elif container_exists "$CONTAINER_NAME"; then
+            log_info "Starting existing container $CONTAINER_NAME..."
             $CONTAINER_TOOL start $CONTAINER_NAME
         else
             log_info "Creating new PostgreSQL container..."
@@ -109,15 +111,22 @@ case "$1" in
         ;;
 
     reset)
-        log_warn "This will delete all database data. Are you sure? (y/N)"
-        read -r response
-        if [[ "$response" == "y" || "$response" == "Y" ]]; then
+        if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing container and data..."
             $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
             $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
             log_info "Database completely reset"
         else
-            log_info "Reset cancelled"
+            log_warn "This will delete all database data. Are you sure? (y/N)"
+            read -r response
+            if [[ "$response" == "y" || "$response" == "Y" ]]; then
+                log_info "Removing container and data..."
+                $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
+                $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+                log_info "Database completely reset"
+            else
+                log_info "Reset cancelled"
+            fi
         fi
         ;;
 
@@ -170,7 +179,7 @@ case "$1" in
         echo "  start      - Start the PostgreSQL container and create all databases"
         echo "  stop       - Stop the PostgreSQL container"
         echo "  remove     - Remove container (keeps data)"
-        echo "  reset      - Remove container and all data"
+        echo "  reset [-y] - Remove container and all data (-y skips confirmation)"
         echo "  logs       - Show PostgreSQL logs"
         echo "  shell      - Open PostgreSQL shell"
         echo "  status     - Check if PostgreSQL is running and list databases"

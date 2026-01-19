@@ -50,9 +50,11 @@ case "$1" in
             exit 1
         fi
 
-        # Check if container already exists
-        if container_exists "$CONTAINER_NAME"; then
-            log_warn "Container $CONTAINER_NAME already exists. Starting it..."
+        # Check if container is already running
+        if container_running "$CONTAINER_NAME"; then
+            log_info "Container $CONTAINER_NAME is already running"
+        elif container_exists "$CONTAINER_NAME"; then
+            log_info "Starting existing container $CONTAINER_NAME..."
             $CONTAINER_TOOL start $CONTAINER_NAME
         else
             log_info "Creating new LangFlow container..."
@@ -101,15 +103,22 @@ case "$1" in
         ;;
 
     reset)
-        log_warn "This will delete all LangFlow data. Are you sure? (y/N)"
-        read -r response
-        if [[ "$response" == "y" || "$response" == "Y" ]]; then
+        if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing container and data..."
             $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
             $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
             log_info "LangFlow completely reset"
         else
-            log_info "Reset cancelled"
+            log_warn "This will delete all LangFlow data. Are you sure? (y/N)"
+            read -r response
+            if [[ "$response" == "y" || "$response" == "Y" ]]; then
+                log_info "Removing container and data..."
+                $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
+                $CONTAINER_TOOL volume rm $VOLUME_NAME 2>/dev/null || true
+                log_info "LangFlow completely reset"
+            else
+                log_info "Reset cancelled"
+            fi
         fi
         ;;
 

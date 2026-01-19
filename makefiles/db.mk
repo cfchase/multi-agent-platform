@@ -9,8 +9,8 @@ db-start: ## Start PostgreSQL development database
 db-stop: ## Stop PostgreSQL development database
 	@./scripts/dev-db.sh stop
 
-db-reset: ## Reset PostgreSQL database (removes all data)
-	@./scripts/dev-db.sh reset
+db-reset: ## Reset PostgreSQL database (removes all data, use FORCE=y to skip prompt)
+	@./scripts/dev-db.sh reset $(if $(FORCE),-y,)
 
 db-shell: ## Open PostgreSQL shell
 	@./scripts/dev-db.sh shell

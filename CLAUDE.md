@@ -9,13 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-Deep Research is a full-stack application with React frontend (Vite + PatternFly UI) and FastAPI backend, designed for deployment to OpenShift using Docker containers and Kustomize.
+Multi-Agent Platform is a full-stack application with React frontend (Vite + PatternFly UI) and FastAPI backend, designed for deployment to OpenShift using Docker containers and Kustomize.
 
 ## Quick Decision Guide
 
 **New to the project?**
 ```bash
-make setup && make db-start && make db-init && make db-seed && make dev
+make setup && make services-start && make db-seed && make dev
 ```
 
 **Making code changes?**
@@ -307,12 +307,12 @@ This application uses **OAuth2 Proxy** for authentication. See [docs/AUTHENTICAT
 
 ### Initial Setup
 1. Install dependencies: `make setup`
-2. Start database: `make db-start`
-3. Initialize database: `make db-init && make db-seed`
+2. Start all services: `make services-start`
+3. Seed test data: `make db-seed`
 4. Start development servers: `make dev`
 
 ### Daily Development
-1. Start database: `make db-start` (if not already running)
+1. Start services: `make services-start` (starts db + langflow + langfuse + mlflow)
 2. Make changes to frontend or backend
 3. Test locally with `make dev`
 4. Run tests: `make test`

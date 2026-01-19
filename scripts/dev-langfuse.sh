@@ -63,7 +63,7 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME
 NETWORK_NAME="app-langfuse-network"
 
 ensure_network() {
-    if ! $CONTAINER_TOOL network exists $NETWORK_NAME 2>/dev/null; then
+    if ! $CONTAINER_TOOL network inspect $NETWORK_NAME >/dev/null 2>&1; then
         log_info "Creating network $NETWORK_NAME..."
         $CONTAINER_TOOL network create $NETWORK_NAME
     fi
@@ -312,9 +312,7 @@ case "$1" in
         ;;
 
     reset)
-        log_warn "This will delete all Langfuse data. Are you sure? (y/N)"
-        read -r response
-        if [[ "$response" == "y" || "$response" == "Y" ]]; then
+        if [[ "$2" == "-y" || "$2" == "--yes" ]]; then
             log_info "Removing containers and data..."
             remove_container $WORKER_CONTAINER
             remove_container $WEB_CONTAINER
@@ -327,7 +325,23 @@ case "$1" in
             $CONTAINER_TOOL network rm $NETWORK_NAME 2>/dev/null || true
             log_info "Langfuse completely reset"
         else
-            log_info "Reset cancelled"
+            log_warn "This will delete all Langfuse data. Are you sure? (y/N)"
+            read -r response
+            if [[ "$response" == "y" || "$response" == "Y" ]]; then
+                log_info "Removing containers and data..."
+                remove_container $WORKER_CONTAINER
+                remove_container $WEB_CONTAINER
+                remove_container $MINIO_CONTAINER
+                remove_container $REDIS_CONTAINER
+                remove_container $CLICKHOUSE_CONTAINER
+                $CONTAINER_TOOL volume rm $CLICKHOUSE_VOLUME 2>/dev/null || true
+                $CONTAINER_TOOL volume rm $MINIO_VOLUME 2>/dev/null || true
+                $CONTAINER_TOOL volume rm $REDIS_VOLUME 2>/dev/null || true
+                $CONTAINER_TOOL network rm $NETWORK_NAME 2>/dev/null || true
+                log_info "Langfuse completely reset"
+            else
+                log_info "Reset cancelled"
+            fi
         fi
         ;;
 

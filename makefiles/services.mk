@@ -1,10 +1,10 @@
 # Service Management Targets (LangFlow, Langfuse, MLFlow, OAuth)
 
-.PHONY: langflow-start langflow-stop langflow-status langflow-logs
-.PHONY: langfuse-start langfuse-stop langfuse-status langfuse-logs
-.PHONY: mlflow-start mlflow-stop mlflow-status mlflow-logs
+.PHONY: langflow-start langflow-stop langflow-status langflow-logs langflow-import langflow-reset
+.PHONY: langfuse-start langfuse-stop langfuse-status langfuse-logs langfuse-reset
+.PHONY: mlflow-start mlflow-stop mlflow-status mlflow-logs mlflow-reset
 .PHONY: oauth-start oauth-stop oauth-status oauth-logs
-.PHONY: services-start services-stop services-status
+.PHONY: services-start services-stop services-status services-reset
 
 # LangFlow
 langflow-start: ## Start LangFlow development server
@@ -20,6 +20,13 @@ langflow-status: ## Check LangFlow status
 langflow-logs: ## Show LangFlow logs
 	@./scripts/dev-langflow.sh logs
 
+langflow-import: ## Import flows from configured sources into LangFlow
+	@chmod +x scripts/import-flows.sh
+	@./scripts/import-flows.sh
+
+langflow-reset: ## Reset LangFlow (removes all data, use FORCE=y to skip prompt)
+	@./scripts/dev-langflow.sh reset $(if $(FORCE),-y,)
+
 # Langfuse
 langfuse-start: ## Start Langfuse development stack
 	@chmod +x scripts/dev-langfuse.sh
@@ -34,6 +41,9 @@ langfuse-status: ## Check Langfuse status
 langfuse-logs: ## Show Langfuse logs (use CONTAINER=web|worker|clickhouse|redis|minio)
 	@./scripts/dev-langfuse.sh logs $(CONTAINER)
 
+langfuse-reset: ## Reset Langfuse (removes all data, use FORCE=y to skip prompt)
+	@./scripts/dev-langfuse.sh reset $(if $(FORCE),-y,)
+
 # MLFlow
 mlflow-start: ## Start MLFlow development server
 	@chmod +x scripts/dev-mlflow.sh
@@ -47,6 +57,9 @@ mlflow-status: ## Check MLFlow status
 
 mlflow-logs: ## Show MLFlow logs
 	@./scripts/dev-mlflow.sh logs
+
+mlflow-reset: ## Reset MLFlow (removes all data, use FORCE=y to skip prompt)
+	@./scripts/dev-mlflow.sh reset $(if $(FORCE),-y,)
 
 # OAuth (local development)
 oauth-start: ## Start local OAuth2 Proxy (requires Google credentials in .env)
@@ -63,7 +76,7 @@ oauth-logs: ## Show OAuth2 Proxy logs
 	@./scripts/dev-oauth.sh logs
 
 # All Services
-services-start: db-start ## Start all services (db, langflow, langfuse, mlflow)
+services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow)
 	@echo "Starting all services..."
 	@./scripts/dev-langflow.sh start
 	@./scripts/dev-langfuse.sh start
@@ -88,3 +101,11 @@ services-status: ## Check status of all services
 	@echo "=== MLFlow ===" && ./scripts/dev-mlflow.sh status || true
 	@echo ""
 	@echo "=== OAuth Proxy ===" && ./scripts/dev-oauth.sh status || true
+
+services-reset: ## Reset all services (removes all data, use FORCE=y to skip prompts)
+	@echo "Resetting all services..."
+	@./scripts/dev-mlflow.sh reset $(if $(FORCE),-y,)
+	@./scripts/dev-langfuse.sh reset $(if $(FORCE),-y,)
+	@./scripts/dev-langflow.sh reset $(if $(FORCE),-y,)
+	@./scripts/dev-db.sh reset $(if $(FORCE),-y,)
+	@echo "All services reset!"

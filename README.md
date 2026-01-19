@@ -1,65 +1,33 @@
 # Multi-Agent Platform
 
-A platform for hosting and orchestrating multiple LangFlow workflows, built on Red Hat technologies. This project experiments with agentic AI patterns that iteratively plan, gather, critique, and synthesize information—mimicking how a human researcher works.
-
-## Vision
-
-Unlike a standard RAG chatbot that retrieves once and answers, Multi-Agent Platform uses a **System of Agents** orchestrated to perform long-horizon tasks:
-
-1. **Planner** decomposes complex queries into sub-questions
-2. **Researcher** gathers evidence using search and vector stores
-3. **Reviewer** critiques findings for gaps and hallucinations
-4. **Writer** synthesizes approved research into cohesive reports
-
-This Supervisor-Worker pattern with reflection loops enables comprehensive, validated research outputs.
+A platform for hosting and orchestrating multiple LangFlow workflows, built on Red Hat technologies.
 
 ## Architecture
 
-```
-    ┌───────────┐                                                        
-    │           │                                                        
-    │   Users   │                                                        
-    │           │                                                        
-    └─────┬─────┘                                                        
-          │                                                              
-          │                                                              
-          │                                                              
-┌─────────┼──────────────────────────┐                    ┌────────────┐ 
-│         │                          │                    │            │ 
-│         │                          │                    │            │ 
-│         │                          │                    │            │ 
-│   ┌─────▼────┐   ┌──────────┐      │                    │            │ 
-│   │          │   │          │      │                    │ PostgreSQL │ 
-│   │ Frontend ┼───► Backend  ┼──────┼────────────────────►            │ 
-│   │          │   │          │      │                    │            │ 
-│   └──────────┘   └────┬─────┘      │                    │            │ 
-│                       │            │                    │            │ 
-│                       │            │                    │     ▲      │ 
-└───────────────────────┼────────────┘                    └─────┼──────┘ 
-                        │                                       │        
-                        │                                       │        
-                        │                                       │        
-      ┌─────────────────┼─────────────────┐                     │        
-      │                 │                 │                     │        
-┌─────▼─────┐     ┌─────▼─────┐     ┌─────▼─────┐               │        
-│           │     │           │     │           │               │        
-│           │     │           │     │           │               │        
-│ LangFlow  │     │  LangFuse │     │  MLflow   │               │        
-│           │     │           │     │           │               │        
-│           │     │           │     │           │               │        
-└─────┬─────┘     └─────┬─────┘     └─────┬─────┘               │        
-      │                 │                 │                     │        
-      └─────────────────┴─────────────────┴─────────────────────┘                             
-
+```text
+         ┌───────┐                             
+         │ Users │                             
+         └───┬───┘                             
+             │                                 
+  ┌──────────┼──────────┐        ┌────────────┐
+  │    ┌─────▼─────┐    │        │            │
+  │    │ Frontend  │    │        │ PostgreSQL │
+  │    └─────┬─────┘    │        │            │
+  │    ┌─────▼─────┐    │        │     ▲      │
+  │    │  Backend  ├────┼────────►     │      │
+  │    └─────┬─────┘    │        └─────┼──────┘
+  └──────────┼──────────┘              │       
+       ┌─────┼─────┐                   │       
+       ▼     ▼     ▼                   │       
+┌────────┬────────┬────────┐           │       
+│LangFlow│Langfuse│ MLflow │───────────┘       
+└────────┴────────┴────────┘                   
 ```
 
-**User Flow**: Users interact with the Multi-Agent Platform, which executes LangFlow workflows via API to perform multi-agent research tasks.
-
-**Observability**: Workflow executions send traces to Langfuse (LLM tracing) and MLFlow (experiment tracking) for monitoring and evaluation.
-
-**Shared Database**: All components use PostgreSQL with separate databases for isolation.
-
-**Developer/Admin Tools**: LangFlow, Langfuse, and MLFlow are accessible only to developers and administrators.
+- **Frontend/Backend**: User-facing app for running workflows
+- **LangFlow**: Visual workflow builder (developers only)
+- **Langfuse/MLflow**: Observability and experiment tracking
+- **PostgreSQL**: Shared database for all services
 
 ## Components
 
@@ -77,63 +45,32 @@ This Supervisor-Worker pattern with reflection loops enables comprehensive, vali
 
 - Docker or Podman
 - Node.js 22+ and Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - OpenShift CLI (`oc`) and Helm 3 (for cluster deployment)
+
+### Local Development
 
 ```bash
 git clone https://github.com/cfchase/multi-agent-platform
 cd multi-agent-platform
 make setup
-
-# Configure environment
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
-```
-
-### Authentication Setup
-
-> **Note:** Full functionality (user sessions, document access, personalized research) requires OAuth authentication. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete setup instructions.
-
-**Option A: No Auth (Quick Start)**
-```bash
-# Edit backend/.env
-ENVIRONMENT=local
-```
-- Uses a default "dev-user" for all requests
-- Good for initial exploration and UI development
-- Some features requiring user identity won't work
-
-**Option B: Google OAuth (Recommended)**
-```bash
-# Edit backend/.env with your Google OAuth credentials
-ENVIRONMENT=development
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
-OAUTH_COOKIE_SECRET=<generate-random-key>
-```
-- Requires [Google Cloud OAuth setup](docs/AUTHENTICATION.md#google-oauth-setup)
-- Enables full user authentication and sessions
-- Required for production-like development
-
-### Local Development
-
-```bash
-# Start database and run app
-make db-start && make db-init
+make services-start
+make db-seed  # optional: load sample data
 make dev
 ```
 
 Access locally:
-- **App**: http://localhost:8080 (or http://localhost:4180 with OAuth)
-- **LangFlow**: http://localhost:7860
-- **MLFlow**: http://localhost:5000
-- **Langfuse**: http://localhost:3000
 
-**Optional: Run AI services locally**
-```bash
-./scripts/dev-langflow.sh start
-./scripts/dev-langfuse.sh start
-./scripts/dev-mlflow.sh start
-```
+- **App**: <http://localhost:8080>
+- **LangFlow**: <http://localhost:7860>
+- **MLFlow**: <http://localhost:5000>
+- **Langfuse**: <http://localhost:3000>
+
+### Authentication
+
+By default, the app runs in local mode with a "dev-user" for all requests. For full OAuth authentication, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 ### Deploy to OpenShift
 
@@ -181,13 +118,13 @@ make helm-langfuse-status     # Langfuse status
 
 ## Project Structure
 
-```
+```text
 ├── backend/              # FastAPI backend
 ├── frontend/             # React + PatternFly frontend
-├── langflow-flows/       # LangFlow flow definitions and docs
-│   ├── docs/            # Flow architecture documentation
-│   ├── flows/           # Exported flow JSON files
-│   └── prompts/         # Prompt templates
+├── langflow-flows/       # LangFlow flow definitions
+│   └── examples/        # Example flows included with platform
+├── config/              # Configuration templates
+│   └── flow-sources.yaml.example  # Flow source configuration
 ├── k8s/
 │   ├── app/             # App deployment (Kustomize)
 │   ├── postgres/        # Database deployment (Kustomize)
@@ -203,15 +140,12 @@ make helm-langfuse-status     # Langfuse status
 
 ## LangFlow Flows
 
-The platform supports multiple flows for different use cases:
+Flows can be imported from multiple sources (local directories, git repos). See [langflow-flows/README.md](langflow-flows/README.md) for configuration details.
 
-| Flow | Description | Status |
-|------|-------------|--------|
-| [Basic Chat](langflow-flows/docs/basic-flow.md) | Simple Q&A with Gemini model | Phase 2A |
-| [Analyze](langflow-flows/docs/analyze-flow.md) | Enterprise data analysis (agents-python port) | Phase 3 |
-| [Deep Research](langflow-flows/docs/deep-research-flow.md) | Multi-agent research with validation | Future |
-
-See [langflow-flows/README.md](langflow-flows/README.md) for full flow documentation.
+```bash
+# Import flows from configured sources
+make langflow-import
+```
 
 ## Documentation
 
