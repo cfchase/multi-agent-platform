@@ -25,16 +25,16 @@ Users submit research queries through a chat interface, and the system executes 
 |        v                    v                    v                    v            |
 |  +----------------+   +----------------+   +----------------+   +----------------+ |
 |  |   FRONTEND     |   |   BACKEND      |   |   LANGFLOW     |   | OBSERVABILITY  | |
-|  |   React/PF     |   |   FastAPI      |   |   Orchestrator |   |                | |
-|  |   :8080        |   |   :8000        |   |   :7860        |   | Langfuse:3000  | |
-|  +----------------+   +----------------+   +----------------+   | MLFlow:5000    | |
-|        |                    |                    |              +----------------+ |
+|  |   React/PF     |   |   FastAPI      |   |   Orchestrator |   | Langfuse:3000  | |
+|  |   :8080        |   |   :8000        |   |   :7860        |   | MLFlow:5000    | |
+|  +----------------+   +----------------+   +----------------+   +----------------+ |
+|        |                    |                    |                    |            |
 |        +--------------------+--------------------+--------------------+            |
 |                             |                                                      |
 |                             v                                                      |
 |  +-------------------------------------------------------------------------------+ |
-|  |                         POSTGRESQL DATABASES                                   | |
-|  |   app | langflow | langfuse | mlflow                                 | |
+|  |                 POSTGRESQL DATABASES                                          | |
+|  |              app | langflow | langfuse | mlflow                               | |
 |  +-------------------------------------------------------------------------------+ |
 +-----------------------------------------------------------------------------------+
 ```
@@ -269,7 +269,34 @@ created_at      TIMESTAMP
 
 ### Authentication
 
-- **OAuth2 Proxy**: All external traffic authenticated via OAuth2 Proxy sidecar
+The platform uses OAuth2 Proxy as the authentication gateway for all external traffic.
+
+**Architecture:**
+
+```text
+Users → OAuth2 Proxy (4180) → Frontend (8080) → Backend (8000)
+              │
+              └── Authenticates with:
+                  - Mock OAuth server (local development)
+                  - Google OAuth (default production provider)
+                  - OIDC providers (Keycloak, Okta, etc.)
+```
+
+**Local Development:**
+
+- **Mock OAuth Server**: Uses [mock-oauth2-server](https://github.com/navikt/mock-oauth2-server) for local development
+- Starts automatically when no real OAuth credentials are configured
+- Login with any username/password (credentials are not validated)
+- Full OAuth flow with proper user headers
+
+**Production:**
+
+- **OAuth2 Proxy**: Runs as a sidecar container, authenticating all requests
+- **Provider Support**: Google (default), GitHub, Keycloak, or any OIDC provider
+- **User Headers**: Sets `X-Forwarded-User`, `X-Forwarded-Email` for downstream services
+
+**Internal Communication:**
+
 - **Service Accounts**: Internal services communicate via K8s service accounts
 - **API Keys**: LangFlow API protected by API key stored in K8s secret
 

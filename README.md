@@ -9,13 +9,16 @@ A platform for hosting and orchestrating multiple LangFlow workflows, built on R
          │ Users │                             
          └───┬───┘                             
              │                                 
-  ┌──────────┼──────────┐        ┌────────────┐
-  │    ┌─────▼─────┐    │        │            │
-  │    │ Frontend  │    │        │ PostgreSQL │
-  │    └─────┬─────┘    │        │            │
-  │    ┌─────▼─────┐    │        │     ▲      │
-  │    │  Backend  ├────┼────────►     │      │
-  │    └─────┬─────┘    │        └─────┼──────┘
+  ┌──────────┼──────────┐                      
+  │  ┌───────▼───────┐  │                      
+  │  │ OAuth2 Proxy  │  │                      
+  │  └───────┬───────┘  │                      
+  │  ┌───────▼───────┐  │        ┌────────────┐
+  │  │   Frontend    │  │        │            │
+  │  └───────┬───────┘  │        │ PostgreSQL │
+  │  ┌───────▼───────┐  │        │            │
+  │  │    Backend    ┼──┼────────►            │
+  │  └───────┬───────┘  │        └─────▲──────┘
   └──────────┼──────────┘              │       
        ┌─────┼─────┐                   │       
        ▼     ▼     ▼                   │       
@@ -24,6 +27,7 @@ A platform for hosting and orchestrating multiple LangFlow workflows, built on R
 └────────┴────────┴────────┘                   
 ```
 
+- **OAuth2 Proxy**: Authentication gateway (mock server for local dev)
 - **Frontend/Backend**: User-facing app for running workflows
 - **LangFlow**: Visual workflow builder (developers only)
 - **Langfuse/MLflow**: Observability and experiment tracking
@@ -33,6 +37,7 @@ A platform for hosting and orchestrating multiple LangFlow workflows, built on R
 
 | Component | Purpose | Access |
 |-----------|---------|--------|
+| **OAuth2 Proxy** | Authentication gateway (uses mock server locally) | Entry point |
 | **Multi-Agent Platform** | User-facing UI that executes research workflows | Users |
 | **LangFlow** | Visual workflow builder for multi-agent orchestration | Developers/Admins |
 | **Langfuse** | LLM observability, tracing, and evaluation | Developers/Admins |
@@ -168,11 +173,11 @@ make langflow-import
 - [CLAUDE.md](CLAUDE.md) - AI assistant development guide
 - [langflow-flows/](langflow-flows/) - Flow architecture documentation
 
-## Authentication
+## Service Credentials
 
 | Service | Access | Method | Credentials |
 |---------|--------|--------|-------------|
-| Multi-Agent Platform | Users | OAuth2 (Google/GitHub) | Configure in OAuth provider |
+| Multi-Agent Platform | Users | OAuth2 Proxy | Mock OAuth or configured provider |
 | LangFlow | Developers/Admins | Built-in auth | `admin-credentials` secret |
 | MLFlow | Developers/Admins | HTTP Basic | `admin-credentials` secret |
 | Langfuse | Developers/Admins | Email/Password | Self-registration |
