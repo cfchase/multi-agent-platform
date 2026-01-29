@@ -55,6 +55,9 @@ k8s/**/*-secret.env
 helm/*/secrets-*.yaml
 !helm/*/secrets-*.yaml.example
 
+# Flow sources config (keep .example, ignore actual config)
+config/flow-sources.yaml
+
 # Local development overrides
 .local/
 

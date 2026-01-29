@@ -21,8 +21,7 @@ langflow-logs: ## Show LangFlow logs
 	@./scripts/dev-langflow.sh logs
 
 langflow-import: ## Import flows from configured sources into LangFlow
-	@chmod +x scripts/import-flows.sh
-	@./scripts/import-flows.sh
+	@uv run --with requests --with pyyaml python scripts/import_flows.py
 
 langflow-reset: ## Reset LangFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
@@ -61,8 +60,8 @@ mlflow-logs: ## Show MLFlow logs
 mlflow-reset: ## Reset MLFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-mlflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
 
-# OAuth (local development)
-oauth-start: ## Start local OAuth2 Proxy (requires Google credentials in .env)
+# OAuth (optional - requires OAUTH_CLIENT_ID/SECRET in .env)
+oauth-start: ## Start OAuth2 Proxy (requires OAuth credentials in backend/.env)
 	@chmod +x scripts/dev-oauth.sh
 	@./scripts/dev-oauth.sh start
 
@@ -76,13 +75,27 @@ oauth-logs: ## Show OAuth2 Proxy logs
 	@./scripts/dev-oauth.sh logs
 
 # All Services
-services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow, oauth)
+services-start: db-start db-init ## Start all services (db, langflow, langfuse, mlflow, oauth if configured)
 	@echo "Starting all services..."
 	@./scripts/dev-langflow.sh start
 	@./scripts/dev-langfuse.sh start
 	@./scripts/dev-mlflow.sh start
 	@./scripts/dev-oauth.sh start
+	@echo ""
+	@echo "=============================================="
 	@echo "All services started!"
+	@echo "=============================================="
+	@echo ""
+	@echo "Service URLs:"
+	@echo "  App:      http://localhost:8080 (after 'make dev')"
+	@echo "  LangFlow: http://localhost:7860"
+	@echo "  Langfuse: http://localhost:3000"
+	@echo "  MLFlow:   http://localhost:5000"
+	@echo ""
+	@echo "Credentials:"
+	@echo "  Langfuse: dev@localhost.local / devpassword123"
+	@echo ""
+	@echo "Run 'make dev' to start the frontend and backend."
 
 services-stop: ## Stop all services
 	@echo "Stopping all services..."

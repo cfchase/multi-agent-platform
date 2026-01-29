@@ -1,0 +1,57 @@
+# Flow Sources Configuration
+# Copy to flow-sources.yaml and customize for your environment
+#
+# Supported source types:
+#   - file: Single JSON file (local path or URL)
+#   - local: Directory of JSON files (scans with pattern)
+#   - git: Git repository (clones and scans with pattern)
+#
+# Common options:
+#   - project: LangFlow project name to import into (created if missing)
+#   - pattern: Glob pattern for finding flow files (default: **/*.json)
+#   - public: Set to true to make flows visible to all users (default: false)
+
+flow_sources:
+  # Example: Direct file URL from GitHub
+  - name: simple-ollama
+    type: file
+    path: https://raw.githubusercontent.com/cfchase/langflow-examples/main/simple-ollama/simple-ollama.json
+    project: "Examples"             # Optional: target project in LangFlow
+    public: true                    # Optional: make flow visible to all users
+    enabled: true
+
+  # Example: Local file
+  # - name: my-flow
+  #   type: file
+  #   path: ./langflow-flows/my-flow.json
+  #   project: "Development"
+  #   enabled: true
+
+  # Example: Local directory
+  # - name: local-dev
+  #   type: local
+  #   path: ./langflow-flows/dev
+  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   project: "Development"
+  #   enabled: true
+
+  # Example: Git repository (public flows)
+  # - name: examples
+  #   type: git
+  #   url: https://github.com/cfchase/langflow-examples
+  #   branch: main
+  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   project: "Examples"
+  #   public: true                  # Make all imported flows public
+  #   enabled: true
+
+  # Example: Private git repository
+  # - name: enterprise
+  #   type: git
+  #   url: https://github.com/your-org/your-langflow-flows
+  #   branch: main
+  #   pattern: "**/flows/*.json"    # Only import from flows/ subdirectories
+  #   project: "Enterprise"
+  #   auth:
+  #     env_var: GITHUB_FLOW_TOKEN
+  #   enabled: true

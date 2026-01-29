@@ -1,97 +1,138 @@
 # LangFlow Flows
 
-This directory contains LangFlow flow definitions and documentation for the Deep Research platform.
+This directory is a placeholder for local flow development. The platform imports flows from external sources (git repositories) rather than bundling them.
 
-## Available Flows
+## Example Flows
 
-| Flow | Status | Complexity | Use Case |
-|------|--------|------------|----------|
-| [Basic Chat](docs/basic-flow.md) | Phase 2A | Minimal | Simple Q&A, testing |
-| [Analyze](docs/analyze-flow.md) | Phase 3 | High | Enterprise data analysis |
-| [Deep Research](docs/deep-research-flow.md) | Future | High | Open-ended research with validation |
+Official example flows are maintained in a separate repository:
 
-## Directory Structure
+**[cfchase/langflow-examples](https://github.com/cfchase/langflow-examples)**
 
+## Flow Sources
+
+The platform can load flows from multiple sources:
+
+| Source Type | Description | Use Case |
+|-------------|-------------|----------|
+| **File** | Single JSON file or URL | Quick imports, direct links |
+| **Git (Public)** | Public git repository | Community flows, examples |
+| **Git (Private)** | Private git repository | Enterprise, proprietary flows |
+| **Local** | Directory on filesystem | Development, testing |
+
+### Configuration
+
+Configure flow sources in `config/flow-sources.yaml`:
+
+```yaml
+flow_sources:
+  # Example flows from GitHub
+  - name: examples
+    type: git
+    url: https://github.com/cfchase/langflow-examples
+    project: "Examples"       # Target project (created if missing)
+    public: true              # Make flows visible to all users
+
+  # Private enterprise flows
+  - name: enterprise
+    type: git
+    url: https://github.com/your-org/your-flows
+    project: "Enterprise"
+    pattern: "**/flows/*.json"  # Only import from flows/ subdirectories
+    auth:
+      env_var: GITHUB_FLOW_TOKEN
+
+  # Local development
+  - name: local-dev
+    type: local
+    path: ./langflow-flows/dev
+    project: "Development"
 ```
-langflow-flows/
-├── README.md                 # This file
-├── docs/                     # Flow architecture documentation
-│   ├── basic-flow.md        # Basic Chat flow design
-│   ├── analyze-flow.md      # Analyze flow (agents-python port)
-│   └── deep-research-flow.md # Deep Research flow design
-├── flows/                    # Exported flow JSON files (Phase 2A+)
-│   ├── hello-gemini.json    # Basic Chat flow
-│   ├── analyze-v1.json      # Analyze flow
-│   └── deep-research-v1.json # Deep Research flow
-└── prompts/                  # Prompt templates (Phase 3+)
-    ├── analyze/             # Analyze flow prompts
-    └── deep-research/       # Deep Research flow prompts
-```
 
-## Flow Comparison
+### Configuration Options
 
-### When to Use Each Flow
+| Option | Description | Default |
+|--------|-------------|---------|
+| `name` | Source identifier | required |
+| `type` | `file`, `local`, or `git` | required |
+| `path` | File path or URL (for `file`/`local` types) | required |
+| `url` | Git repository URL (for `git` type) | required |
+| `branch` | Git branch to clone (for `git` type) | `main` |
+| `project` | LangFlow project name (created if missing) | none |
+| `pattern` | Glob pattern for finding flows | `**/*.json` |
+| `public` | Make flows visible to all users | `false` |
+| `enabled` | Enable/disable this source | `true` |
 
-| Question | Basic | Analyze | Deep Research |
-|----------|-------|---------|---------------|
-| Simple Q&A? | ✅ | | |
-| Enterprise data? | | ✅ | |
-| Web research? | | | ✅ |
-| Need citations? | | ✅ | ✅ |
-| Need validation? | | | ✅ |
-| Report output? | | | ✅ |
-
-### Architecture Patterns
-
-| Pattern | Basic | Analyze | Deep Research |
-|---------|-------|---------|---------------|
-| Single LLM | ✅ | | |
-| Supervisor-Worker | | ✅ | ✅ |
-| Reflection Loop | | | ✅ |
-| Tool Mode Agents | | ✅ | ✅ |
-| Data Isolation | | ✅ | |
-
-## Working with Flows
-
-### Importing a Flow
-
-1. Open LangFlow UI (http://localhost:7860)
-2. Click "Import" or drag JSON file
-3. Configure credentials (API keys)
-4. Test in playground
-
-### Exporting a Flow
-
-1. Open flow in LangFlow UI
-2. Click "Export" → "Download JSON"
-3. Save to `flows/` directory
-4. Commit to version control
-
-### API Usage
+### Import Flows
 
 ```bash
-# Execute a flow
-curl -X POST "http://localhost:7860/api/v1/run/{flow_id}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_value": "Your query here",
-    "input_type": "chat",
-    "output_type": "chat",
-    "session_id": "optional-session-id"
-  }'
+# Import from all configured sources
+make langflow-import
+
+# Or with a simple path override
+FLOW_SOURCE_PATH=./my-flows make langflow-import
 ```
 
-## Development Workflow
+## Flow File Format
 
-1. **Design** flow architecture in docs
-2. **Build** flow in LangFlow UI
-3. **Test** in LangFlow playground
-4. **Export** JSON to `flows/`
-5. **Document** prompts and decisions
-6. **Commit** to version control
+Each flow consists of:
+
+### 1. Flow Definition (`*.json`)
+
+LangFlow export JSON file:
+
+```json
+{
+  "name": "Flow Name",
+  "description": "Flow description",
+  "data": {
+    "nodes": [...],
+    "edges": [...]
+  }
+}
+```
+
+### 2. Metadata (`*.metadata.yaml`) - Planned Feature
+
+> **Note**: Metadata files are not yet processed by the importer. This is a planned feature.
+
+Additional platform metadata (future):
+
+```yaml
+name: Flow Name
+description: Flow description
+version: 1.0.0
+author: Team Name
+tags: [research, chat]
+requires: [GEMINI_API_KEY]
+```
+
+## Creating Flows
+
+1. Open LangFlow UI: http://localhost:7860
+2. Create flow using visual builder
+3. Test in playground
+4. Export: Click "Export" → "Download JSON"
+5. Add to your flow repository
+6. Import: `make langflow-import`
+
+## Creating Your Own Flow Repository
+
+See [cfchase/langflow-examples](https://github.com/cfchase/langflow-examples) as a template:
+
+```
+your-flows-repo/
+├── README.md
+├── simple-ollama/
+│   └── simple-ollama.json
+└── my-flow/
+    ├── my-flow.json
+    └── my-flow.metadata.yaml   # Optional
+```
+
+The import script recursively finds all `*.json` files in the repository.
 
 ## See Also
 
-- [Development Plan](../.tmp/DEVELOPMENT-PLAN.md) - Project phases and tasks
-- [Architecture](../docs/ARCHITECTURE.md) - Platform architecture
-- [Development Guide](../docs/DEVELOPMENT.md) - Local development setup
+- [cfchase/langflow-examples](https://github.com/cfchase/langflow-examples) - Example flows
+- [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md) - Local development
+- [config/flow-sources.yaml.example](../config/flow-sources.yaml.example) - Configuration template

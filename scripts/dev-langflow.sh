@@ -72,6 +72,7 @@ case "$1" in
                 -e LANGFLOW_CONFIG_DIR=/app/langflow \
                 -e LANGFLOW_SECRET_KEY="$SECRET_KEY" \
                 -e LANGFLOW_AUTO_LOGIN=true \
+                -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true \
                 -e LANGFLOW_LOG_LEVEL=info \
                 -e LANGFLOW_PORT=7860 \
                 -p $LANGFLOW_PORT:7860 \
