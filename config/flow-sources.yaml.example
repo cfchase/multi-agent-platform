@@ -6,19 +6,23 @@
 #   - local: Directory of JSON files (scans with pattern)
 #   - git: Git repository (clones and scans with pattern)
 #
-# Pattern: Glob pattern for finding flow files (default: **/*.json)
+# Common options:
+#   - project: LangFlow project name to import into (optional)
+#   - pattern: Glob pattern for finding flow files (default: **/*.json)
 
 flow_sources:
   # Example: Direct file URL from GitHub
   - name: simple-ollama
     type: file
     path: https://raw.githubusercontent.com/cfchase/langflow-examples/main/simple-ollama/simple-ollama.json
+    project: "Examples"             # Optional: target project in LangFlow
     enabled: true
 
   # Example: Local file
   # - name: my-flow
   #   type: file
   #   path: ./langflow-flows/my-flow.json
+  #   project: "Development"
   #   enabled: true
 
   # Example: Local directory
@@ -26,6 +30,7 @@ flow_sources:
   #   type: local
   #   path: ./langflow-flows/dev
   #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   project: "Development"
   #   enabled: true
 
   # Example: Git repository
@@ -34,6 +39,7 @@ flow_sources:
   #   url: https://github.com/cfchase/langflow-examples
   #   branch: main
   #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   project: "Examples"
   #   enabled: true
 
   # Example: Private git repository
@@ -42,6 +48,7 @@ flow_sources:
   #   url: https://github.com/your-org/your-langflow-flows
   #   branch: main
   #   pattern: "**/flows/*.json"    # Only import from flows/ subdirectories
+  #   project: "Enterprise"
   #   auth:
   #     env_var: GITHUB_FLOW_TOKEN
   #   enabled: true
