@@ -85,8 +85,35 @@ def authenticate() -> bool:
         return False
 
 
-def get_project_id(project_name: str) -> str | None:
-    """Look up a project by name and return its ID."""
+def create_project(project_name: str) -> str | None:
+    """Create a new project and return its ID."""
+    headers = {"Content-Type": "application/json"}
+    if ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
+    try:
+        resp = requests.post(
+            f"{LANGFLOW_URL}/api/v1/projects/",
+            headers=headers,
+            json={"name": project_name, "description": ""},
+            timeout=10,
+        )
+        if resp.ok:
+            project = resp.json()
+            project_id = project["id"]
+            PROJECT_CACHE[project_name] = project_id
+            log_info(f"Created project '{project_name}' (ID: {project_id[:8]}...)")
+            return project_id
+        else:
+            log_error(f"Failed to create project '{project_name}': {resp.text[:200]}")
+            return None
+    except requests.RequestException as e:
+        log_error(f"Failed to create project: {e}")
+        return None
+
+
+def get_project_id(project_name: str, create_if_missing: bool = True) -> str | None:
+    """Look up a project by name and return its ID. Creates the project if not found."""
     if project_name in PROJECT_CACHE:
         return PROJECT_CACHE[project_name]
 
@@ -109,6 +136,9 @@ def get_project_id(project_name: str) -> str | None:
             if project_name in PROJECT_CACHE:
                 log_info(f"Found project '{project_name}' (ID: {PROJECT_CACHE[project_name][:8]}...)")
                 return PROJECT_CACHE[project_name]
+            elif create_if_missing:
+                log_info(f"Project '{project_name}' not found, creating it...")
+                return create_project(project_name)
             else:
                 log_warn(f"Project '{project_name}' not found")
                 log_warn(f"Available projects: {', '.join(p['name'] for p in projects)}")
