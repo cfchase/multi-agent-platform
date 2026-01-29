@@ -157,16 +157,18 @@ def import_from_url(url: str, name: str) -> bool:
     return import_flow_data(flow_data, name)
 
 
-def import_from_directory(directory: Path, source_name: str) -> int:
-    """Scan a directory and import all flow JSON files."""
+def import_from_directory(
+    directory: Path, source_name: str, pattern: str = "**/*.json"
+) -> int:
+    """Scan a directory and import flow JSON files matching pattern."""
     if not directory.is_dir():
         log_warn(f"Directory not found: {directory}")
         return 0
 
-    log_info(f"Scanning directory: {directory}")
+    log_info(f"Scanning directory: {directory} (pattern: {pattern})")
 
     count = 0
-    for json_file in directory.glob("*.json"):
+    for json_file in directory.glob(pattern):
         if import_flow(json_file):
             count += 1
 
@@ -254,7 +256,7 @@ def import_from_config(config_file: Path) -> None:
         elif source_type == "git":
             url = source.get("url")
             branch = source.get("branch", "main")
-            path = source.get("path", "flows")
+            pattern = source.get("pattern", "**/*.json")
 
             # Get token from environment if specified
             token = None
@@ -267,19 +269,16 @@ def import_from_config(config_file: Path) -> None:
 
             repo_dir = sync_git_repo(url, branch, name, token)
             if repo_dir:
-                flow_path = repo_dir / path
-                if flow_path.is_dir():
-                    import_from_directory(flow_path, name)
-                else:
-                    log_error(f"Flow path not found: {flow_path}")
+                import_from_directory(repo_dir, name, pattern)
 
         elif source_type == "local":
             path = Path(source.get("path", ""))
+            pattern = source.get("pattern", "**/*.json")
             if not path.is_absolute():
                 path = PROJECT_ROOT / path
 
             if path.is_dir():
-                import_from_directory(path, name)
+                import_from_directory(path, name, pattern)
             else:
                 log_error(f"Local path not found: {path}")
 

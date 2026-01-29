@@ -23,18 +23,16 @@ The platform can load flows from multiple sources:
 Configure flow sources in `config/flow-sources.yaml`:
 
 ```yaml
-sources:
+flow_sources:
   # Example flows from GitHub
   - name: examples
     type: git
     url: https://github.com/cfchase/langflow-examples
-    path: flows
 
   # Private enterprise flows
   - name: enterprise
     type: git
     url: https://github.com/your-org/your-flows
-    path: flows
     auth:
       type: token
       env_var: GITHUB_FLOW_TOKEN
@@ -103,11 +101,14 @@ See [cfchase/langflow-examples](https://github.com/cfchase/langflow-examples) as
 ```
 your-flows-repo/
 ├── README.md
-├── flows/
-│   ├── my-flow.json
-│   └── my-flow.metadata.yaml
-└── components/     # Custom LangFlow components
+├── simple-ollama/
+│   └── simple-ollama.json
+└── my-flow/
+    ├── my-flow.json
+    └── my-flow.metadata.yaml   # Optional
 ```
+
+The import script recursively finds all `*.json` files in the repository.
 
 ## See Also
 

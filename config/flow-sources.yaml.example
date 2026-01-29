@@ -1,34 +1,47 @@
 # Flow Sources Configuration
 # Copy to flow-sources.yaml and customize for your environment
 #
-# The import-flows.sh script reads this file to discover and import
-# flows from various sources into LangFlow.
+# Supported source types:
+#   - file: Single JSON file (local path or URL)
+#   - local: Directory of JSON files (scans with pattern)
+#   - git: Git repository (clones and scans with pattern)
+#
+# Pattern: Glob pattern for finding flow files (default: **/*.json)
 
 flow_sources:
-  # Example flows from GitHub (recommended starting point)
-  - name: examples
-    type: git
-    url: https://github.com/cfchase/langflow-examples
-    branch: main
-    path: flows
-    description: "Official example flows"
+  # Example: Direct file URL from GitHub
+  - name: simple-ollama
+    type: file
+    path: https://raw.githubusercontent.com/cfchase/langflow-examples/main/simple-ollama/simple-ollama.json
     enabled: true
 
-  # Example: Your organization's flows (private repo)
+  # Example: Local file
+  # - name: my-flow
+  #   type: file
+  #   path: ./langflow-flows/my-flow.json
+  #   enabled: true
+
+  # Example: Local directory
+  # - name: local-dev
+  #   type: local
+  #   path: ./langflow-flows/dev
+  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   enabled: true
+
+  # Example: Git repository
+  # - name: examples
+  #   type: git
+  #   url: https://github.com/cfchase/langflow-examples
+  #   branch: main
+  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   enabled: true
+
+  # Example: Private git repository
   # - name: enterprise
   #   type: git
   #   url: https://github.com/your-org/your-langflow-flows
   #   branch: main
-  #   path: flows
-  #   description: "Enterprise flows"
+  #   pattern: "**/flows/*.json"    # Only import from flows/ subdirectories
   #   auth:
-  #     type: token
   #     env_var: GITHUB_FLOW_TOKEN
-  #   enabled: true
-
-  # Example: Local development flows
-  # - name: local-dev
-  #   type: local
-  #   path: ./langflow-flows/dev
-  #   description: "Local development flows"
   #   enabled: true
