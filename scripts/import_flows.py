@@ -16,6 +16,7 @@ Environment variables:
 Config options per source:
     project           - LangFlow project name to import flows into
     pattern           - Glob pattern for finding flow files (default: **/*.json)
+    public            - Set to true to make flows visible to all users
 """
 
 import json
@@ -169,7 +170,12 @@ def check_langflow() -> bool:
     return False
 
 
-def import_flow_data(flow_data: dict, flow_name: str, project_id: str | None = None) -> bool:
+def import_flow_data(
+    flow_data: dict,
+    flow_name: str,
+    project_id: str | None = None,
+    public: bool = False,
+) -> bool:
     """Import flow data to LangFlow."""
     headers = {"Content-Type": "application/json"}
     if ACCESS_TOKEN:
@@ -178,6 +184,10 @@ def import_flow_data(flow_data: dict, flow_name: str, project_id: str | None = N
     # Add project (folder_id) if specified
     if project_id:
         flow_data = {**flow_data, "folder_id": project_id}
+
+    # Set access type
+    if public:
+        flow_data = {**flow_data, "access_type": "PUBLIC"}
 
     try:
         resp = requests.post(
@@ -198,7 +208,9 @@ def import_flow_data(flow_data: dict, flow_name: str, project_id: str | None = N
         return False
 
 
-def import_flow(json_file: Path, project_id: str | None = None) -> bool:
+def import_flow(
+    json_file: Path, project_id: str | None = None, public: bool = False
+) -> bool:
     """Import a single flow JSON file to LangFlow."""
     flow_name = json_file.stem
     log_info(f"Importing flow: {flow_name}")
@@ -210,10 +222,12 @@ def import_flow(json_file: Path, project_id: str | None = None) -> bool:
         log_error(f"  Invalid JSON in {json_file}: {e}")
         return False
 
-    return import_flow_data(flow_data, flow_name, project_id)
+    return import_flow_data(flow_data, flow_name, project_id, public)
 
 
-def import_from_url(url: str, name: str, project_id: str | None = None) -> bool:
+def import_from_url(
+    url: str, name: str, project_id: str | None = None, public: bool = False
+) -> bool:
     """Import a flow from a URL."""
     log_info(f"Fetching flow from: {url}")
 
@@ -230,7 +244,7 @@ def import_from_url(url: str, name: str, project_id: str | None = None) -> bool:
         log_error(f"  Invalid JSON from {url}: {e}")
         return False
 
-    return import_flow_data(flow_data, name, project_id)
+    return import_flow_data(flow_data, name, project_id, public)
 
 
 def import_from_directory(
@@ -238,6 +252,7 @@ def import_from_directory(
     source_name: str,
     pattern: str = "**/*.json",
     project_id: str | None = None,
+    public: bool = False,
 ) -> int:
     """Scan a directory and import flow JSON files matching pattern."""
     if not directory.is_dir():
@@ -248,7 +263,7 @@ def import_from_directory(
 
     count = 0
     for json_file in directory.glob(pattern):
-        if import_flow(json_file, project_id):
+        if import_flow(json_file, project_id, public):
             count += 1
 
     log_info(f"Imported {count} flow(s) from {source_name}")
@@ -327,17 +342,20 @@ def import_from_config(config_file: Path) -> None:
                 log_warn(f"Skipping source '{name}' - project not found")
                 continue
 
+        # Check if flows should be public
+        public = source.get("public", False)
+
         if source_type == "file":
             # Single file: local path or URL
             path = source.get("path", "")
             if path.startswith(("http://", "https://")):
-                import_from_url(path, name, project_id)
+                import_from_url(path, name, project_id, public)
             else:
                 file_path = Path(path)
                 if not file_path.is_absolute():
                     file_path = PROJECT_ROOT / file_path
                 if file_path.is_file():
-                    import_flow(file_path, project_id)
+                    import_flow(file_path, project_id, public)
                 else:
                     log_error(f"File not found: {file_path}")
 
@@ -357,7 +375,7 @@ def import_from_config(config_file: Path) -> None:
 
             repo_dir = sync_git_repo(url, branch, name, token)
             if repo_dir:
-                import_from_directory(repo_dir, name, pattern, project_id)
+                import_from_directory(repo_dir, name, pattern, project_id, public)
 
         elif source_type == "local":
             path = Path(source.get("path", ""))
@@ -366,7 +384,7 @@ def import_from_config(config_file: Path) -> None:
                 path = PROJECT_ROOT / path
 
             if path.is_dir():
-                import_from_directory(path, name, pattern, project_id)
+                import_from_directory(path, name, pattern, project_id, public)
             else:
                 log_error(f"Local path not found: {path}")
 

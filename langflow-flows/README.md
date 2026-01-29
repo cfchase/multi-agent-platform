@@ -28,20 +28,35 @@ flow_sources:
   - name: examples
     type: git
     url: https://github.com/cfchase/langflow-examples
+    project: "Examples"       # Target project (created if missing)
+    public: true              # Make flows visible to all users
 
   # Private enterprise flows
   - name: enterprise
     type: git
     url: https://github.com/your-org/your-flows
+    project: "Enterprise"
+    pattern: "**/flows/*.json"  # Only import from flows/ subdirectories
     auth:
-      type: token
       env_var: GITHUB_FLOW_TOKEN
 
   # Local development
   - name: local-dev
     type: local
     path: ./langflow-flows/dev
+    project: "Development"
 ```
+
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `name` | Source identifier | required |
+| `type` | `file`, `local`, or `git` | required |
+| `project` | LangFlow project name (created if missing) | none |
+| `pattern` | Glob pattern for finding flows | `**/*.json` |
+| `public` | Make flows visible to all users | `false` |
+| `enabled` | Enable/disable this source | `true` |
 
 ### Import Flows
 

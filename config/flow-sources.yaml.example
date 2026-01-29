@@ -7,8 +7,9 @@
 #   - git: Git repository (clones and scans with pattern)
 #
 # Common options:
-#   - project: LangFlow project name to import into (optional)
+#   - project: LangFlow project name to import into (created if missing)
 #   - pattern: Glob pattern for finding flow files (default: **/*.json)
+#   - public: Set to true to make flows visible to all users (default: false)
 
 flow_sources:
   # Example: Direct file URL from GitHub
@@ -16,6 +17,7 @@ flow_sources:
     type: file
     path: https://raw.githubusercontent.com/cfchase/langflow-examples/main/simple-ollama/simple-ollama.json
     project: "Examples"             # Optional: target project in LangFlow
+    public: true                    # Optional: make flow visible to all users
     enabled: true
 
   # Example: Local file
@@ -33,13 +35,14 @@ flow_sources:
   #   project: "Development"
   #   enabled: true
 
-  # Example: Git repository
+  # Example: Git repository (public flows)
   # - name: examples
   #   type: git
   #   url: https://github.com/cfchase/langflow-examples
   #   branch: main
   #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
   #   project: "Examples"
+  #   public: true                  # Make all imported flows public
   #   enabled: true
 
   # Example: Private git repository
