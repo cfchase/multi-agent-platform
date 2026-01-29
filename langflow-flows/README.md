@@ -14,6 +14,7 @@ The platform can load flows from multiple sources:
 
 | Source Type | Description | Use Case |
 |-------------|-------------|----------|
+| **File** | Single JSON file or URL | Quick imports, direct links |
 | **Git (Public)** | Public git repository | Community flows, examples |
 | **Git (Private)** | Private git repository | Enterprise, proprietary flows |
 | **Local** | Directory on filesystem | Development, testing |
@@ -53,6 +54,9 @@ flow_sources:
 |--------|-------------|---------|
 | `name` | Source identifier | required |
 | `type` | `file`, `local`, or `git` | required |
+| `path` | File path or URL (for `file`/`local` types) | required |
+| `url` | Git repository URL (for `git` type) | required |
+| `branch` | Git branch to clone (for `git` type) | `main` |
 | `project` | LangFlow project name (created if missing) | none |
 | `pattern` | Glob pattern for finding flows | `**/*.json` |
 | `public` | Make flows visible to all users | `false` |
@@ -87,9 +91,11 @@ LangFlow export JSON file:
 }
 ```
 
-### 2. Metadata (`*.metadata.yaml`) - Optional
+### 2. Metadata (`*.metadata.yaml`) - Planned Feature
 
-Additional platform metadata:
+> **Note**: Metadata files are not yet processed by the importer. This is a planned feature.
+
+Additional platform metadata (future):
 
 ```yaml
 name: Flow Name
