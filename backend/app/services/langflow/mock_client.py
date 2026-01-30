@@ -126,6 +126,7 @@ class MockLangflowClient:
         session_id: str | None = None,
         tweaks: dict | None = None,
         flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> str:
         """
         Return a mock response (non-streaming).
@@ -134,6 +135,8 @@ class MockLangflowClient:
             message: The user message (logged but not processed)
             session_id: Optional session ID (logged)
             tweaks: Optional tweaks (ignored)
+            flow_id: Optional flow ID (ignored in mock)
+            flow_name: Optional flow name (ignored in mock)
 
         Returns:
             A canned response string
@@ -160,6 +163,7 @@ class MockLangflowClient:
         session_id: str | None = None,
         tweaks: dict | None = None,
         flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a mock response in chunks.
@@ -168,6 +172,8 @@ class MockLangflowClient:
             message: The user message (logged but not processed)
             session_id: Optional session ID (logged)
             tweaks: Optional tweaks (ignored)
+            flow_id: Optional flow ID (ignored in mock)
+            flow_name: Optional flow name (ignored in mock)
 
         Yields:
             Chunks of the response string

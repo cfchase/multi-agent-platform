@@ -41,9 +41,9 @@ const Chat: React.FunctionComponent = () => {
   const [chatsLoading, setChatsLoading] = React.useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
-  // Flow selector state
+  // Flow selector state (using name for stable identification across imports)
   const [flows, setFlows] = React.useState<Flow[]>([]);
-  const [selectedFlowId, setSelectedFlowId] = React.useState<string | null>(null);
+  const [selectedFlowName, setSelectedFlowName] = React.useState<string | null>(null);
   const [isFlowMenuOpen, setIsFlowMenuOpen] = React.useState(false);
 
   // Messages state
@@ -66,8 +66,8 @@ const Chat: React.FunctionComponent = () => {
       const response = await ChatAPI.getFlows();
       const flowData = response?.data || [];
       setFlows(flowData);
-      if (flowData.length > 0 && !selectedFlowId) {
-        setSelectedFlowId(flowData[0].id);
+      if (flowData.length > 0 && !selectedFlowName) {
+        setSelectedFlowName(flowData[0].name);
       }
     } catch (err) {
       console.error('Failed to load flows:', err);
@@ -244,7 +244,7 @@ const Chat: React.FunctionComponent = () => {
       () => {
         setIsSending(false);
       },
-      selectedFlowId || undefined
+      selectedFlowName || undefined
     );
   };
 
@@ -319,7 +319,7 @@ const Chat: React.FunctionComponent = () => {
                         isExpanded={isFlowMenuOpen}
                         isDisabled={flows.length === 0}
                       >
-                        {flows.find((f) => f.id === selectedFlowId)?.name || 'Select Flow'}
+                        {selectedFlowName || 'Select Flow'}
                       </MenuToggle>
                     )}
                   >
@@ -327,7 +327,7 @@ const Chat: React.FunctionComponent = () => {
                       {flows.map((flow) => (
                         <DropdownItem
                           key={flow.id}
-                          onClick={() => setSelectedFlowId(flow.id)}
+                          onClick={() => setSelectedFlowName(flow.name)}
                           description={flow.description}
                         >
                           {flow.name}

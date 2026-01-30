@@ -113,6 +113,7 @@ export const ChatAPI = {
    * Send a message and stream the AI response via SSE.
    *
    * Based on reference chatbot pattern using fetch + ReadableStream.
+   * Uses flow_name for identification as flow IDs change on import.
    */
   createStreamingMessage(
     chatId: number,
@@ -120,15 +121,15 @@ export const ChatAPI = {
     onMessage: (event: StreamingEvent) => void,
     onError?: (error: Error) => void,
     onComplete?: () => void,
-    flowId?: string
+    flowName?: string
   ): { close: () => void } {
     const controller = new AbortController();
 
     const url = `/api${API_BASE}/${chatId}/messages/stream`;
 
-    const body: { content: string; flow_id?: string } = { content };
-    if (flowId) {
-      body.flow_id = flowId;
+    const body: { content: string; flow_name?: string } = { content };
+    if (flowName) {
+      body.flow_name = flowName;
     }
 
     fetch(url, {

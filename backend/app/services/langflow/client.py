@@ -53,7 +53,8 @@ class LangflowClient:
     - LANGFLOW_URL: Base URL of the Langflow server
     - LANGFLOW_API_KEY: API key for authentication (optional for self-hosted)
     - LANGFLOW_ID: Langflow project ID (for Langflow Cloud)
-    - LANGFLOW_FLOW_ID: Flow ID to execute
+    - LANGFLOW_DEFAULT_FLOW: Default flow name to execute (preferred)
+    - LANGFLOW_FLOW_ID: Flow ID to execute (fallback, deprecated)
     """
 
     def __init__(
@@ -62,6 +63,7 @@ class LangflowClient:
         api_key: str | None = None,
         langflow_id: str | None = None,
         flow_id: str | None = None,
+        default_flow: str | None = None,
     ):
         """
         Initialize Langflow client.
@@ -71,11 +73,16 @@ class LangflowClient:
             api_key: API key for authentication (defaults to settings.LANGFLOW_API_KEY)
             langflow_id: Langflow project ID (defaults to settings.LANGFLOW_ID)
             flow_id: Flow ID to use (defaults to settings.LANGFLOW_FLOW_ID)
+            default_flow: Default flow name (defaults to settings.LANGFLOW_DEFAULT_FLOW)
         """
         self.base_url = base_url or settings.LANGFLOW_URL
         self.api_key = api_key or settings.LANGFLOW_API_KEY
         self.langflow_id = langflow_id or settings.LANGFLOW_ID
         self.flow_id = flow_id or settings.LANGFLOW_FLOW_ID
+        self.default_flow = default_flow or settings.LANGFLOW_DEFAULT_FLOW
+
+        # Cache for flow name to ID mapping
+        self._flow_cache: dict[str, str] = {}
 
         # Build headers
         self.headers = {
@@ -83,6 +90,67 @@ class LangflowClient:
         }
         if self.api_key:
             self.headers["Authorization"] = f"Bearer {self.api_key}"
+
+    async def get_flow_id_by_name(self, name: str) -> str | None:
+        """
+        Look up a flow ID by its name.
+
+        Args:
+            name: The flow name to look up
+
+        Returns:
+            The flow ID if found, None otherwise
+        """
+        # Check cache first
+        if name in self._flow_cache:
+            return self._flow_cache[name]
+
+        # Fetch flows and find by name
+        flows = await self.list_flows()
+        for flow in flows:
+            self._flow_cache[flow.name] = flow.id
+            if flow.name == name:
+                return flow.id
+
+        return None
+
+    async def resolve_flow_id(
+        self, flow_id: str | None = None, flow_name: str | None = None
+    ) -> str | None:
+        """
+        Resolve a flow ID from either an ID or name.
+
+        Priority:
+        1. Explicit flow_id parameter
+        2. Explicit flow_name parameter (looked up)
+        3. Configured default_flow setting (looked up)
+        4. Configured flow_id setting
+
+        Args:
+            flow_id: Optional explicit flow ID
+            flow_name: Optional explicit flow name
+
+        Returns:
+            The resolved flow ID, or None if not found
+        """
+        # If explicit ID provided, use it
+        if flow_id:
+            return flow_id
+
+        # If explicit name provided, look it up
+        if flow_name:
+            resolved = await self.get_flow_id_by_name(flow_name)
+            if resolved:
+                return resolved
+
+        # Fall back to configured default flow name
+        if self.default_flow:
+            resolved = await self.get_flow_id_by_name(self.default_flow)
+            if resolved:
+                return resolved
+
+        # Fall back to configured ID (deprecated)
+        return self.flow_id
 
     def _get_run_url(self, flow_id: str | None = None, stream: bool = False) -> str:
         """
@@ -166,6 +234,7 @@ class LangflowClient:
         session_id: str | None = None,
         tweaks: dict | None = None,
         flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> str:
         """
         Send a chat message and get a response (non-streaming).
@@ -175,6 +244,7 @@ class LangflowClient:
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
             flow_id: Optional flow ID to use (defaults to configured flow)
+            flow_name: Optional flow name to use (looked up to get ID)
 
         Returns:
             The assistant's response text
@@ -182,6 +252,11 @@ class LangflowClient:
         Raises:
             LangflowError: If the API call fails
         """
+        # Resolve flow ID from name if needed
+        resolved_flow_id = await self.resolve_flow_id(flow_id, flow_name)
+        if not resolved_flow_id:
+            raise LangflowError("No flow ID or name configured")
+
         payload = {
             "input_value": message,
             "output_type": "chat",
@@ -193,7 +268,7 @@ class LangflowClient:
         if tweaks:
             payload["tweaks"] = tweaks
 
-        url = self._get_run_url(flow_id=flow_id, stream=False)
+        url = self._get_run_url(flow_id=resolved_flow_id, stream=False)
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
@@ -236,6 +311,7 @@ class LangflowClient:
         session_id: str | None = None,
         tweaks: dict | None = None,
         flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Send a chat message and stream the response.
@@ -245,6 +321,7 @@ class LangflowClient:
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
             flow_id: Optional flow ID to use (defaults to configured flow)
+            flow_name: Optional flow name to use (looked up to get ID)
 
         Yields:
             Chunks of the assistant's response text
@@ -252,6 +329,11 @@ class LangflowClient:
         Raises:
             LangflowError: If the API call fails
         """
+        # Resolve flow ID from name if needed
+        resolved_flow_id = await self.resolve_flow_id(flow_id, flow_name)
+        if not resolved_flow_id:
+            raise LangflowError("No flow ID or name configured")
+
         payload = {
             "input_value": message,
             "output_type": "chat",
@@ -263,7 +345,7 @@ class LangflowClient:
         if tweaks:
             payload["tweaks"] = tweaks
 
-        url = self._get_run_url(flow_id=flow_id, stream=True)
+        url = self._get_run_url(flow_id=resolved_flow_id, stream=True)
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:

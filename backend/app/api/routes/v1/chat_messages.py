@@ -149,6 +149,7 @@ class StreamMessageRequest(BaseModel):
     """Request body for streaming message endpoint."""
     content: str
     flow_id: str | None = None
+    flow_name: str | None = None
 
 
 @router.post("/stream")
@@ -201,6 +202,7 @@ async def stream_message(
                 message=request.content,
                 session_id=str(chat_id),
                 flow_id=request.flow_id,
+                flow_name=request.flow_name,
             ):
                 accumulated_content += chunk
                 event = {"type": "content", "content": chunk}
