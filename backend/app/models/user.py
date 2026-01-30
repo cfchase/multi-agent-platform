@@ -14,6 +14,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from app.models.item import Item
+    from app.models.chat import Chat
 
 
 class UserBase(SQLModel):
@@ -50,6 +51,7 @@ class User(UserBase, table=True):
     last_login: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+    chats: list["Chat"] = Relationship(back_populates="user", cascade_delete=True)
 
     def __str__(self) -> str:
         """Display format for admin dropdowns and references."""
