@@ -19,7 +19,6 @@ import {
   ChatbotHeaderTitle,
   ChatbotHeaderActions,
   ChatbotConversationHistoryNav,
-  ChatbotWelcomePrompt,
   Message,
   MessageBar,
   MessageBox,
@@ -39,7 +38,7 @@ const Chat: React.FunctionComponent = () => {
   const [chats, setChats] = React.useState<ChatType[]>([]);
   const [selectedChatId, setSelectedChatId] = React.useState<number | null>(null);
   const [chatsLoading, setChatsLoading] = React.useState(true);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = React.useState(true);
 
   // Flow selector state (using name for stable identification across imports)
   const [flows, setFlows] = React.useState<Flow[]>([]);
@@ -48,7 +47,6 @@ const Chat: React.FunctionComponent = () => {
 
   // Messages state
   const [messages, setMessages] = React.useState<MessageProps[]>([]);
-  const [messagesLoading, setMessagesLoading] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [announcement, setAnnouncement] = React.useState<string>();
 
@@ -102,7 +100,6 @@ const Chat: React.FunctionComponent = () => {
   };
 
   const loadMessages = async (chatId: number) => {
-    setMessagesLoading(true);
     try {
       const response = await ChatAPI.getMessages(chatId);
       const messageData = response?.data || [];
@@ -119,8 +116,6 @@ const Chat: React.FunctionComponent = () => {
     } catch (err) {
       console.error('Failed to load messages:', err);
       setMessages([]);
-    } finally {
-      setMessagesLoading(false);
     }
   };
 
@@ -266,19 +261,6 @@ const Chat: React.FunctionComponent = () => {
     ),
   }));
 
-  const welcomePrompts = [
-    {
-      title: 'Research a topic',
-      message: 'Help me research and summarize information about a specific topic.',
-      onClick: () => handleSend('Help me research and summarize information about a specific topic.'),
-    },
-    {
-      title: 'Analyze data',
-      message: 'Help me analyze and interpret data or documents.',
-      onClick: () => handleSend('Help me analyze and interpret data or documents.'),
-    },
-  ];
-
   return (
     <PageSection isFilled hasBodyWrapper={false} style={{ height: '100%', padding: 0 }}>
       <Chatbot displayMode={displayMode}>
@@ -339,13 +321,6 @@ const Chat: React.FunctionComponent = () => {
               </ChatbotHeader>
               <ChatbotContent>
                 <MessageBox announcement={announcement}>
-                  {messages.length === 0 && !messagesLoading && (
-                    <ChatbotWelcomePrompt
-                      title="Hello!"
-                      description="How can I help you today?"
-                      prompts={welcomePrompts}
-                    />
-                  )}
                   {messages.map((message) => (
                     <Message
                       key={message.id}

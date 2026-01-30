@@ -61,7 +61,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <OutlinedCommentsIcon style={{ fontSize: '28px', color: 'var(--pf-t--global--color--brand--default)' }} />
               <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--pf-t--global--text--color--regular)' }}>
-                Multi-Agent Platform
+                Chat
               </span>
             </span>
           </MastheadLogo>
