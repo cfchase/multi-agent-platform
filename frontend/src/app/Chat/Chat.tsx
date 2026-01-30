@@ -27,6 +27,7 @@ import {
   Conversation,
 } from '@patternfly/chatbot';
 
+import { TrashIcon } from '@patternfly/react-icons';
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
@@ -135,6 +136,20 @@ const Chat: React.FunctionComponent = () => {
     }
   };
 
+  const handleDeleteChat = async (chatId: number) => {
+    try {
+      await ChatAPI.deleteChat(chatId);
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      if (selectedChatId === chatId) {
+        const remaining = chats.filter((c) => c.id !== chatId);
+        setSelectedChatId(remaining.length > 0 ? remaining[0].id : null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Failed to delete chat:', err);
+    }
+  };
+
   const handleSelectConversation = (
     _e: React.MouseEvent | undefined,
     itemId: string | number | undefined
@@ -237,6 +252,18 @@ const Chat: React.FunctionComponent = () => {
   const conversations: Conversation[] = chats.map((chat) => ({
     id: chat.id.toString(),
     text: chat.title,
+    menuItems: (
+      <DropdownItem
+        key="delete"
+        icon={<TrashIcon />}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteChat(chat.id);
+        }}
+      >
+        Delete
+      </DropdownItem>
+    ),
   }));
 
   const welcomePrompts = [
