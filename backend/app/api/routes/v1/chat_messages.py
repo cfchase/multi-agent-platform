@@ -148,6 +148,7 @@ def delete_message(
 class StreamMessageRequest(BaseModel):
     """Request body for streaming message endpoint."""
     content: str
+    flow_id: str | None = None
 
 
 @router.post("/stream")
@@ -199,6 +200,7 @@ async def stream_message(
             async for chunk in client.chat_stream(
                 message=request.content,
                 session_id=str(chat_id),
+                flow_id=request.flow_id,
             ):
                 accumulated_content += chunk
                 event = {"type": "content", "content": chunk}

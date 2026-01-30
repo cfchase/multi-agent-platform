@@ -15,11 +15,12 @@ Configuration (environment variables):
     LANGFLOW_FLOW_ID: Flow ID to execute
 """
 
-from .client import LangflowClient, LangflowError
+from .client import Flow, LangflowClient, LangflowError
 from .factory import get_langflow_client, is_langflow_configured, is_mock_langflow_enabled
 from .mock_client import MockLangflowClient
 
 __all__ = [
+    "Flow",
     "LangflowClient",
     "LangflowError",
     "MockLangflowClient",

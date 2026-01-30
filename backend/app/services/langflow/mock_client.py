@@ -14,7 +14,7 @@ import asyncio
 import logging
 from typing import AsyncGenerator
 
-from .client import LangflowError
+from .client import Flow, LangflowError
 
 
 logger = logging.getLogger(__name__)
@@ -95,11 +95,37 @@ class MockLangflowClient:
             "session_id": session_id,
         })
 
+    async def list_flows(self) -> list[Flow]:
+        """
+        Return mock flows for testing.
+
+        Returns:
+            A list of mock Flow objects
+        """
+        logger.debug("[MOCK] list_flows called")
+
+        if self.simulate_error:
+            raise LangflowError(self.error_message, status_code=500)
+
+        return [
+            Flow(
+                id="mock-flow-1",
+                name="Mock Chat Flow",
+                description="A mock flow for testing chat functionality",
+            ),
+            Flow(
+                id="mock-flow-2",
+                name="Mock Research Flow",
+                description="A mock flow for testing research queries",
+            ),
+        ]
+
     async def chat(
         self,
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
     ) -> str:
         """
         Return a mock response (non-streaming).
@@ -133,6 +159,7 @@ class MockLangflowClient:
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream a mock response in chunks.

@@ -1,5 +1,12 @@
 import * as React from 'react';
-import { PageSection } from '@patternfly/react-core';
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownList,
+  MenuToggle,
+  MenuToggleElement,
+  PageSection,
+} from '@patternfly/react-core';
 import {
   Chatbot,
   ChatbotContent,
@@ -10,6 +17,7 @@ import {
   ChatbotHeaderMain,
   ChatbotHeaderMenu,
   ChatbotHeaderTitle,
+  ChatbotHeaderActions,
   ChatbotConversationHistoryNav,
   ChatbotWelcomePrompt,
   Message,
@@ -19,7 +27,7 @@ import {
   Conversation,
 } from '@patternfly/chatbot';
 
-import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent } from './chatApi';
+import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
 
@@ -32,6 +40,11 @@ const Chat: React.FunctionComponent = () => {
   const [chatsLoading, setChatsLoading] = React.useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
+  // Flow selector state
+  const [flows, setFlows] = React.useState<Flow[]>([]);
+  const [selectedFlowId, setSelectedFlowId] = React.useState<string | null>(null);
+  const [isFlowMenuOpen, setIsFlowMenuOpen] = React.useState(false);
+
   // Messages state
   const [messages, setMessages] = React.useState<MessageProps[]>([]);
   const [messagesLoading, setMessagesLoading] = React.useState(false);
@@ -41,10 +54,25 @@ const Chat: React.FunctionComponent = () => {
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const displayMode = ChatbotDisplayMode.embedded;
 
-  // Load chats on mount
+  // Load chats and flows on mount
   React.useEffect(() => {
     loadChats();
+    loadFlows();
   }, []);
+
+  const loadFlows = async () => {
+    try {
+      const response = await ChatAPI.getFlows();
+      const flowData = response?.data || [];
+      setFlows(flowData);
+      if (flowData.length > 0 && !selectedFlowId) {
+        setSelectedFlowId(flowData[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load flows:', err);
+      setFlows([]);
+    }
+  };
 
   // Load messages when chat changes
   React.useEffect(() => {
@@ -200,7 +228,8 @@ const Chat: React.FunctionComponent = () => {
       },
       () => {
         setIsSending(false);
-      }
+      },
+      selectedFlowId || undefined
     );
   };
 
@@ -251,6 +280,35 @@ const Chat: React.FunctionComponent = () => {
                       : 'Research Assistant'}
                   </ChatbotHeaderTitle>
                 </ChatbotHeaderMain>
+                <ChatbotHeaderActions>
+                  <Dropdown
+                    isOpen={isFlowMenuOpen}
+                    onOpenChange={(isOpen) => setIsFlowMenuOpen(isOpen)}
+                    onSelect={() => setIsFlowMenuOpen(false)}
+                    toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                      <MenuToggle
+                        ref={toggleRef}
+                        onClick={() => setIsFlowMenuOpen(!isFlowMenuOpen)}
+                        isExpanded={isFlowMenuOpen}
+                        isDisabled={flows.length === 0}
+                      >
+                        {flows.find((f) => f.id === selectedFlowId)?.name || 'Select Flow'}
+                      </MenuToggle>
+                    )}
+                  >
+                    <DropdownList>
+                      {flows.map((flow) => (
+                        <DropdownItem
+                          key={flow.id}
+                          onClick={() => setSelectedFlowId(flow.id)}
+                          description={flow.description}
+                        >
+                          {flow.name}
+                        </DropdownItem>
+                      ))}
+                    </DropdownList>
+                  </Dropdown>
+                </ChatbotHeaderActions>
               </ChatbotHeader>
               <ChatbotContent>
                 <MessageBox announcement={announcement}>

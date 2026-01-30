@@ -49,6 +49,17 @@ export interface StreamingEvent {
   error?: string;
 }
 
+export interface Flow {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface FlowsResponse {
+  data: Flow[];
+  count: number;
+}
+
 // =============================================================================
 // Chat CRUD
 // =============================================================================
@@ -56,6 +67,11 @@ export interface StreamingEvent {
 export const ChatAPI = {
   async getChats(): Promise<ChatsResponse> {
     const response = await apiClient.get<ChatsResponse>(`${API_BASE}/`);
+    return response.data;
+  },
+
+  async getFlows(): Promise<FlowsResponse> {
+    const response = await apiClient.get<FlowsResponse>('/v1/flows/');
     return response.data;
   },
 
@@ -103,11 +119,17 @@ export const ChatAPI = {
     content: string,
     onMessage: (event: StreamingEvent) => void,
     onError?: (error: Error) => void,
-    onComplete?: () => void
+    onComplete?: () => void,
+    flowId?: string
   ): { close: () => void } {
     const controller = new AbortController();
 
     const url = `/api${API_BASE}/${chatId}/messages/stream`;
+
+    const body: { content: string; flow_id?: string } = { content };
+    if (flowId) {
+      body.flow_id = flowId;
+    }
 
     fetch(url, {
       method: 'POST',
@@ -115,7 +137,7 @@ export const ChatAPI = {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     })
       .then((response) => {

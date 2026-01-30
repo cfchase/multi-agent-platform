@@ -27,6 +27,22 @@ class LangflowError(Exception):
         super().__init__(self.message)
 
 
+class Flow:
+    """Represents a Langflow flow."""
+
+    def __init__(self, id: str, name: str, description: str | None = None):
+        self.id = id
+        self.name = name
+        self.description = description
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+        }
+
+
 class LangflowClient:
     """
     HTTP client for Langflow API integration.
@@ -68,32 +84,88 @@ class LangflowClient:
         if self.api_key:
             self.headers["Authorization"] = f"Bearer {self.api_key}"
 
-    def _get_run_url(self, stream: bool = False) -> str:
+    def _get_run_url(self, flow_id: str | None = None, stream: bool = False) -> str:
         """
         Build the Langflow run API URL.
 
         Args:
+            flow_id: Override flow ID (defaults to self.flow_id)
             stream: Whether to use streaming endpoint
 
         Returns:
             Full URL for the Langflow run API
         """
+        target_flow_id = flow_id or self.flow_id
         if self.langflow_id:
             # Langflow Cloud format
-            base = f"{self.base_url}/lf/{self.langflow_id}/api/v1/run/{self.flow_id}"
+            base = f"{self.base_url}/lf/{self.langflow_id}/api/v1/run/{target_flow_id}"
         else:
             # Self-hosted Langflow format
-            base = f"{self.base_url}/api/v1/run/{self.flow_id}"
+            base = f"{self.base_url}/api/v1/run/{target_flow_id}"
 
         if stream:
             return f"{base}?stream=true"
         return base
+
+    async def list_flows(self) -> list[Flow]:
+        """
+        List available public flows from Langflow.
+
+        Returns:
+            List of Flow objects
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        if self.langflow_id:
+            # Langflow Cloud format
+            url = f"{self.base_url}/lf/{self.langflow_id}/api/v1/flows/"
+        else:
+            # Self-hosted Langflow format
+            url = f"{self.base_url}/api/v1/flows/"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.get(url, headers=self.headers)
+                response.raise_for_status()
+
+                data = response.json()
+                flows = []
+
+                # Handle both list response and paginated response
+                flow_list = data if isinstance(data, list) else data.get("flows", [])
+
+                for flow_data in flow_list:
+                    # Filter to only public flows (if access_type field exists)
+                    # Langflow returns uppercase (e.g., "PUBLIC", "PRIVATE")
+                    access_type = flow_data.get("access_type", "PUBLIC")
+                    if access_type.upper() == "PUBLIC":
+                        flows.append(
+                            Flow(
+                                id=flow_data.get("id"),
+                                name=flow_data.get("name", "Unnamed Flow"),
+                                description=flow_data.get("description"),
+                            )
+                        )
+
+                return flows
+
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Langflow API error listing flows: {e.response.status_code}")
+                raise LangflowError(
+                    f"Failed to list flows: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+            except httpx.RequestError as e:
+                logger.error(f"Langflow connection error: {e}")
+                raise LangflowError(f"Failed to connect to Langflow: {str(e)}")
 
     async def chat(
         self,
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
     ) -> str:
         """
         Send a chat message and get a response (non-streaming).
@@ -102,6 +174,7 @@ class LangflowClient:
             message: The user message to send
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
+            flow_id: Optional flow ID to use (defaults to configured flow)
 
         Returns:
             The assistant's response text
@@ -120,7 +193,7 @@ class LangflowClient:
         if tweaks:
             payload["tweaks"] = tweaks
 
-        url = self._get_run_url(stream=False)
+        url = self._get_run_url(flow_id=flow_id, stream=False)
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
@@ -162,6 +235,7 @@ class LangflowClient:
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Send a chat message and stream the response.
@@ -170,6 +244,7 @@ class LangflowClient:
             message: The user message to send
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
+            flow_id: Optional flow ID to use (defaults to configured flow)
 
         Yields:
             Chunks of the assistant's response text
@@ -188,7 +263,7 @@ class LangflowClient:
         if tweaks:
             payload["tweaks"] = tweaks
 
-        url = self._get_run_url(stream=True)
+        url = self._get_run_url(flow_id=flow_id, stream=True)
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
