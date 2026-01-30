@@ -114,6 +114,36 @@ exports[`App tests > should render default App component 1`] = `
                 <div
                   class="pf-v6-c-toolbar__item"
                 >
+                  <button
+                    aria-label="System theme"
+                    class="pf-v6-c-button pf-m-plain"
+                    data-ouia-component-id="OUIA-Generated-Button-plain-2"
+                    data-ouia-component-type="PF6/Button"
+                    data-ouia-safe="true"
+                    type="button"
+                  >
+                    <span
+                      class="pf-v6-c-button__icon"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="pf-v6-svg"
+                        fill="currentColor"
+                        height="1em"
+                        role="img"
+                        viewBox="0 0 512 512"
+                        width="1em"
+                      >
+                        <path
+                          d="M8 256c0 136.966 111.033 248 248 248s248-111.034 248-248S392.966 8 256 8 8 119.033 8 256zm248 184V72c101.705 0 184 82.311 184 184 0 101.705-82.311 184-184 184z"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
+                <div
+                  class="pf-v6-c-toolbar__item"
+                >
                   <svg
                     aria-label="Loading user information"
                     aria-valuetext="Loading..."
@@ -312,7 +342,7 @@ exports[`App tests > should render default App component 1`] = `
                                 aria-expanded="true"
                                 aria-label="Chat history menu"
                                 class="pf-v6-c-button pf-m-plain pf-chatbot__button--toggle-menu "
-                                data-ouia-component-id="OUIA-Generated-Button-plain-7"
+                                data-ouia-component-id="OUIA-Generated-Button-plain-8"
                                 data-ouia-component-type="PF6/Button"
                                 data-ouia-safe="true"
                                 type="button"
@@ -454,7 +484,7 @@ exports[`App tests > should render default App component 1`] = `
                                 <button
                                   aria-label="Attach"
                                   class="pf-v6-c-button pf-m-plain pf-chatbot__button--attach  "
-                                  data-ouia-component-id="OUIA-Generated-Button-plain-5"
+                                  data-ouia-component-id="OUIA-Generated-Button-plain-6"
                                   data-ouia-component-type="PF6/Button"
                                   data-ouia-safe="true"
                                   type="button"
@@ -528,7 +558,7 @@ exports[`App tests > should render default App component 1`] = `
                           <button
                             aria-label="Close drawer panel"
                             class="pf-v6-c-button pf-m-plain"
-                            data-ouia-component-id="OUIA-Generated-Button-plain-6"
+                            data-ouia-component-id="OUIA-Generated-Button-plain-7"
                             data-ouia-component-type="PF6/Button"
                             data-ouia-safe="true"
                             type="button"

@@ -27,7 +27,7 @@ import {
   ToolbarItem,
 } from '@patternfly/react-core';
 import { IAppRoute, IAppRouteGroup, routes } from '@app/routeConfig';
-import { BarsIcon, OutlinedCommentsIcon } from '@patternfly/react-icons';
+import { AdjustIcon, BarsIcon, MoonIcon, OutlinedCommentsIcon, SunIcon } from '@patternfly/react-icons';
 import { useApp } from '@app/contexts/AppContext';
 import { userService } from '@app/services/userService';
 
@@ -39,6 +39,47 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const { currentUser, isLoadingUser } = useApp();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  type ThemeMode = 'system' | 'light' | 'dark';
+  const [themeMode, setThemeMode] = React.useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('theme') as ThemeMode | null;
+    return saved && ['system', 'light', 'dark'].includes(saved) ? saved : 'system';
+  });
+
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
+        root.classList.add('pf-v6-theme-dark');
+      } else {
+        root.classList.remove('pf-v6-theme-dark');
+      }
+    };
+
+    localStorage.setItem('theme', themeMode);
+
+    if (themeMode === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      applyTheme(mediaQuery.matches);
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    } else {
+      applyTheme(themeMode === 'dark');
+    }
+  }, [themeMode]);
+
+  const cycleTheme = () => {
+    setThemeMode((current) => {
+      if (current === 'system') return 'light';
+      if (current === 'light') return 'dark';
+      return 'system';
+    });
+  };
+
+  // Icons represent the CURRENT mode (PatternFly convention)
+  // AdjustIcon (half light/dark) for system, SunIcon for light, MoonIcon for dark
+  const themeIcon = themeMode === 'system' ? <AdjustIcon /> : themeMode === 'light' ? <SunIcon /> : <MoonIcon />;
+  const themeLabel = themeMode === 'system' ? 'System theme' : themeMode === 'light' ? 'Light mode' : 'Dark mode';
 
   const handleLogout = () => {
     setIsUserMenuOpen(false);
@@ -71,6 +112,14 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         <Toolbar id="masthead-toolbar" isStatic>
           <ToolbarContent>
             <ToolbarGroup variant="action-group-plain" align={{ default: 'alignEnd' }}>
+              <ToolbarItem>
+                <Button
+                  variant="plain"
+                  aria-label={themeLabel}
+                  onClick={cycleTheme}
+                  icon={themeIcon}
+                />
+              </ToolbarItem>
               <ToolbarItem>
                 {isLoadingUser ? (
                   <Spinner size="md" aria-label="Loading user information" />
