@@ -1,0 +1,185 @@
+/**
+ * Chat API service for communicating with the backend.
+ *
+ * Adapted from reference chatbot to work with our persistent chat backend.
+ */
+
+import apiClient from '@app/api/apiClient';
+
+const API_BASE = '/v1/chats';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface Chat {
+  id: number;
+  title: string;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatCreate {
+  title: string;
+}
+
+export interface ChatsResponse {
+  data: Chat[];
+  count: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  chat_id: number;
+  content: string;
+  role: 'user' | 'assistant';
+  created_at: string;
+}
+
+export interface ChatMessagesResponse {
+  data: ChatMessage[];
+  count: number;
+}
+
+export interface StreamingEvent {
+  type: 'content' | 'done' | 'error';
+  content?: string;
+  message_id?: number;
+  error?: string;
+}
+
+// =============================================================================
+// Chat CRUD
+// =============================================================================
+
+export const ChatAPI = {
+  async getChats(): Promise<ChatsResponse> {
+    const response = await apiClient.get<ChatsResponse>(`${API_BASE}/`);
+    return response.data;
+  },
+
+  async getChat(id: number): Promise<Chat> {
+    const response = await apiClient.get<Chat>(`${API_BASE}/${id}`);
+    return response.data;
+  },
+
+  async createChat(data: ChatCreate): Promise<Chat> {
+    const response = await apiClient.post<Chat>(`${API_BASE}/`, data);
+    return response.data;
+  },
+
+  async updateChat(id: number, data: Partial<ChatCreate>): Promise<Chat> {
+    const response = await apiClient.put<Chat>(`${API_BASE}/${id}`, data);
+    return response.data;
+  },
+
+  async deleteChat(id: number): Promise<void> {
+    await apiClient.delete(`${API_BASE}/${id}`);
+  },
+
+  // ===========================================================================
+  // Messages
+  // ===========================================================================
+
+  async getMessages(chatId: number): Promise<ChatMessagesResponse> {
+    const response = await apiClient.get<ChatMessagesResponse>(
+      `${API_BASE}/${chatId}/messages/`
+    );
+    return response.data;
+  },
+
+  // ===========================================================================
+  // Streaming
+  // ===========================================================================
+
+  /**
+   * Send a message and stream the AI response via SSE.
+   *
+   * Based on reference chatbot pattern using fetch + ReadableStream.
+   */
+  createStreamingMessage(
+    chatId: number,
+    content: string,
+    onMessage: (event: StreamingEvent) => void,
+    onError?: (error: Error) => void,
+    onComplete?: () => void
+  ): { close: () => void } {
+    const controller = new AbortController();
+
+    const url = `/api${API_BASE}/${chatId}/messages/stream`;
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ content }),
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        const processStream = async () => {
+          let buffer = '';
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                onComplete?.();
+                break;
+              }
+
+              buffer += decoder.decode(value, { stream: true });
+
+              // Process complete SSE events (separated by double newlines)
+              const events = buffer.split('\n\n');
+              buffer = events.pop() || '';
+
+              for (const event of events) {
+                if (!event.trim()) continue;
+
+                const lines = event.split('\n');
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const data = JSON.parse(line.slice(6));
+                      onMessage(data);
+                    } catch (e) {
+                      console.error('Error parsing SSE data:', e);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            if (error instanceof Error && error.name !== 'AbortError') {
+              onError?.(error);
+            }
+          }
+        };
+
+        processStream();
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          onError?.(error);
+        }
+      });
+
+    return {
+      close: () => controller.abort(),
+    };
+  },
+};

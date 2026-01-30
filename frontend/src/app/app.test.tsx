@@ -25,7 +25,7 @@ describe('App tests', () => {
 
     window.dispatchEvent(new Event('resize'));
 
-    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Chat' })).not.toBeInTheDocument();
   });
 
   it('should expand the sidebar on larger viewports', () => {
@@ -35,7 +35,7 @@ describe('App tests', () => {
       window.dispatchEvent(new Event('resize'));
     });
 
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Chat' })).toBeVisible();
   });
 
   it('should hide the sidebar when clicking the nav-toggle button', async () => {
@@ -48,12 +48,12 @@ describe('App tests', () => {
     });
     const button = screen.getByRole('button', { name: 'Global navigation' });
 
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Chat' })).toBeVisible();
 
     await act(async () => {
       await user.click(button);
     });
 
-    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Chat' })).not.toBeInTheDocument();
   });
 });

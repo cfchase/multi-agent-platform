@@ -202,7 +202,9 @@ exports[`App tests > should render default App component 1`] = `
             hidden=""
           >
             <div
-              class="pf-v6-c-toolbar__group"
+              aria-hidden="true"
+              class="pf-v6-c-toolbar__group pf-m-hidden"
+              hidden=""
             />
           </div>
         </div>
@@ -241,35 +243,7 @@ exports[`App tests > should render default App component 1`] = `
                 data-discover="true"
                 href="/"
               >
-                Dashboard
-              </a>
-            </li>
-            <li
-              class="pf-v6-c-nav__item"
-              data-ouia-component-id="OUIA-Generated-NavItem-2"
-              data-ouia-component-type="PF6/NavItem"
-              data-ouia-safe="true"
-            >
-              <a
-                class="pf-v6-c-nav__link"
-                data-discover="true"
-                href="/items"
-              >
-                Items
-              </a>
-            </li>
-            <li
-              class="pf-v6-c-nav__item"
-              data-ouia-component-id="OUIA-Generated-NavItem-3"
-              data-ouia-component-type="PF6/NavItem"
-              data-ouia-safe="true"
-            >
-              <a
-                class="pf-v6-c-nav__link"
-                data-discover="true"
-                href="/support"
-              >
-                Support
+                Chat
               </a>
             </li>
             <li
@@ -281,7 +255,7 @@ exports[`App tests > should render default App component 1`] = `
               <button
                 aria-expanded="false"
                 class="pf-v6-c-nav__link"
-                id="Settings-3"
+                id="Settings-1"
               >
                 Settings
                 <span
@@ -307,7 +281,7 @@ exports[`App tests > should render default App component 1`] = `
                 </span>
               </button>
               <section
-                aria-labelledby="Settings-3"
+                aria-labelledby="Settings-1"
                 class="pf-v6-c-nav__subnav"
                 hidden=""
                 inert=""
@@ -318,7 +292,7 @@ exports[`App tests > should render default App component 1`] = `
                 >
                   <li
                     class="pf-v6-c-nav__item"
-                    data-ouia-component-id="OUIA-Generated-NavItem-4"
+                    data-ouia-component-id="OUIA-Generated-NavItem-2"
                     data-ouia-component-type="PF6/NavItem"
                     data-ouia-safe="true"
                   >
@@ -332,7 +306,7 @@ exports[`App tests > should render default App component 1`] = `
                   </li>
                   <li
                     class="pf-v6-c-nav__item"
-                    data-ouia-component-id="OUIA-Generated-NavItem-5"
+                    data-ouia-component-id="OUIA-Generated-NavItem-3"
                     data-ouia-component-type="PF6/NavItem"
                     data-ouia-safe="true"
                   >
@@ -360,32 +334,332 @@ exports[`App tests > should render default App component 1`] = `
         tabindex="-1"
       >
         <section
-          class="pf-v6-c-page__main-section"
+          class="pf-v6-c-page__main-section pf-m-fill"
+          style="height: 100%; padding: 0px;"
         >
-          <h1
-            class="pf-v6-c-title pf-m-lg"
-            data-ouia-component-id="OUIA-Generated-Title-1"
-            data-ouia-component-type="PF6/Title"
-            data-ouia-safe="true"
-          >
-            Dashboard Page Title!
-          </h1>
           <div
-            style="margin-top: 20px;"
+            class="pf-chatbot pf-chatbot--embedded pf-chatbot--visible   "
           >
-            <button
-              class="pf-v6-c-button pf-m-primary pf-m-progress"
-              data-ouia-component-id="OUIA-Generated-Button-primary-2"
-              data-ouia-component-type="PF6/Button"
-              data-ouia-safe="true"
-              type="button"
+            <section
+              aria-label="Chatbot"
+              class="pf-chatbot-container pf-chatbot-container--embedded "
+              tabindex="-1"
             >
-              <span
-                class="pf-v6-c-button__text"
+              <div
+                class="pf-v6-c-drawer pf-m-inline pf-m-panel-left pf-chatbot__history "
               >
-                Check Backend Health
-              </span>
-            </button>
+                <div
+                  class="pf-v6-c-drawer__main"
+                >
+                  <div
+                    class="pf-v6-c-drawer__content"
+                  >
+                    <div
+                      class="pf-v6-c-drawer__body"
+                    >
+                      <div
+                        class="undefined "
+                      />
+                      <div
+                        class="pf-chatbot__header-container"
+                      >
+                        <div
+                          class="pf-chatbot__header"
+                        >
+                          <div
+                            class="pf-chatbot__header-main"
+                          >
+                            <div
+                              class="pf-chatbot__menu undefined"
+                            >
+                              <button
+                                aria-expanded="false"
+                                aria-label="Chat history menu"
+                                class="pf-v6-c-button pf-m-plain pf-chatbot__button--toggle-menu "
+                                data-ouia-component-id="OUIA-Generated-Button-plain-6"
+                                data-ouia-component-type="PF6/Button"
+                                data-ouia-safe="true"
+                                type="button"
+                              >
+                                <span
+                                  class="pf-v6-c-button__icon"
+                                >
+                                  <span
+                                    class="pf-v6-c-icon pf-m-inline pf-m-xl"
+                                  >
+                                    <span
+                                      class="pf-v6-c-icon__content"
+                                    >
+                                      <svg
+                                        aria-hidden="true"
+                                        class="pf-v6-svg"
+                                        fill="currentColor"
+                                        height="1em"
+                                        role="img"
+                                        viewBox="0 0 448 512"
+                                        width="1em"
+                                      >
+                                        <path
+                                          d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"
+                                        />
+                                      </svg>
+                                    </span>
+                                  </span>
+                                </span>
+                              </button>
+                            </div>
+                            <div
+                              class="pf-v6-l-split__item pf-m-fill pf-chatbot__title "
+                            >
+                              Research Assistant
+                            </div>
+                          </div>
+                        </div>
+                        <hr
+                          class="pf-v6-c-divider pf-chatbot__header__divider"
+                        />
+                      </div>
+                      <div
+                        class="pf-chatbot__content  "
+                      >
+                        <div
+                          aria-label="Scrollable message log"
+                          class="pf-chatbot__messagebox  "
+                          role="region"
+                          tabindex="0"
+                        >
+                          <div
+                            class="pf-chatbot--layout--welcome  "
+                          >
+                            <h1
+                              class="pf-v6-c-content--h1"
+                              data-ouia-component-id="OUIA-Generated-Content-1"
+                              data-ouia-component-type="PF6/Content"
+                              data-ouia-safe="true"
+                              data-pf-content="true"
+                            >
+                              <span
+                                class="pf-chatbot__hello"
+                              >
+                                Hello!
+                              </span>
+                              <br />
+                              <span
+                                class="pf-chatbot__question"
+                              >
+                                How can I help you today?
+                              </span>
+                            </h1>
+                            <div
+                              class="pf-chatbot__prompt-suggestions"
+                            >
+                              <div
+                                class="pf-v6-c-card pf-m-clickable pf-chatbot__prompt-suggestion"
+                                data-ouia-component-id="OUIA-Generated-Card-1"
+                                data-ouia-component-type="PF6/Card"
+                                data-ouia-safe="true"
+                                id=""
+                              >
+                                <div
+                                  class="pf-v6-c-card__header"
+                                >
+                                  <div
+                                    class="pf-v6-c-card__actions"
+                                  >
+                                    <div
+                                      class="pf-v6-c-card__selectable-actions"
+                                    >
+                                      <button
+                                        aria-labelledby="welcome-prompt-title-0"
+                                        class="pf-v6-c-card__clickable-action"
+                                        id="welcome-prompt-input-0"
+                                        type="button"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div
+                                    class="pf-v6-c-card__header-main"
+                                  >
+                                    <div
+                                      class="pf-v6-c-card__title"
+                                    >
+                                      <div
+                                        class="pf-v6-c-card__title-text"
+                                        id="welcome-prompt-title-0"
+                                      >
+                                        Research a topic
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div
+                                  class="pf-v6-c-card__body"
+                                >
+                                  Help me research and summarize information about a specific topic.
+                                </div>
+                              </div>
+                              <div
+                                class="pf-v6-c-card pf-m-clickable pf-chatbot__prompt-suggestion"
+                                data-ouia-component-id="OUIA-Generated-Card-2"
+                                data-ouia-component-type="PF6/Card"
+                                data-ouia-safe="true"
+                                id=""
+                              >
+                                <div
+                                  class="pf-v6-c-card__header"
+                                >
+                                  <div
+                                    class="pf-v6-c-card__actions"
+                                  >
+                                    <div
+                                      class="pf-v6-c-card__selectable-actions"
+                                    >
+                                      <button
+                                        aria-labelledby="welcome-prompt-title-1"
+                                        class="pf-v6-c-card__clickable-action"
+                                        id="welcome-prompt-input-1"
+                                        type="button"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div
+                                    class="pf-v6-c-card__header-main"
+                                  >
+                                    <div
+                                      class="pf-v6-c-card__title"
+                                    >
+                                      <div
+                                        class="pf-v6-c-card__title-text"
+                                        id="welcome-prompt-title-1"
+                                      >
+                                        Analyze data
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div
+                                  class="pf-v6-c-card__body"
+                                >
+                                  Help me analyze and interpret data or documents.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            aria-live="polite"
+                            class="pf-chatbot__messagebox-announcement pf-chatbot-m-hidden"
+                          />
+                        </div>
+                      </div>
+                      <div
+                        class="pf-chatbot__footer   "
+                      >
+                        <hr
+                          class="pf-v6-c-divider"
+                        />
+                        <div
+                          class="pf-chatbot__footer-container"
+                        >
+                          <div
+                            class="pf-chatbot__message-bar"
+                          >
+                            <div
+                              class="pf-chatbot__message-bar-input "
+                              style="flex-basis: auto;"
+                            >
+                              <span
+                                class="pf-v6-c-form-control pf-m-textarea pf-m-resize-both pf-chatbot__message-textarea"
+                                style="margin-top: 1rem; margin-bottom: 0rem; height: inherit;"
+                              >
+                                <textarea
+                                  aria-invalid="false"
+                                  aria-label="Send a message..."
+                                  placeholder="Send a message..."
+                                  style="line-height: 1rem;"
+                                />
+                              </span>
+                            </div>
+                            <div
+                              class="pf-chatbot__message-bar-actions"
+                            >
+                              <input
+                                hidden=""
+                                multiple=""
+                                style="border: 0px; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(50%); height: 1px; margin: 0px -1px -1px 0px; overflow: hidden; padding: 0px; position: absolute; width: 1px; white-space: nowrap;"
+                                tabindex="-1"
+                                type="file"
+                              />
+                              <div
+                                style="display: contents;"
+                              >
+                                <button
+                                  aria-label="Attach"
+                                  class="pf-v6-c-button pf-m-plain pf-chatbot__button--attach  "
+                                  data-ouia-component-id="OUIA-Generated-Button-plain-5"
+                                  data-ouia-component-type="PF6/Button"
+                                  data-ouia-safe="true"
+                                  type="button"
+                                >
+                                  <span
+                                    class="pf-v6-c-button__icon"
+                                  >
+                                    <span
+                                      class="pf-v6-c-icon pf-m-inline"
+                                    >
+                                      <span
+                                        class="pf-v6-c-icon__content pf-m-xl"
+                                      >
+                                        <svg
+                                          aria-hidden="true"
+                                          class="pf-v6-svg"
+                                          fill="currentColor"
+                                          height="1em"
+                                          role="img"
+                                          viewBox="0 0 448 512"
+                                          width="1em"
+                                        >
+                                          <path
+                                            d="M43.246 466.142c-58.43-60.289-57.341-157.511 1.386-217.581L254.392 34c44.316-45.332 116.351-45.336 160.671 0 43.89 44.894 43.943 117.329 0 162.276L232.214 383.128c-29.855 30.537-78.633 30.111-107.982-.998-28.275-29.97-27.368-77.473 1.452-106.953l143.743-146.835c6.182-6.314 16.312-6.422 22.626-.241l22.861 22.379c6.315 6.182 6.422 16.312.241 22.626L171.427 319.927c-4.932 5.045-5.236 13.428-.648 18.292 4.372 4.634 11.245 4.711 15.688.165l182.849-186.851c19.613-20.062 19.613-52.725-.011-72.798-19.189-19.627-49.957-19.637-69.154 0L90.39 293.295c-34.763 35.56-35.299 93.12-1.191 128.313 34.01 35.093 88.985 35.137 123.058.286l172.06-175.999c6.177-6.319 16.307-6.433 22.626-.256l22.877 22.364c6.319 6.177 6.434 16.307.256 22.626l-172.06 175.998c-59.576 60.938-155.943 60.216-214.77-.485z"
+                                          />
+                                        </svg>
+                                      </span>
+                                    </span>
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            class="pf-chatbot__footnote "
+                          >
+                            <small
+                              class="pf-v6-c-content--small"
+                              data-ouia-component-id="OUIA-Generated-Content-2"
+                              data-ouia-component-type="PF6/Content"
+                              data-ouia-safe="true"
+                              data-pf-content="true"
+                            >
+                              AI-powered research assistant. Verify important information.
+                            </small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    aria-labelledby="pf-drawer-panel-2"
+                    aria-live="polite"
+                    aria-modal="true"
+                    class="pf-v6-c-drawer__panel"
+                    hidden=""
+                    id="pf-drawer-panel-2"
+                    role="dialog"
+                    style="--pf-v6-c-drawer__panel--md--FlexBasis: 384px;"
+                    tabindex="-1"
+                  />
+                </div>
+              </div>
+            </section>
           </div>
         </section>
       </main>

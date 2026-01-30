@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { playwright } from '@vitest/browser-playwright';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = resolve(__filename, '..');
@@ -8,7 +9,14 @@ const __dirname = resolve(__filename, '..');
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'jsdom',
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      headless: true,
+      instances: [
+        { browser: 'chromium' }
+      ],
+    },
     setupFiles: './src/setupTests.ts',
     exclude: ['**/node_modules/**', '**/e2e/**'],
   },

@@ -17,7 +17,7 @@ export default defineConfig({
       exclude: [
         '**/node_modules/@patternfly/**/assets/fonts/**',
         '**/node_modules/@patternfly/**/assets/pficon/**',
-        '**/bgimages/**'
+        '**/images/**'
       ],
       svgrOptions: {
         exportType: 'default',
