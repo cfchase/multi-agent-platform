@@ -4,9 +4,12 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 from sqlmodel import Session
 
 from app.models import Chat, ChatMessage, User
+from app.api.deps import get_current_user
+from app.main import app
 
 
 @pytest.fixture
@@ -334,3 +337,225 @@ class TestMessageStreaming:
         assert len(messages) == 1
         # Mock client returns canned responses
         assert len(messages[0].content) > 0
+
+    def test_stream_message_langflow_error(
+        self, client: TestClient, session: Session, test_chat: Chat, monkeypatch
+    ):
+        """Test that Langflow errors return SSE error event."""
+        from app.services.langflow.mock_client import MockLangflowClient
+        from app.api.routes.v1 import chat_messages
+
+        # Create a mock client that simulates errors
+        error_client = MockLangflowClient(
+            simulate_error=True,
+            error_message="Simulated Langflow connection error"
+        )
+
+        # Patch the function where it's imported (in the route module)
+        monkeypatch.setattr(chat_messages, "get_langflow_client", lambda: error_client)
+
+        response = client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "This will fail"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+        # Parse SSE events - should contain error event
+        events = []
+        for line in response.text.split("\n\n"):
+            if line.startswith("data: "):
+                data = json.loads(line[6:])
+                events.append(data)
+
+        # Should have an error event
+        error_events = [e for e in events if e.get("type") == "error"]
+        assert len(error_events) == 1
+        assert "Simulated Langflow connection error" in error_events[0].get("error", "")
+
+    def test_stream_message_langflow_error_still_saves_user_message(
+        self, client: TestClient, session: Session, test_chat: Chat, monkeypatch
+    ):
+        """Test that user message is saved even when Langflow fails."""
+        from app.services.langflow.mock_client import MockLangflowClient
+        from app.api.routes.v1 import chat_messages
+
+        # Create a mock client that simulates errors
+        error_client = MockLangflowClient(simulate_error=True)
+        monkeypatch.setattr(chat_messages, "get_langflow_client", lambda: error_client)
+
+        # Consume the streaming response (will get error)
+        client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Message before error"},
+        )
+
+        # Refresh session to get updated data
+        session.expire_all()
+
+        # Check that user message was still saved
+        user_messages = session.query(ChatMessage).filter(
+            ChatMessage.chat_id == test_chat.id,
+            ChatMessage.role == "user"
+        ).all()
+
+        assert len(user_messages) == 1
+        assert user_messages[0].content == "Message before error"
+
+        # But no assistant message should be saved (since Langflow failed)
+        assistant_messages = session.query(ChatMessage).filter(
+            ChatMessage.chat_id == test_chat.id,
+            ChatMessage.role == "assistant"
+        ).all()
+        assert len(assistant_messages) == 0
+
+
+@pytest.fixture
+def other_user(session: Session) -> User:
+    """
+    Create a second user for authorization testing.
+
+    This user is different from dev_user and should NOT have access
+    to dev_user's chats.
+    """
+    user = User(
+        email="other-user@example.com",
+        username="other-user",
+        full_name="Other User",
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def other_user_client(session: Session, other_user: User) -> TestClient:
+    """
+    Create a test client that authenticates as other_user.
+
+    This is used to test authorization - other_user should NOT be able
+    to access dev_user's chats.
+    """
+    from app.api.deps import get_db
+
+    def get_other_user():
+        return other_user
+
+    def get_session_override():
+        return session
+
+    app.dependency_overrides[get_current_user] = get_other_user
+    app.dependency_overrides[get_db] = get_session_override
+
+    client = TestClient(app)
+    yield client
+
+    # Clean up: restore to original overrides
+    app.dependency_overrides.clear()
+
+
+class TestChatAuthorization:
+    """Tests for chat authorization - verify users cannot access other users' chats."""
+
+    def test_read_chat_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot read another user's chat (403 Forbidden)."""
+        response = other_user_client.get(f"/api/v1/chats/{test_chat.id}")
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_update_chat_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot update another user's chat (403 Forbidden)."""
+        response = other_user_client.put(
+            f"/api/v1/chats/{test_chat.id}",
+            json={"title": "Hacked Title"},
+        )
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_delete_chat_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot delete another user's chat (403 Forbidden)."""
+        response = other_user_client.delete(f"/api/v1/chats/{test_chat.id}")
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_read_messages_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot read another user's chat messages (403 Forbidden)."""
+        response = other_user_client.get(f"/api/v1/chats/{test_chat.id}/messages/")
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_create_message_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot create messages in another user's chat (403 Forbidden)."""
+        response = other_user_client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/",
+            json={"content": "Malicious message", "role": "user"},
+        )
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_stream_message_forbidden_for_other_user(
+        self, other_user_client: TestClient, test_chat: Chat, other_user: User
+    ):
+        """Test that a user cannot stream messages to another user's chat (403 Forbidden)."""
+        response = other_user_client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Malicious stream"},
+        )
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_delete_message_forbidden_for_other_user(
+        self,
+        other_user_client: TestClient,
+        session: Session,
+        test_chat: Chat,
+        other_user: User,
+    ):
+        """Test that a user cannot delete another user's chat message (403 Forbidden)."""
+        # Create a message in the chat
+        message = ChatMessage(
+            chat_id=test_chat.id, content="Private message", role="user"
+        )
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+
+        response = other_user_client.delete(
+            f"/api/v1/chats/{test_chat.id}/messages/{message.id}"
+        )
+        assert response.status_code == 403
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_list_chats_only_shows_own_chats(
+        self,
+        other_user_client: TestClient,
+        session: Session,
+        test_chat: Chat,
+        other_user: User,
+    ):
+        """Test that listing chats only shows the current user's chats, not others'."""
+        # Create a chat for other_user
+        other_chat = Chat(title="Other User's Chat", user_id=other_user.id)
+        session.add(other_chat)
+        session.commit()
+
+        response = other_user_client.get("/api/v1/chats/")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should only see other_user's chat, not test_chat (which belongs to dev_user)
+        chat_ids = [chat["id"] for chat in data["data"]]
+        assert other_chat.id in chat_ids
+        assert test_chat.id not in chat_ids

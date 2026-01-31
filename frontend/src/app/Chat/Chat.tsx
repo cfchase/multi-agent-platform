@@ -1,5 +1,7 @@
 import * as React from 'react';
 import {
+  Alert,
+  AlertActionCloseButton,
   Button,
   Dropdown,
   DropdownItem,
@@ -70,6 +72,9 @@ function Chat(): React.ReactElement {
   const [announcement, setAnnouncement] = React.useState<string>();
   const [lastError, setLastError] = React.useState<{ message: string; chatId: number } | null>(null);
 
+  // Operation error state (for displaying errors to user)
+  const [operationError, setOperationError] = React.useState<string | null>(null);
+
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
   const messageBoxRef = React.useRef<MessageBoxHandle | null>(null);
@@ -134,6 +139,7 @@ function Chat(): React.ReactElement {
 
   const loadChats = async () => {
     setChatsLoading(true);
+    setOperationError(null);
     try {
       const response = await ChatAPI.getChats();
       const chatData = response?.data || [];
@@ -143,6 +149,7 @@ function Chat(): React.ReactElement {
       }
     } catch (err) {
       console.error('Failed to load chats:', err);
+      setOperationError('Failed to load chats. Please try refreshing the page.');
       setChats([]);
     } finally {
       setChatsLoading(false);
@@ -150,17 +157,20 @@ function Chat(): React.ReactElement {
   };
 
   const loadMessages = async (chatId: number) => {
+    setOperationError(null);
     try {
       const response = await ChatAPI.getMessages(chatId);
       const messageData = response?.data || [];
       setMessages(messageData.map(convertMessageToProps));
     } catch (err) {
       console.error('Failed to load messages:', err);
+      setOperationError('Failed to load messages. Please try selecting the chat again.');
       setMessages([]);
     }
   };
 
   const handleNewChat = async () => {
+    setOperationError(null);
     try {
       const newChat = await ChatAPI.createChat({ title: 'New Chat' });
       setChats((prev) => [newChat, ...prev]);
@@ -168,10 +178,12 @@ function Chat(): React.ReactElement {
       setMessages([]);
     } catch (err) {
       console.error('Failed to create chat:', err);
+      setOperationError('Failed to create a new chat. Please try again.');
     }
   };
 
   const handleDeleteChat = async (chatId: number) => {
+    setOperationError(null);
     try {
       await ChatAPI.deleteChat(chatId);
       setChats((prev) => prev.filter((c) => c.id !== chatId));
@@ -182,6 +194,7 @@ function Chat(): React.ReactElement {
       }
     } catch (err) {
       console.error('Failed to delete chat:', err);
+      setOperationError('Failed to delete chat. Please try again.');
     }
   };
 
@@ -398,6 +411,14 @@ function Chat(): React.ReactElement {
                   </Dropdown>
                 </ChatbotHeaderActions>
               </ChatbotHeader>
+              {operationError && (
+                <Alert
+                  variant="danger"
+                  title={operationError}
+                  actionClose={<AlertActionCloseButton onClose={() => setOperationError(null)} />}
+                  isInline
+                />
+              )}
               <ChatbotContent>
                 {userScrolledUp && (
                   <div className="pf-chatbot__jump-button">

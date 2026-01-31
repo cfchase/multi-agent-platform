@@ -7,7 +7,10 @@ enabling type-safe dependency injection and easy mocking for tests.
 Both real and mock implementations must satisfy these protocols.
 """
 
-from typing import AsyncGenerator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, AsyncGenerator, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from app.services.langflow.client import Flow
 
 
 @runtime_checkable
@@ -71,6 +74,18 @@ class LangflowClientProtocol(Protocol):
 
         Yields:
             Chunks of the assistant's response text
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        ...
+
+    async def list_flows(self) -> list["Flow"]:
+        """
+        List available Langflow flows.
+
+        Returns:
+            List of Flow objects with id, name, and description
 
         Raises:
             LangflowError: If the API call fails

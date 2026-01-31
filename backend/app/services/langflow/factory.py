@@ -99,9 +99,17 @@ def get_langflow_client() -> LangflowClientProtocol:
         logger.info(f"Using real Langflow client (URL: {settings.LANGFLOW_URL})")
         return LangflowClient()
 
+    # In production/staging, fail explicitly rather than silently using mock
+    if settings.ENVIRONMENT in ("production", "staging"):
+        raise RuntimeError(
+            "Langflow not configured. LANGFLOW_URL must be set in production/staging. "
+            "Set LANGFLOW_URL=mock to explicitly use mock client for testing."
+        )
+
+    # In local/development, fall back to mock with a warning
     logger.warning(
         "Langflow not configured. Set LANGFLOW_URL=mock for testing, "
         "or provide LANGFLOW_URL for production. "
-        "Falling back to mock client."
+        "Falling back to mock client in development."
     )
     return MockLangflowClient()

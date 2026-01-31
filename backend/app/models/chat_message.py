@@ -17,9 +17,9 @@ if TYPE_CHECKING:
     from app.models.chat import Chat
 
 
-# Valid roles for chat messages
+# Valid roles for chat messages - type hint only (SQLModel can't use Literal for db columns)
 MessageRole = Literal["user", "assistant"]
-VALID_ROLES = {"user", "assistant"}
+VALID_ROLES = ("user", "assistant")
 
 
 class ChatMessageBase(SQLModel):
@@ -30,9 +30,9 @@ class ChatMessageBase(SQLModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        """Validate role is 'user' or 'assistant'."""
+        """Validate role is either 'user' or 'assistant'."""
         if v not in VALID_ROLES:
-            raise ValueError("Role must be 'user' or 'assistant'")
+            raise ValueError(f"role must be one of {VALID_ROLES}")
         return v
 
 
