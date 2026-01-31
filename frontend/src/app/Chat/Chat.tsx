@@ -26,22 +26,38 @@ import {
   MessageProps,
   Conversation,
 } from '@patternfly/chatbot';
-
 import { RedoIcon, TrashIcon } from '@patternfly/react-icons';
+
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
 
 import '@patternfly/chatbot/dist/css/main.css';
 
-const Chat: React.FunctionComponent = () => {
+const ERROR_MESSAGE = 'Sorry, an error occurred. Click retry to try again.';
+const DISPLAY_MODE = ChatbotDisplayMode.embedded;
+
+function convertMessageToProps(msg: ChatMessage): MessageProps {
+  const isUser = msg.role === 'user';
+  return {
+    id: msg.id.toString(),
+    role: isUser ? 'user' : 'bot',
+    content: msg.content,
+    name: isUser ? 'You' : 'Assistant',
+    avatar: isUser ? userAvatar : aiLogo,
+    timestamp: new Date(msg.created_at).toLocaleString(),
+    avatarProps: isUser ? { isBordered: true } : undefined,
+  };
+}
+
+function Chat(): React.ReactElement {
   // Chat list state
   const [chats, setChats] = React.useState<ChatType[]>([]);
   const [selectedChatId, setSelectedChatId] = React.useState<number | null>(null);
   const [chatsLoading, setChatsLoading] = React.useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(true);
 
-  // Flow selector state (using name for stable identification across imports)
+  // Flow selector state
   const [flows, setFlows] = React.useState<Flow[]>([]);
   const [selectedFlowName, setSelectedFlowName] = React.useState<string | null>(null);
   const [isFlowMenuOpen, setIsFlowMenuOpen] = React.useState(false);
@@ -54,7 +70,6 @@ const Chat: React.FunctionComponent = () => {
 
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
-  const displayMode = ChatbotDisplayMode.embedded;
 
   // Load chats and flows on mount
   React.useEffect(() => {
@@ -106,16 +121,7 @@ const Chat: React.FunctionComponent = () => {
     try {
       const response = await ChatAPI.getMessages(chatId);
       const messageData = response?.data || [];
-      const messageProps: MessageProps[] = messageData.map((msg: ChatMessage) => ({
-        id: msg.id.toString(),
-        role: msg.role === 'user' ? 'user' : 'bot',
-        content: msg.content,
-        name: msg.role === 'user' ? 'You' : 'Assistant',
-        avatar: msg.role === 'user' ? userAvatar : aiLogo,
-        timestamp: new Date(msg.created_at).toLocaleString(),
-        avatarProps: msg.role === 'user' ? { isBordered: true } : undefined,
-      }));
-      setMessages(messageProps);
+      setMessages(messageData.map(convertMessageToProps));
     } catch (err) {
       console.error('Failed to load messages:', err);
       setMessages([]);
@@ -233,7 +239,7 @@ const Chat: React.FunctionComponent = () => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === loadingBotMessage.id
-                ? { ...msg, content: 'Sorry, an error occurred. Click retry to try again.', isLoading: false }
+                ? { ...msg, content: ERROR_MESSAGE, isLoading: false }
                 : msg
             )
           );
@@ -247,7 +253,7 @@ const Chat: React.FunctionComponent = () => {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === loadingBotMessage.id
-              ? { ...msg, content: 'Sorry, an error occurred. Click retry to try again.', isLoading: false }
+              ? { ...msg, content: ERROR_MESSAGE, isLoading: false }
               : msg
           )
         );
@@ -304,9 +310,9 @@ const Chat: React.FunctionComponent = () => {
 
   return (
     <PageSection isFilled hasBodyWrapper={false} style={{ height: '100%', padding: 0 }}>
-      <Chatbot displayMode={displayMode}>
+      <Chatbot displayMode={DISPLAY_MODE}>
         <ChatbotConversationHistoryNav
-          displayMode={displayMode}
+          displayMode={DISPLAY_MODE}
           onDrawerToggle={() => setIsDrawerOpen(!isDrawerOpen)}
           isDrawerOpen={isDrawerOpen}
           setIsDrawerOpen={setIsDrawerOpen}
