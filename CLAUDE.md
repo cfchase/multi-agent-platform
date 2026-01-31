@@ -24,7 +24,7 @@ make setup && make services-start && make db-seed && make dev
 - Backend changes: FastAPI auto-reloads on save
 
 **Changing database models?**
-1. Update models in `backend/app/models/` (user.py, item.py, or create new files)
+1. Update models in `backend/app/models/` (user.py, item.py, chat.py, chat_message.py)
 2. Export new models in `backend/app/models/__init__.py`
 3. Create migration: `cd backend && uv run alembic revision --autogenerate -m "description"`
 4. Review auto-generated migration file (CRITICAL!)
@@ -210,6 +210,21 @@ make undeploy             # Remove development deployment
 - `POST /api/v1/items/` - Create new item (authenticated)
 - `PUT /api/v1/items/{id}` - Update item (owner or admin only)
 - `DELETE /api/v1/items/{id}` - Delete item (owner or admin only)
+
+**Chats API (REST):**
+- `GET /api/v1/chats/` - List user's chats with pagination
+- `GET /api/v1/chats/{id}` - Get chat by ID (ownership check)
+- `POST /api/v1/chats/` - Create new chat
+- `PUT /api/v1/chats/{id}` - Update chat title
+- `DELETE /api/v1/chats/{id}` - Delete chat (cascades to messages)
+
+**Chat Messages API (REST):**
+- `GET /api/v1/chats/{chat_id}/messages/` - List messages in a chat
+- `POST /api/v1/chats/{chat_id}/messages/` - Create message (non-streaming)
+- `POST /api/v1/chats/{chat_id}/messages/stream` - Stream AI response via SSE
+
+**Flows API (REST):**
+- `GET /api/v1/flows/` - List available Langflow flows
 
 ## GraphQL API
 
