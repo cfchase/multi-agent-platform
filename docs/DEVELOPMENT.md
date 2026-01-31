@@ -216,10 +216,28 @@ make mlflow-stop
 
 ### Service Details
 
-**LangFlow** - Visual workflow builder
+**LangFlow** - Visual workflow builder for the Chat feature
 - Connects to PostgreSQL for persistence
-- Default credentials: Set via environment
-- Useful for prototyping LLM pipelines
+- Create flows in the LangFlow UI at http://localhost:7860
+- Configure flows for the Chat feature via environment variables:
+
+```bash
+# In backend/.env for mock mode (no Langflow required):
+LANGFLOW_URL=mock
+
+# For local Langflow:
+LANGFLOW_URL=http://localhost:7860
+LANGFLOW_DEFAULT_FLOW=My Chat Flow  # Flow name (stable across imports)
+
+# For Langflow Cloud:
+LANGFLOW_URL=https://api.langflow.astra.datastax.com
+LANGFLOW_ID=your-project-id
+LANGFLOW_DEFAULT_FLOW=My Chat Flow
+LANGFLOW_API_KEY=your-api-key
+```
+
+- The Chat UI allows selecting different flows from a dropdown
+- Flow names are preferred over IDs as they're stable across imports
 
 **Langfuse** - LLM observability
 - Full stack: Redis, ClickHouse, MinIO, PostgreSQL

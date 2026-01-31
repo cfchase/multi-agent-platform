@@ -107,6 +107,19 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "changethis"
     POSTGRES_DB: str = "app"
 
+    # Langflow Configuration
+    # Used for chat AI backend integration
+    #
+    # In Kubernetes, these are typically populated from secrets:
+    #   - LANGFLOW_API_KEY from a Secret (e.g., langflow-credentials)
+    #   - Other values from ConfigMap or environment
+    #
+    # Set LANGFLOW_URL="mock" to use MockLangflowClient for testing
+    LANGFLOW_URL: str = "http://localhost:7860"
+    LANGFLOW_API_KEY: str | None = None  # Bearer token for auth (from K8s secret)
+    LANGFLOW_ID: str | None = None  # Langflow Cloud project ID (optional)
+    LANGFLOW_DEFAULT_FLOW: str | None = None  # Default flow name to execute
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:

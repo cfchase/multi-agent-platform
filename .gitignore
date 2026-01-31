@@ -1,6 +1,10 @@
 # Claude Code
 .claude/settings.local.json
 
+# Root npm dependencies (for concurrently)
+node_modules/
+package-lock.json
+
 # Environment variables
 .env
 .env.local
@@ -65,3 +69,6 @@ config/flow-sources.yaml
 *.bak
 *.backup
 *~
+
+# Playwright MCP
+.playwright-mcp/

@@ -12,6 +12,9 @@ import os
 # This prevents loading .env file during tests, ensuring test isolation
 os.environ["TESTING"] = "1"
 
+# Use mock Langflow client for tests
+os.environ["LANGFLOW_URL"] = "mock"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine

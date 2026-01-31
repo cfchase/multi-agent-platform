@@ -60,3 +60,6 @@ coverage/
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Test artifacts
+__screenshots__/

@@ -1,0 +1,73 @@
+/* ImagePreview component styles */
+
+.image-preview-container {
+  margin-top: var(--pf-v6-global--spacer--md);
+}
+
+.image-preview-invalid-section {
+  margin-bottom: var(--pf-v6-global--spacer--lg);
+}
+
+.image-preview-alert {
+  margin-bottom: var(--pf-v6-global--spacer--sm);
+}
+
+.image-preview-button {
+  cursor: pointer;
+  border-radius: var(--pf-v6-global--BorderRadius--lg);
+  overflow: hidden;
+  box-shadow: var(--pf-v6-global--BoxShadow--sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background-color: var(--pf-v6-global--BackgroundColor--200);
+  outline: none;
+}
+
+.image-preview-button:hover {
+  transform: scale(1.02);
+  box-shadow: var(--pf-v6-global--BoxShadow--md);
+}
+
+.image-preview-button:focus {
+  box-shadow: 0 0 0 2px var(--pf-v6-global--active-color--100);
+}
+
+.image-preview-error-placeholder {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-v6-global--danger-color--100);
+  font-size: var(--pf-v6-global--FontSize--sm);
+  padding: var(--pf-v6-global--spacer--lg);
+  text-align: center;
+}
+
+.image-preview-error-icon {
+  margin-bottom: var(--pf-v6-global--spacer--sm);
+  font-size: var(--pf-v6-global--icon--FontSize--xl);
+}
+
+.image-preview-error-detail {
+  font-size: var(--pf-v6-global--FontSize--xs);
+  margin-top: var(--pf-v6-global--spacer--xs);
+  opacity: 0.8;
+}
+
+.image-preview-thumbnail {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  display: block;
+}
+
+.image-preview-modal-center {
+  text-align: center;
+}
+
+.image-preview-modal-image {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}

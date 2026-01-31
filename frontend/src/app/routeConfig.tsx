@@ -1,9 +1,12 @@
 import * as React from 'react';
-import { Dashboard } from '@app/Dashboard/Dashboard';
-import { ItemBrowser } from '@app/Items/ItemBrowser';
-import { Support } from '@app/Support/Support';
+
+import { Chat } from '@app/Chat/Chat';
 import { GeneralSettings } from '@app/Settings/General/GeneralSettings';
 import { ProfileSettings } from '@app/Settings/Profile/ProfileSettings';
+
+// =============================================================================
+// Types
+// =============================================================================
 
 export interface IAppRoute {
   label?: string; // Excluding the label will exclude the route from the nav sidebar in AppLayout
@@ -21,27 +24,17 @@ export interface IAppRouteGroup {
 
 export type AppRouteConfig = IAppRoute | IAppRouteGroup;
 
+// =============================================================================
+// Route Configuration
+// =============================================================================
+
 export const routes: AppRouteConfig[] = [
   {
-    element: <Dashboard />,
+    element: <Chat />,
     exact: true,
-    label: 'Dashboard',
+    label: 'Chat',
     path: '/',
-    title: 'PatternFly Seed | Main Dashboard',
-  },
-  {
-    element: <ItemBrowser />,
-    exact: true,
-    label: 'Items',
-    path: '/items',
-    title: 'PatternFly Seed | Items',
-  },
-  {
-    element: <Support />,
-    exact: true,
-    label: 'Support',
-    path: '/support',
-    title: 'PatternFly Seed | Support Page',
+    title: 'Multi-Agent Platform | Chat',
   },
   {
     label: 'Settings',
@@ -51,20 +44,30 @@ export const routes: AppRouteConfig[] = [
         exact: true,
         label: 'General',
         path: '/settings/general',
-        title: 'PatternFly Seed | General Settings',
+        title: 'Multi-Agent Platform | General Settings',
       },
       {
         element: <ProfileSettings />,
         exact: true,
         label: 'Profile',
         path: '/settings/profile',
-        title: 'PatternFly Seed | Profile Settings',
+        title: 'Multi-Agent Platform | Profile Settings',
       },
     ],
   },
 ];
 
-export const flattenedRoutes: IAppRoute[] = routes.reduce(
-  (flattened, route) => [...flattened, ...(route.routes ? route.routes : [route])],
-  [] as IAppRoute[],
-);
+// =============================================================================
+// Utilities
+// =============================================================================
+
+function flattenRoutes(routeConfigs: AppRouteConfig[]): IAppRoute[] {
+  return routeConfigs.reduce<IAppRoute[]>((flattened, route) => {
+    if (route.routes) {
+      return [...flattened, ...route.routes];
+    }
+    return [...flattened, route];
+  }, []);
+}
+
+export const flattenedRoutes: IAppRoute[] = flattenRoutes(routes);
