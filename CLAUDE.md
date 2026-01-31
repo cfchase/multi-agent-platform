@@ -224,7 +224,7 @@ make undeploy             # Remove development deployment
 - `POST /api/v1/chats/{chat_id}/messages/stream` - Stream AI response via SSE
 
 **Flows API (REST):**
-- `GET /api/v1/flows/` - List available Langflow flows
+- `GET /api/v1/flows/` - List available Langflow flows (includes `default_flow` from LANGFLOW_DEFAULT_FLOW)
 
 ## GraphQL API
 

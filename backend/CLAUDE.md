@@ -12,6 +12,17 @@
 - **Testing**: pytest with async support
 - **Python Version**: 3.11+
 
+## Langflow Integration
+
+- No official Python SDK exists - use httpx directly for API calls
+- `LANGFLOW_URL=mock` enables MockLangflowClient for testing
+- Flow selection uses names (LANGFLOW_DEFAULT_FLOW), not IDs
+- Test streaming: `curl -N -X POST -H "X-Forwarded-Preferred-Username: dev-user" -H "X-Forwarded-Email: dev@example.com" http://localhost:8000/api/v1/chats/{id}/messages/stream`
+
+**Test Configuration:**
+- `tests/conftest.py` sets `LANGFLOW_URL=mock` to use mock client
+- Without this, tests try to connect to real Langflow and fail
+
 ## File Organization
 
 **Directory Structure:**

@@ -437,6 +437,12 @@ export const itemService = {
 - Configured in `vite.config.ts`
 - Production uses Nginx reverse proxy
 
+## CI/Testing Notes
+
+- Vitest uses browser mode with Playwright (headless: true)
+- CI requires: `npx playwright install --with-deps chromium`
+- Without this, tests fail with "Executable doesn't exist" error
+
 ## Additional Resources
 
 - [../docs/TESTING.md](../docs/TESTING.md) - Testing frameworks, patterns
