@@ -155,8 +155,8 @@ class TestChatMessages:
             f"/api/v1/chats/{test_chat.id}/messages/",
             json={"content": "Hello!", "role": "invalid"},
         )
-        assert response.status_code == 400
-        assert "role" in response.json()["detail"].lower()
+        # Pydantic validates role via Literal type, returns 422
+        assert response.status_code == 422
 
     def test_create_message_chat_not_found(
         self, client: TestClient, dev_user: User

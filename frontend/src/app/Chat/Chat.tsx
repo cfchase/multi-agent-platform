@@ -309,7 +309,7 @@ function Chat(): React.ReactElement {
   }));
 
   return (
-    <PageSection isFilled hasBodyWrapper={false} style={{ height: '100%', padding: 0 }}>
+    <PageSection isFilled hasBodyWrapper={false} padding={{ default: 'noPadding' }}>
       <Chatbot displayMode={DISPLAY_MODE}>
         <ChatbotConversationHistoryNav
           displayMode={DISPLAY_MODE}

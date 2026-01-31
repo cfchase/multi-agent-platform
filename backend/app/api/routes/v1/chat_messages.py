@@ -31,9 +31,6 @@ from app.services.langflow import LangflowError, get_langflow_client
 
 logger = logging.getLogger(__name__)
 
-# Valid message roles
-VALID_ROLES = {"user", "assistant"}
-
 # SSE response headers
 SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -117,10 +114,7 @@ def create_message(
     # Verify chat exists and user has access
     get_chat_with_permission(session, current_user, chat_id)
 
-    # Validate role
-    if message_in.role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail="Role must be 'user' or 'assistant'")
-
+    # Role is validated by Pydantic via MessageRole Literal type
     message = ChatMessage.model_validate(message_in, update={"chat_id": chat_id})
     session.add(message)
     session.commit()

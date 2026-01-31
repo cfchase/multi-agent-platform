@@ -307,8 +307,7 @@ exports[`App tests > should render default App component 1`] = `
         tabindex="-1"
       >
         <section
-          class="pf-v6-c-page__main-section pf-m-fill"
-          style="height: 100%; padding: 0px;"
+          class="pf-v6-c-page__main-section pf-m-no-padding pf-m-fill"
         >
           <div
             class="pf-chatbot pf-chatbot--embedded pf-chatbot--visible   "

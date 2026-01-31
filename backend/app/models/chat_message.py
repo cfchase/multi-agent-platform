@@ -10,6 +10,7 @@ This module contains:
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal, Optional
 
+from pydantic import field_validator
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -18,12 +19,21 @@ if TYPE_CHECKING:
 
 # Valid roles for chat messages
 MessageRole = Literal["user", "assistant"]
+VALID_ROLES = {"user", "assistant"}
 
 
 class ChatMessageBase(SQLModel):
     """Shared properties for ChatMessage."""
     content: str = Field(min_length=1, max_length=10000)
-    role: str = Field(max_length=20)  # "user" or "assistant"
+    role: str = Field(max_length=20)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        """Validate role is 'user' or 'assistant'."""
+        if v not in VALID_ROLES:
+            raise ValueError("Role must be 'user' or 'assistant'")
+        return v
 
 
 class ChatMessageCreate(ChatMessageBase):
