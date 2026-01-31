@@ -23,16 +23,18 @@ import {
   Message,
   MessageBar,
   MessageBox,
+  MessageBoxHandle,
   MessageProps,
   Conversation,
 } from '@patternfly/chatbot';
-import { RedoIcon, TrashIcon } from '@patternfly/react-icons';
+import { ArrowDownIcon, RedoIcon, TrashIcon } from '@patternfly/react-icons';
 
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
 
 import '@patternfly/chatbot/dist/css/main.css';
+import './Chat.css';
 
 const ERROR_MESSAGE = 'Sorry, an error occurred. Click retry to try again.';
 const DISPLAY_MODE = ChatbotDisplayMode.embedded;
@@ -70,6 +72,33 @@ function Chat(): React.ReactElement {
 
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
+  const messageBoxRef = React.useRef<MessageBoxHandle | null>(null);
+  const [userScrolledUp, setUserScrolledUp] = React.useState(false);
+  const scrollDetectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Scroll utility functions
+  const scrollToBottom = React.useCallback(() => {
+    if (messageBoxRef.current?.scrollToBottom) {
+      messageBoxRef.current.scrollToBottom({ behavior: 'smooth' });
+    }
+  }, []);
+
+  const isScrolledNearBottom = React.useCallback((threshold = 100) => {
+    if (!messageBoxRef.current) return true;
+    const container = messageBoxRef.current;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom <= threshold;
+  }, []);
+
+  const handleScroll = React.useCallback(() => {
+    if (scrollDetectionTimeoutRef.current) {
+      clearTimeout(scrollDetectionTimeoutRef.current);
+    }
+    scrollDetectionTimeoutRef.current = setTimeout(() => {
+      const nearBottom = isScrolledNearBottom();
+      setUserScrolledUp(!nearBottom);
+    }, 100);
+  }, [isScrolledNearBottom]);
 
   // Load chats and flows on mount
   React.useEffect(() => {
@@ -171,6 +200,7 @@ function Chat(): React.ReactElement {
 
     setIsSending(true);
     setLastError(null);
+    setUserScrolledUp(false);
     const timestamp = new Date().toLocaleString();
     const isRetry = !!retryMessageText;
 
@@ -206,6 +236,7 @@ function Chat(): React.ReactElement {
       setMessages((prev) => [...prev, userMessage, loadingBotMessage]);
     }
     setAnnouncement(`Message from You: ${messageText}. Assistant is thinking...`);
+    setTimeout(() => scrollToBottom(), 50);
 
     let accumulatedContent = '';
 
@@ -368,7 +399,27 @@ function Chat(): React.ReactElement {
                 </ChatbotHeaderActions>
               </ChatbotHeader>
               <ChatbotContent>
-                <MessageBox announcement={announcement}>
+                {userScrolledUp && (
+                  <div className="pf-chatbot__jump-button">
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        scrollToBottom();
+                        setUserScrolledUp(false);
+                      }}
+                      icon={<ArrowDownIcon />}
+                      aria-label="Scroll to bottom"
+                      size="sm"
+                    >
+                      New messages
+                    </Button>
+                  </div>
+                )}
+                <MessageBox
+                  ref={messageBoxRef}
+                  announcement={announcement}
+                  onScroll={handleScroll}
+                >
                   {messages.map((message) => {
                     const hasError = message.content?.includes('error occurred');
                     const canRetry = hasError && lastError && lastError.chatId === selectedChatId;

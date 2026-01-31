@@ -1,0 +1,6 @@
+.pf-chatbot__jump-button {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  z-index: 1000;
+}
