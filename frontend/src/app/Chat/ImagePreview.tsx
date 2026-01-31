@@ -46,6 +46,10 @@ interface DetectedImage {
   validationError?: string;
 }
 
+// =============================================================================
+// Constants
+// =============================================================================
+
 const ALLOWED_PROTOCOLS = ['https:', 'http:'];
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -55,9 +59,31 @@ const ALLOWED_IMAGE_TYPES = [
   'image/webp',
   'image/svg+xml',
 ];
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE_ERROR = 'File size exceeds limit (50MB max)';
 
-const validateImageUrl = (url: string): SecurityValidationResult => {
+const MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
+const STANDALONE_IMAGE_URL_REGEX = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?/gi;
+
+const PRIVATE_NETWORK_PREFIXES = ['192.168.', '10.', '172.'];
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
+
+// =============================================================================
+// Validation Functions
+// =============================================================================
+
+function isLocalDevelopment(): boolean {
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function isPrivateNetworkHost(hostname: string): boolean {
+  if (LOCAL_HOSTNAMES.includes(hostname)) return true;
+  if (hostname.includes('..')) return true;
+  return PRIVATE_NETWORK_PREFIXES.some((prefix) => hostname.startsWith(prefix));
+}
+
+function validateImageUrl(url: string): SecurityValidationResult {
   try {
     const urlObj = new URL(url);
 
@@ -66,30 +92,17 @@ const validateImageUrl = (url: string): SecurityValidationResult => {
     }
 
     const hostname = urlObj.hostname.toLowerCase();
-    const isLocalDevelopment =
-      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (!isLocalDevelopment) {
-      if (
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname.startsWith('192.168.') ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('172.') ||
-        hostname === '0.0.0.0' ||
-        hostname.includes('..')
-      ) {
-        return { isValid: false, reason: 'Access to local/private networks is not allowed.' };
-      }
+    if (!isLocalDevelopment() && isPrivateNetworkHost(hostname)) {
+      return { isValid: false, reason: 'Access to local/private networks is not allowed.' };
     }
 
     return { isValid: true };
   } catch {
     return { isValid: false, reason: 'Invalid URL format.' };
   }
-};
+}
 
-const validateImageType = async (url: string): Promise<SecurityValidationResult> => {
+async function validateImageType(url: string): Promise<SecurityValidationResult> {
   try {
     const response = await fetch(url, { method: 'HEAD' });
     const contentType = response.headers.get('content-type');
@@ -99,17 +112,42 @@ const validateImageType = async (url: string): Promise<SecurityValidationResult>
     }
 
     const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-      return { isValid: false, reason: 'File size exceeds limit (50MB max).' };
+    if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE_BYTES) {
+      return { isValid: false, reason: MAX_FILE_SIZE_ERROR };
     }
 
     return { isValid: true };
   } catch {
     return { isValid: false, reason: 'Unable to validate image.' };
   }
-};
+}
 
-export const ImagePreview: React.FunctionComponent<ImagePreviewProps> = ({ content }) => {
+// =============================================================================
+// Clipboard Utilities
+// =============================================================================
+
+function copyToClipboardFallback(text: string): void {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  document.body.appendChild(textArea);
+  textArea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textArea);
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    copyToClipboardFallback(text);
+  }
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement | null {
   const [imageModal, setImageModal] = React.useState<ImageModalState>({
     isOpen: false,
     imageUrl: '',
@@ -122,32 +160,36 @@ export const ImagePreview: React.FunctionComponent<ImagePreviewProps> = ({ conte
 
   const detectedImages = React.useMemo(() => {
     const images: DetectedImage[] = [];
+    const existingUrls = new Set<string>();
 
-    const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    // Extract markdown images: ![alt](url)
+    const markdownRegex = new RegExp(MARKDOWN_IMAGE_REGEX.source, 'g');
     let match;
-    while ((match = markdownImageRegex.exec(content)) !== null) {
+    while ((match = markdownRegex.exec(content)) !== null) {
       const url = match[2];
       const validation = validateImageUrl(url);
       images.push({
-        url: url,
+        url,
         alt: match[1] || 'Image',
         isValid: validation.isValid,
         validationError: validation.reason,
       });
+      existingUrls.add(url);
     }
 
-    const imageUrlRegex = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)(\?[^\s]*)?/gi;
-    while ((match = imageUrlRegex.exec(content)) !== null) {
+    // Extract standalone image URLs (not already in markdown)
+    const standaloneRegex = new RegExp(STANDALONE_IMAGE_URL_REGEX.source, 'gi');
+    while ((match = standaloneRegex.exec(content)) !== null) {
       const url = match[0];
-      const isMarkdownImage = images.some((img) => img.url === url);
-      if (!isMarkdownImage) {
+      if (!existingUrls.has(url)) {
         const validation = validateImageUrl(url);
         images.push({
-          url: url,
+          url,
           alt: 'Image',
           isValid: validation.isValid,
           validationError: validation.reason,
         });
+        existingUrls.add(url);
       }
     }
 
@@ -227,14 +269,14 @@ export const ImagePreview: React.FunctionComponent<ImagePreviewProps> = ({ conte
       }
 
       const contentLength = response.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-        throw new Error('File size exceeds limit (50MB max)');
+      if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE_BYTES) {
+        throw new Error(MAX_FILE_SIZE_ERROR);
       }
 
       const blob = await response.blob();
 
-      if (blob.size > MAX_FILE_SIZE) {
-        throw new Error('File size exceeds limit (50MB max)');
+      if (blob.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error(MAX_FILE_SIZE_ERROR);
       }
 
       const url = window.URL.createObjectURL(blob);
@@ -257,35 +299,17 @@ export const ImagePreview: React.FunctionComponent<ImagePreviewProps> = ({ conte
   };
 
   const handleCopyUrl = async () => {
+    setClipboardError(null);
     try {
-      setClipboardError(null);
-
-      if (!navigator.clipboard) {
-        const textArea = document.createElement('textarea');
-        textArea.value = imageModal.imageUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        return;
-      }
-
-      await navigator.clipboard.writeText(imageModal.imageUrl);
+      await copyToClipboard(imageModal.imageUrl);
     } catch (error) {
-      const errorMessage = 'Failed to copy URL to clipboard';
       console.error('Error copying to clipboard:', error);
-      setClipboardError(errorMessage);
-
+      // Try fallback method
       try {
-        const textArea = document.createElement('textarea');
-        textArea.value = imageModal.imageUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        setClipboardError(null);
+        copyToClipboardFallback(imageModal.imageUrl);
       } catch (fallbackError) {
         console.error('Fallback copy method also failed:', fallbackError);
+        setClipboardError('Failed to copy URL to clipboard');
       }
     }
   };

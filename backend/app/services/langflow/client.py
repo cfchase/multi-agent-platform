@@ -14,8 +14,32 @@ import httpx
 
 from app.core.config import settings
 
-
 logger = logging.getLogger(__name__)
+
+# HTTP timeout constants (seconds)
+LIST_FLOWS_TIMEOUT = 30.0
+CHAT_TIMEOUT = 120.0
+
+# SSE constants
+SSE_DATA_PREFIX = "data: "
+SSE_DONE_MARKER = "[DONE]"
+
+
+def extract_chunk_from_sse_data(data: dict) -> str | None:
+    """
+    Extract the text chunk from an SSE data payload.
+
+    Handles two Langflow streaming formats:
+    - Token event: {"event": "token", "data": {"chunk": "..."}}
+    - Direct chunk: {"chunk": "..."}
+
+    Returns the chunk text or None if not found.
+    """
+    if data.get("event") == "token":
+        return data.get("data", {}).get("chunk") or None
+    if "chunk" in data:
+        return data.get("chunk") or None
+    return None
 
 
 class LangflowError(Exception):
@@ -192,7 +216,7 @@ class LangflowClient:
             # Self-hosted Langflow format
             url = f"{self.base_url}/api/v1/flows/"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=LIST_FLOWS_TIMEOUT) as client:
             try:
                 response = await client.get(url, headers=self.headers)
                 response.raise_for_status()
@@ -270,7 +294,7 @@ class LangflowClient:
 
         url = self._get_run_url(flow_id=resolved_flow_id, stream=False)
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
             try:
                 response = await client.post(
                     url,
@@ -347,7 +371,7 @@ class LangflowClient:
 
         url = self._get_run_url(flow_id=resolved_flow_id, stream=True)
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
             try:
                 async with client.stream(
                     "POST",
@@ -362,9 +386,9 @@ class LangflowClient:
                             continue
 
                         # Handle SSE format (data: {...})
-                        if line.startswith("data: "):
-                            data_str = line[6:]  # Remove "data: " prefix
-                            if data_str == "[DONE]":
+                        if line.startswith(SSE_DATA_PREFIX):
+                            data_str = line[len(SSE_DATA_PREFIX):]
+                            if data_str == SSE_DONE_MARKER:
                                 break
                         else:
                             # Handle plain JSON format from Langflow
@@ -372,17 +396,9 @@ class LangflowClient:
 
                         try:
                             data = json.loads(data_str)
-
-                            # Langflow streaming format: {"event": "token", "data": {"chunk": "..."}}
-                            if data.get("event") == "token":
-                                chunk = data.get("data", {}).get("chunk", "")
-                                if chunk:
-                                    yield chunk
-                            # Also handle direct chunk format: {"chunk": "..."}
-                            elif "chunk" in data:
-                                chunk = data.get("chunk", "")
-                                if chunk:
-                                    yield chunk
+                            chunk = extract_chunk_from_sse_data(data)
+                            if chunk:
+                                yield chunk
                         except json.JSONDecodeError:
                             # Some lines might not be JSON
                             continue

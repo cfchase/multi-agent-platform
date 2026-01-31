@@ -27,10 +27,24 @@ from app.models import (
     ChatMessagesPublic,
     Message,
 )
-from app.services.langflow import get_langflow_client, LangflowError
-
+from app.services.langflow import LangflowError, get_langflow_client
 
 logger = logging.getLogger(__name__)
+
+# Valid message roles
+VALID_ROLES = {"user", "assistant"}
+
+# SSE response headers
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",  # Disable nginx buffering
+}
+
+
+def format_sse_event(event_data: dict) -> str:
+    """Format a dictionary as an SSE event string."""
+    return f"data: {json.dumps(event_data)}\n\n"
 
 router = APIRouter(prefix="/chats/{chat_id}/messages", tags=["chat-messages"])
 
@@ -104,10 +118,8 @@ def create_message(
     get_chat_with_permission(session, current_user, chat_id)
 
     # Validate role
-    if message_in.role not in ["user", "assistant"]:
-        raise HTTPException(
-            status_code=400, detail="Role must be 'user' or 'assistant'"
-        )
+    if message_in.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail="Role must be 'user' or 'assistant'")
 
     message = ChatMessage.model_validate(message_in, update={"chat_id": chat_id})
     session.add(message)
@@ -205,8 +217,7 @@ async def stream_message(
                 flow_name=request.flow_name,
             ):
                 accumulated_content += chunk
-                event = {"type": "content", "content": chunk}
-                yield f"data: {json.dumps(event)}\n\n"
+                yield format_sse_event({"type": "content", "content": chunk})
 
             # Save assistant message with accumulated content (only if not empty)
             if accumulated_content.strip():
@@ -219,31 +230,21 @@ async def stream_message(
                 session.commit()
                 session.refresh(assistant_message)
 
-                # Send done event with message ID
-                done_event = {"type": "done", "message_id": assistant_message.id}
-                yield f"data: {json.dumps(done_event)}\n\n"
+                yield format_sse_event({"type": "done", "message_id": assistant_message.id})
             else:
-                # No content received, send done without message_id
                 logger.warning(f"No content received from Langflow for chat {chat_id}")
-                done_event = {"type": "done"}
-                yield f"data: {json.dumps(done_event)}\n\n"
+                yield format_sse_event({"type": "done"})
 
         except LangflowError as e:
             logger.error(f"Langflow error in chat {chat_id}: {e.message}")
-            error_event = {"type": "error", "error": e.message}
-            yield f"data: {json.dumps(error_event)}\n\n"
+            yield format_sse_event({"type": "error", "error": e.message})
 
         except Exception as e:
             logger.error(f"Unexpected error in chat {chat_id}: {str(e)}")
-            error_event = {"type": "error", "error": "An unexpected error occurred"}
-            yield f"data: {json.dumps(error_event)}\n\n"
+            yield format_sse_event({"type": "error", "error": "An unexpected error occurred"})
 
     return StreamingResponse(
         generate_stream(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
+        headers=SSE_HEADERS,
     )

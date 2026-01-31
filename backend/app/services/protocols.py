@@ -30,6 +30,8 @@ class LangflowClientProtocol(Protocol):
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> str:
         """
         Send a chat message and get a response (non-streaming).
@@ -38,6 +40,8 @@ class LangflowClientProtocol(Protocol):
             message: The user message to send
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
+            flow_id: Optional flow ID to use
+            flow_name: Optional flow name to use (looked up to get ID)
 
         Returns:
             The assistant's response text
@@ -52,6 +56,8 @@ class LangflowClientProtocol(Protocol):
         message: str,
         session_id: str | None = None,
         tweaks: dict | None = None,
+        flow_id: str | None = None,
+        flow_name: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Send a chat message and stream the response.
@@ -60,6 +66,8 @@ class LangflowClientProtocol(Protocol):
             message: The user message to send
             session_id: Optional session ID for conversation continuity
             tweaks: Optional tweaks to modify flow behavior
+            flow_id: Optional flow ID to use
+            flow_name: Optional flow name to use (looked up to get ID)
 
         Yields:
             Chunks of the assistant's response text

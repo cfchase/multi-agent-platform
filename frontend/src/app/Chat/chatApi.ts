@@ -124,13 +124,8 @@ export const ChatAPI = {
     flowName?: string
   ): { close: () => void } {
     const controller = new AbortController();
-
     const url = `/api${API_BASE}/${chatId}/messages/stream`;
-
-    const body: { content: string; flow_name?: string } = { content };
-    if (flowName) {
-      body.flow_name = flowName;
-    }
+    const body = flowName ? { content, flow_name: flowName } : { content };
 
     fetch(url, {
       method: 'POST',
@@ -147,53 +142,11 @@ export const ChatAPI = {
         }
 
         const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
         if (!reader) {
           throw new Error('No response body');
         }
 
-        const processStream = async () => {
-          let buffer = '';
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                onComplete?.();
-                break;
-              }
-
-              buffer += decoder.decode(value, { stream: true });
-
-              // Process complete SSE events (separated by double newlines)
-              const events = buffer.split('\n\n');
-              buffer = events.pop() || '';
-
-              for (const event of events) {
-                if (!event.trim()) continue;
-
-                const lines = event.split('\n');
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    try {
-                      const data = JSON.parse(line.slice(6));
-                      onMessage(data);
-                    } catch (e) {
-                      console.error('Error parsing SSE data:', e);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-              onError?.(error);
-            }
-          }
-        };
-
-        processStream();
+        processSSEStream(reader, onMessage, onComplete, onError);
       })
       .catch((error) => {
         if (error.name !== 'AbortError') {
@@ -201,8 +154,52 @@ export const ChatAPI = {
         }
       });
 
-    return {
-      close: () => controller.abort(),
-    };
+    return { close: () => controller.abort() };
   },
 };
+
+async function processSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onMessage: (event: StreamingEvent) => void,
+  onComplete?: () => void,
+  onError?: (error: Error) => void
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        onComplete?.();
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const event of events) {
+        if (!event.trim()) continue;
+        parseSSEEvent(event, onMessage);
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'AbortError') {
+      onError?.(error);
+    }
+  }
+}
+
+function parseSSEEvent(event: string, onMessage: (event: StreamingEvent) => void): void {
+  const lines = event.split('\n');
+  for (const line of lines) {
+    if (!line.startsWith('data: ')) continue;
+    try {
+      const data = JSON.parse(line.slice(6));
+      onMessage(data);
+    } catch (e) {
+      console.error('Error parsing SSE data:', e);
+    }
+  }
+}

@@ -68,14 +68,13 @@ class TestMockLangflowClient:
             async for _ in client.chat_stream("Hello"):
                 pass
 
-    def test_call_history_records_calls(self):
+    @pytest.mark.asyncio
+    async def test_call_history_records_calls(self):
         """Test that call history is recorded."""
         client = MockLangflowClient()
 
-        # Need to run async function
-        import asyncio
-        asyncio.get_event_loop().run_until_complete(client.chat("Message 1", session_id="sess1"))
-        asyncio.get_event_loop().run_until_complete(client.chat("Message 2"))
+        await client.chat("Message 1", session_id="sess1")
+        await client.chat("Message 2")
 
         history = client.get_call_history()
         assert len(history) == 2
@@ -83,18 +82,18 @@ class TestMockLangflowClient:
         assert history[0]["session_id"] == "sess1"
         assert history[1]["message"] == "Message 2"
 
-    def test_reset_clears_state(self):
+    @pytest.mark.asyncio
+    async def test_reset_clears_state(self):
         """Test that reset clears call history and response index."""
         client = MockLangflowClient(responses=["A", "B"])
 
-        import asyncio
-        asyncio.get_event_loop().run_until_complete(client.chat("Test"))
+        await client.chat("Test")
 
         client.reset()
 
         assert len(client.get_call_history()) == 0
         # Response index should be reset
-        response = asyncio.get_event_loop().run_until_complete(client.chat("Test"))
+        response = await client.chat("Test")
         assert response == "A"
 
     def test_implements_protocol(self):

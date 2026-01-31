@@ -12,8 +12,7 @@ This module provides CRUD operations for chats:
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
-
+from fastapi import APIRouter, HTTPException
 from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -27,6 +26,24 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+def get_chat_with_permission(
+    session: SessionDep, current_user: CurrentUser, chat_id: int
+) -> Chat:
+    """
+    Get a chat and verify user has access.
+
+    Raises HTTPException if chat not found or user lacks permission.
+    """
+    chat = session.get(Chat, chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if chat.user_id != current_user.id and not current_user.admin:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    return chat
 
 
 @router.get("/", response_model=ChatsPublic)
@@ -63,15 +80,7 @@ def read_chat(session: SessionDep, current_user: CurrentUser, id: int) -> Any:
 
     Users can only view their own chats (unless admin).
     """
-    chat = session.get(Chat, id)
-    if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-
-    # Check ownership (admins can view any chat)
-    if chat.user_id != current_user.id and not current_user.admin:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    return chat
+    return get_chat_with_permission(session, current_user, id)
 
 
 @router.post("/", response_model=ChatPublic)
@@ -99,13 +108,7 @@ def update_chat(
 
     Users can only update their own chats (unless admin).
     """
-    chat = session.get(Chat, id)
-    if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-
-    # Check ownership (admins can update any chat)
-    if chat.user_id != current_user.id and not current_user.admin:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    chat = get_chat_with_permission(session, current_user, id)
 
     update_dict = chat_in.model_dump(exclude_unset=True)
     update_dict["updated_at"] = datetime.now(timezone.utc)
@@ -124,14 +127,7 @@ def delete_chat(session: SessionDep, current_user: CurrentUser, id: int) -> Mess
     Users can only delete their own chats (unless admin).
     This will also delete all messages in the chat (cascade).
     """
-    chat = session.get(Chat, id)
-    if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-
-    # Check ownership (admins can delete any chat)
-    if chat.user_id != current_user.id and not current_user.admin:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
+    chat = get_chat_with_permission(session, current_user, id)
     session.delete(chat)
     session.commit()
     return Message(message="Chat deleted successfully")
