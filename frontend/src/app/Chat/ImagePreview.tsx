@@ -13,6 +13,8 @@ import {
 } from '@patternfly/react-core';
 import { DownloadIcon, CopyIcon, ExclamationTriangleIcon } from '@patternfly/react-icons';
 
+import './ImagePreview.css';
+
 interface ImagePreviewProps {
   content: string;
 }
@@ -323,15 +325,15 @@ export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement
 
   return (
     <>
-      <div style={{ marginTop: '12px' }}>
+      <div className="image-preview-container">
         {invalidImages.length > 0 && (
-          <div style={{ marginBottom: '16px' }}>
+          <div className="image-preview-invalid-section">
             {invalidImages.map((image, index) => (
               <Alert
                 key={`invalid-${image.url}-${index}`}
                 variant={AlertVariant.warning}
                 title="Invalid Image URL"
-                style={{ marginBottom: '8px' }}
+                className="image-preview-alert"
               >
                 {image.validationError}: {image.url}
               </Alert>
@@ -344,7 +346,7 @@ export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement
             key={`error-${error.url}-${index}`}
             variant={AlertVariant.danger}
             title="Image Load Error"
-            style={{ marginBottom: '8px' }}
+            className="image-preview-alert"
           >
             {error.message}: {error.url}
           </Alert>
@@ -366,51 +368,15 @@ export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement
                     role="button"
                     tabIndex={0}
                     aria-label={`View image: ${image.alt}`}
-                    style={{
-                      cursor: 'pointer',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      backgroundColor: 'var(--pf-v6-global--BackgroundColor--200)',
-                      outline: 'none',
-                    }}
+                    className="image-preview-button"
                     onClick={() => handleImageClick(image.url, image.alt)}
                     onKeyDown={(e) => handleKeyDown(e, image.url, image.alt)}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.02)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.boxShadow =
-                        '0 0 0 2px var(--pf-v6-global--active-color--100)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                    }}
                   >
                     {hasError ? (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '300px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--pf-v6-global--danger-color--100)',
-                          fontSize: '14px',
-                          padding: '16px',
-                          textAlign: 'center',
-                        }}
-                      >
-                        <ExclamationTriangleIcon style={{ marginBottom: '8px', fontSize: '24px' }} />
+                      <div className="image-preview-error-placeholder">
+                        <ExclamationTriangleIcon className="image-preview-error-icon" />
                         <div>Failed to load image</div>
-                        <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                        <div className="image-preview-error-detail">
                           {loadState.error || 'Unknown error'}
                         </div>
                       </div>
@@ -418,12 +384,7 @@ export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement
                       <img
                         src={image.url}
                         alt={image.alt}
-                        style={{
-                          width: '100%',
-                          height: '300px',
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
+                        className="image-preview-thumbnail"
                         onError={() => {
                           handleImageError(image.url, 'Failed to load image');
                         }}
@@ -465,26 +426,22 @@ export function ImagePreview({ content }: ImagePreviewProps): React.ReactElement
         />
         <ModalBody>
           {clipboardError && (
-            <Alert variant={AlertVariant.danger} title="Clipboard Error" style={{ marginBottom: '16px' }}>
+            <Alert variant={AlertVariant.danger} title="Clipboard Error" className="image-preview-alert">
               {clipboardError}
             </Alert>
           )}
 
           {imageErrors[imageModal.imageUrl] && (
-            <Alert variant={AlertVariant.danger} title="Image Error" style={{ marginBottom: '16px' }}>
+            <Alert variant={AlertVariant.danger} title="Image Error" className="image-preview-alert">
               {imageErrors[imageModal.imageUrl].message}
             </Alert>
           )}
 
-          <div style={{ textAlign: 'center' }}>
+          <div className="image-preview-modal-center">
             <img
               src={imageModal.imageUrl}
               alt={imageModal.altText}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '60vh',
-                objectFit: 'contain',
-              }}
+              className="image-preview-modal-image"
               onError={() => {
                 handleImageError(imageModal.imageUrl, 'Failed to load image in preview');
               }}

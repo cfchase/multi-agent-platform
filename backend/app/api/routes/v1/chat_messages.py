@@ -10,12 +10,14 @@ This module provides operations for chat messages:
 
 import json
 import logging
+import traceback
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -233,8 +235,18 @@ async def stream_message(
             logger.error(f"Langflow error in chat {chat_id}: {e.message}")
             yield format_sse_event({"type": "error", "error": e.message})
 
+        except SQLAlchemyError as e:
+            logger.error(
+                f"Database error in chat {chat_id}: {type(e).__name__}: {str(e)}"
+            )
+            yield format_sse_event({"type": "error", "error": "Database error occurred"})
+
         except Exception as e:
-            logger.error(f"Unexpected error in chat {chat_id}: {str(e)}")
+            # Log full traceback for debugging unexpected errors
+            logger.error(
+                f"Unexpected error in chat {chat_id}: {type(e).__name__}: {str(e)}\n"
+                f"{traceback.format_exc()}"
+            )
             yield format_sse_event({"type": "error", "error": "An unexpected error occurred"})
 
     return StreamingResponse(

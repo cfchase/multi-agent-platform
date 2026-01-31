@@ -400,7 +400,9 @@ class LangflowClient:
                             if chunk:
                                 yield chunk
                         except json.JSONDecodeError:
-                            # Some lines might not be JSON
+                            # Log malformed JSON for debugging, but continue processing
+                            # (some SSE lines like event markers may not be JSON)
+                            logger.debug(f"Non-JSON SSE line received: {data_str[:100]}")
                             continue
 
             except httpx.HTTPStatusError as e:

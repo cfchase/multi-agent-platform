@@ -1,5 +1,7 @@
 """Tests for the Chat API endpoints."""
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -255,3 +257,80 @@ class TestChatMessages:
         for msg_id in message_ids:
             deleted_message = session.get(ChatMessage, msg_id)
             assert deleted_message is None
+
+
+class TestMessageStreaming:
+    """Tests for streaming message endpoint."""
+
+    def test_stream_message_chat_not_found(
+        self, client: TestClient, dev_user: User
+    ):
+        """Test streaming to non-existent chat returns 404."""
+        response = client.post(
+            "/api/v1/chats/99999/messages/stream",
+            json={"content": "Hello!"},
+        )
+        assert response.status_code == 404
+
+    def test_stream_message_returns_sse_format(
+        self, client: TestClient, test_chat: Chat
+    ):
+        """Test streaming endpoint returns SSE formatted response."""
+        response = client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Hello, AI!"},
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+        # Parse SSE events from response
+        events = []
+        for line in response.text.split("\n\n"):
+            if line.startswith("data: "):
+                data = json.loads(line[6:])
+                events.append(data)
+
+        # Should have at least content and done events
+        assert len(events) >= 1
+        event_types = [e["type"] for e in events]
+        # Last event should be done
+        assert events[-1]["type"] == "done"
+
+    def test_stream_message_saves_user_message(
+        self, client: TestClient, session: Session, test_chat: Chat
+    ):
+        """Test that user message is saved before streaming."""
+        # Consume the streaming response
+        client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Test message to save"},
+        )
+
+        # Check that user message was saved
+        messages = session.query(ChatMessage).filter(
+            ChatMessage.chat_id == test_chat.id,
+            ChatMessage.role == "user"
+        ).all()
+
+        assert len(messages) == 1
+        assert messages[0].content == "Test message to save"
+
+    def test_stream_message_saves_assistant_response(
+        self, client: TestClient, session: Session, test_chat: Chat
+    ):
+        """Test that assistant response is saved after streaming."""
+        # Consume the streaming response
+        client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Hello!"},
+        )
+
+        # Check that assistant message was saved
+        messages = session.query(ChatMessage).filter(
+            ChatMessage.chat_id == test_chat.id,
+            ChatMessage.role == "assistant"
+        ).all()
+
+        assert len(messages) == 1
+        # Mock client returns canned responses
+        assert len(messages[0].content) > 0

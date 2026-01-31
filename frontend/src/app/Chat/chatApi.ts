@@ -42,12 +42,14 @@ export interface ChatMessagesResponse {
   count: number;
 }
 
-export interface StreamingEvent {
-  type: 'content' | 'done' | 'error';
-  content?: string;
-  message_id?: number;
-  error?: string;
-}
+/**
+ * Discriminated union for streaming events.
+ * Each event type has its own specific fields.
+ */
+export type StreamingEvent =
+  | { type: 'content'; content: string }
+  | { type: 'done'; message_id?: number }
+  | { type: 'error'; error: string };
 
 export interface Flow {
   id: string;
