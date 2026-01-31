@@ -69,3 +69,6 @@ config/flow-sources.yaml
 *.bak
 *.backup
 *~
+
+# Playwright MCP
+.playwright-mcp/

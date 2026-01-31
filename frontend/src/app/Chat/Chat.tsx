@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+  Button,
   Dropdown,
   DropdownItem,
   DropdownList,
@@ -26,7 +27,7 @@ import {
   Conversation,
 } from '@patternfly/chatbot';
 
-import { TrashIcon } from '@patternfly/react-icons';
+import { RedoIcon, TrashIcon } from '@patternfly/react-icons';
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
@@ -49,8 +50,10 @@ const Chat: React.FunctionComponent = () => {
   const [messages, setMessages] = React.useState<MessageProps[]>([]);
   const [isSending, setIsSending] = React.useState(false);
   const [announcement, setAnnouncement] = React.useState<string>();
+  const [lastError, setLastError] = React.useState<{ message: string; chatId: number } | null>(null);
 
   const historyRef = React.useRef<HTMLButtonElement>(null);
+  const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
   const displayMode = ChatbotDisplayMode.embedded;
 
   // Load chats and flows on mount
@@ -155,14 +158,16 @@ const Chat: React.FunctionComponent = () => {
     }
   };
 
-  const handleSend = (message: string | number) => {
-    const messageText = typeof message === 'string' ? message : message.toString();
+  const handleSend = (message: string | number, retryMessageText?: string) => {
+    const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
     if (!messageText.trim() || !selectedChatId || isSending) return;
 
     setIsSending(true);
+    setLastError(null);
     const timestamp = new Date().toLocaleString();
+    const isRetry = !!retryMessageText;
 
-    // Add user message immediately
+    // Add user message immediately (unless retrying)
     const userMessage: MessageProps = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -184,12 +189,20 @@ const Chat: React.FunctionComponent = () => {
       isLoading: true,
     };
 
-    setMessages((prev) => [...prev, userMessage, loadingBotMessage]);
+    if (isRetry) {
+      // Remove the error message and add new loading message
+      setMessages((prev) => {
+        const withoutError = prev.filter((msg) => !msg.content?.includes('error occurred'));
+        return [...withoutError, loadingBotMessage];
+      });
+    } else {
+      setMessages((prev) => [...prev, userMessage, loadingBotMessage]);
+    }
     setAnnouncement(`Message from You: ${messageText}. Assistant is thinking...`);
 
     let accumulatedContent = '';
 
-    ChatAPI.createStreamingMessage(
+    const streamController = ChatAPI.createStreamingMessage(
       selectedChatId,
       messageText,
       (event: StreamingEvent) => {
@@ -204,6 +217,7 @@ const Chat: React.FunctionComponent = () => {
             )
           );
         } else if (event.type === 'done') {
+          streamControllerRef.current = null;
           // Reload to get the saved message IDs
           loadMessages(selectedChatId);
           setIsSending(false);
@@ -215,32 +229,59 @@ const Chat: React.FunctionComponent = () => {
             ChatAPI.updateChat(selectedChatId, { title }).then(() => loadChats());
           }
         } else if (event.type === 'error') {
+          streamControllerRef.current = null;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === loadingBotMessage.id
-                ? { ...msg, content: 'Sorry, an error occurred.', isLoading: false }
+                ? { ...msg, content: 'Sorry, an error occurred. Click retry to try again.', isLoading: false }
                 : msg
             )
           );
+          setLastError({ message: messageText, chatId: selectedChatId });
           setIsSending(false);
         }
       },
       (err) => {
         console.error('Streaming error:', err);
+        streamControllerRef.current = null;
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === loadingBotMessage.id
-              ? { ...msg, content: 'Sorry, an error occurred.', isLoading: false }
+              ? { ...msg, content: 'Sorry, an error occurred. Click retry to try again.', isLoading: false }
               : msg
           )
         );
+        setLastError({ message: messageText, chatId: selectedChatId });
         setIsSending(false);
       },
       () => {
+        streamControllerRef.current = null;
         setIsSending(false);
       },
       selectedFlowName || undefined
     );
+
+    streamControllerRef.current = streamController;
+  };
+
+  const handleStopStreaming = () => {
+    if (streamControllerRef.current) {
+      streamControllerRef.current.close();
+      streamControllerRef.current = null;
+    }
+    setIsSending(false);
+    // Update any loading message to show it was stopped
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.isLoading ? { ...msg, content: msg.content || '(Stopped)', isLoading: false } : msg
+      )
+    );
+  };
+
+  const handleRetry = () => {
+    if (lastError && lastError.chatId === selectedChatId) {
+      handleSend('', lastError.message);
+    }
   };
 
   // Build conversations for the drawer
@@ -321,21 +362,38 @@ const Chat: React.FunctionComponent = () => {
               </ChatbotHeader>
               <ChatbotContent>
                 <MessageBox announcement={announcement}>
-                  {messages.map((message) => (
-                    <Message
-                      key={message.id}
-                      {...message}
-                      actions={
-                        message.role === 'bot' && !message.isLoading
-                          ? {
-                              copy: {
-                                onClick: () => navigator.clipboard.writeText(message.content || ''),
-                              },
-                            }
-                          : undefined
-                      }
-                    />
-                  ))}
+                  {messages.map((message) => {
+                    const hasError = message.content?.includes('error occurred');
+                    const canRetry = hasError && lastError && lastError.chatId === selectedChatId;
+                    const showCopyAction = message.role === 'bot' && !message.isLoading && !hasError;
+
+                    return (
+                      <Message
+                        key={message.id}
+                        {...message}
+                        actions={
+                          showCopyAction
+                            ? {
+                                copy: {
+                                  onClick: () => navigator.clipboard.writeText(message.content || ''),
+                                },
+                              }
+                            : undefined
+                        }
+                      >
+                        {canRetry && (
+                          <Button
+                            variant="link"
+                            icon={<RedoIcon />}
+                            onClick={handleRetry}
+                            isDisabled={isSending}
+                          >
+                            Retry
+                          </Button>
+                        )}
+                      </Message>
+                    );
+                  })}
                 </MessageBox>
               </ChatbotContent>
               <ChatbotFooter>
@@ -343,7 +401,7 @@ const Chat: React.FunctionComponent = () => {
                   onSendMessage={handleSend}
                   isSendButtonDisabled={isSending || !selectedChatId}
                   hasStopButton={isSending}
-                  handleStopButton={() => setIsSending(false)}
+                  handleStopButton={handleStopStreaming}
                 />
                 <ChatbotFootnote label="AI-powered research assistant. Verify important information." />
               </ChatbotFooter>
