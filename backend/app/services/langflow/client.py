@@ -77,8 +77,7 @@ class LangflowClient:
     - LANGFLOW_URL: Base URL of the Langflow server
     - LANGFLOW_API_KEY: API key for authentication (optional for self-hosted)
     - LANGFLOW_ID: Langflow project ID (for Langflow Cloud)
-    - LANGFLOW_DEFAULT_FLOW: Default flow name to execute (preferred)
-    - LANGFLOW_FLOW_ID: Flow ID to execute (fallback, deprecated)
+    - LANGFLOW_DEFAULT_FLOW: Default flow name to execute (optional)
     """
 
     def __init__(
@@ -86,7 +85,6 @@ class LangflowClient:
         base_url: str | None = None,
         api_key: str | None = None,
         langflow_id: str | None = None,
-        flow_id: str | None = None,
         default_flow: str | None = None,
     ):
         """
@@ -96,13 +94,11 @@ class LangflowClient:
             base_url: Langflow server URL (defaults to settings.LANGFLOW_URL)
             api_key: API key for authentication (defaults to settings.LANGFLOW_API_KEY)
             langflow_id: Langflow project ID (defaults to settings.LANGFLOW_ID)
-            flow_id: Flow ID to use (defaults to settings.LANGFLOW_FLOW_ID)
             default_flow: Default flow name (defaults to settings.LANGFLOW_DEFAULT_FLOW)
         """
         self.base_url = base_url or settings.LANGFLOW_URL
         self.api_key = api_key or settings.LANGFLOW_API_KEY
         self.langflow_id = langflow_id or settings.LANGFLOW_ID
-        self.flow_id = flow_id or settings.LANGFLOW_FLOW_ID
         self.default_flow = default_flow or settings.LANGFLOW_DEFAULT_FLOW
 
         # Cache for flow name to ID mapping
@@ -148,7 +144,6 @@ class LangflowClient:
         1. Explicit flow_id parameter
         2. Explicit flow_name parameter (looked up)
         3. Configured default_flow setting (looked up)
-        4. Configured flow_id setting
 
         Args:
             flow_id: Optional explicit flow ID
@@ -173,27 +168,25 @@ class LangflowClient:
             if resolved:
                 return resolved
 
-        # Fall back to configured ID (deprecated)
-        return self.flow_id
+        return None
 
-    def _get_run_url(self, flow_id: str | None = None, stream: bool = False) -> str:
+    def _get_run_url(self, flow_id: str, stream: bool = False) -> str:
         """
         Build the Langflow run API URL.
 
         Args:
-            flow_id: Override flow ID (defaults to self.flow_id)
+            flow_id: The flow ID to execute (required)
             stream: Whether to use streaming endpoint
 
         Returns:
             Full URL for the Langflow run API
         """
-        target_flow_id = flow_id or self.flow_id
         if self.langflow_id:
             # Langflow Cloud format
-            base = f"{self.base_url}/lf/{self.langflow_id}/api/v1/run/{target_flow_id}"
+            base = f"{self.base_url}/lf/{self.langflow_id}/api/v1/run/{flow_id}"
         else:
             # Self-hosted Langflow format
-            base = f"{self.base_url}/api/v1/run/{target_flow_id}"
+            base = f"{self.base_url}/api/v1/run/{flow_id}"
 
         if stream:
             return f"{base}?stream=true"

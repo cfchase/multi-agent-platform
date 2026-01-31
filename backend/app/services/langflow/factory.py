@@ -15,7 +15,7 @@ Environment Variables:
     LANGFLOW_URL: Langflow server URL. Set to "mock" for testing.
     LANGFLOW_API_KEY: API key for authentication (loaded from K8s secret)
     LANGFLOW_ID: Langflow project ID (for Langflow Cloud)
-    LANGFLOW_FLOW_ID: Flow ID to execute
+    LANGFLOW_DEFAULT_FLOW: Default flow name to execute
 """
 
 import logging
@@ -60,8 +60,8 @@ def is_langflow_configured() -> bool:
     if is_mock_langflow_enabled():
         return True
 
-    # Real mode requires URL and flow ID
-    return bool(settings.LANGFLOW_FLOW_ID)
+    # Real mode just requires URL (flow selected via UI)
+    return True
 
 
 def get_langflow_client() -> LangflowClientProtocol:
@@ -70,7 +70,7 @@ def get_langflow_client() -> LangflowClientProtocol:
 
     Automatically selects between real and mock client based on configuration:
     - If LANGFLOW_URL is "mock": Returns MockLangflowClient (explicit mock mode)
-    - If LANGFLOW_URL and LANGFLOW_FLOW_ID are set: Returns real LangflowClient
+    - If LANGFLOW_URL is set: Returns real LangflowClient
     - Otherwise: Returns MockLangflowClient with warning
 
     The factory reads configuration from environment variables, which can be
@@ -79,7 +79,7 @@ def get_langflow_client() -> LangflowClientProtocol:
         LANGFLOW_URL: Base URL or "mock" for testing
         LANGFLOW_API_KEY: Bearer token (from K8s secret)
         LANGFLOW_ID: Project ID for Langflow Cloud
-        LANGFLOW_FLOW_ID: Flow to execute
+        LANGFLOW_DEFAULT_FLOW: Optional default flow name
 
     Returns:
         A Langflow client implementing LangflowClientProtocol
@@ -88,20 +88,20 @@ def get_langflow_client() -> LangflowClientProtocol:
         # Mock mode (LANGFLOW_URL=mock):
         client = get_langflow_client()  # Returns MockLangflowClient
 
-        # Production (real LANGFLOW_URL and LANGFLOW_FLOW_ID):
+        # Production (real LANGFLOW_URL):
         client = get_langflow_client()  # Returns LangflowClient
     """
     if is_mock_langflow_enabled():
         logger.info("Using mock Langflow client (LANGFLOW_URL=mock)")
         return MockLangflowClient()
 
-    if settings.LANGFLOW_URL and settings.LANGFLOW_FLOW_ID:
+    if settings.LANGFLOW_URL:
         logger.info(f"Using real Langflow client (URL: {settings.LANGFLOW_URL})")
         return LangflowClient()
 
     logger.warning(
-        "Langflow not fully configured. Set LANGFLOW_URL=mock for testing, "
-        "or provide LANGFLOW_URL and LANGFLOW_FLOW_ID for production. "
+        "Langflow not configured. Set LANGFLOW_URL=mock for testing, "
+        "or provide LANGFLOW_URL for production. "
         "Falling back to mock client."
     )
     return MockLangflowClient()

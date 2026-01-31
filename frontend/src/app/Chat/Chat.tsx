@@ -83,7 +83,10 @@ function Chat(): React.ReactElement {
       const flowData = response?.data || [];
       setFlows(flowData);
       if (flowData.length > 0 && !selectedFlowName) {
-        setSelectedFlowName(flowData[0].name);
+        // Use configured default flow, or first flow as fallback
+        const defaultFlow = response?.default_flow;
+        const flowExists = defaultFlow && flowData.some((f) => f.name === defaultFlow);
+        setSelectedFlowName(flowExists ? defaultFlow : flowData[0].name);
       }
     } catch (err) {
       console.error('Failed to load flows:', err);
@@ -134,7 +137,6 @@ function Chat(): React.ReactElement {
       setChats((prev) => [newChat, ...prev]);
       setSelectedChatId(newChat.id);
       setMessages([]);
-      setIsDrawerOpen(false);
     } catch (err) {
       console.error('Failed to create chat:', err);
     }
@@ -160,7 +162,6 @@ function Chat(): React.ReactElement {
   ) => {
     if (itemId) {
       setSelectedChatId(Number(itemId));
-      setIsDrawerOpen(false);
     }
   };
 

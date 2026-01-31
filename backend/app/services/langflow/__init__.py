@@ -12,7 +12,7 @@ Configuration (environment variables):
     LANGFLOW_URL: Server URL or "mock" for testing
     LANGFLOW_API_KEY: API key (from K8s secret in production)
     LANGFLOW_ID: Project ID (for Langflow Cloud)
-    LANGFLOW_FLOW_ID: Flow ID to execute
+    LANGFLOW_DEFAULT_FLOW: Default flow name (optional, can be selected in UI)
 """
 
 from .client import Flow, LangflowClient, LangflowError

@@ -118,8 +118,7 @@ class Settings(BaseSettings):
     LANGFLOW_URL: str = "http://localhost:7860"
     LANGFLOW_API_KEY: str | None = None  # Bearer token for auth (from K8s secret)
     LANGFLOW_ID: str | None = None  # Langflow Cloud project ID (optional)
-    LANGFLOW_FLOW_ID: str | None = None  # Flow ID (deprecated, use LANGFLOW_DEFAULT_FLOW)
-    LANGFLOW_DEFAULT_FLOW: str | None = None  # Preferred: Default flow name to execute
+    LANGFLOW_DEFAULT_FLOW: str | None = None  # Default flow name to execute
 
     @computed_field  # type: ignore[prop-decorator]
     @property

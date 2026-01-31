@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser
+from app.core.config import settings
 from app.services.langflow import get_langflow_client, LangflowError
 
 
@@ -32,6 +33,7 @@ class FlowsPublic(BaseModel):
 
     data: list[FlowPublic]
     count: int
+    default_flow: str | None = None
 
 
 @router.get("/", response_model=FlowsPublic)
@@ -55,7 +57,11 @@ async def list_flows(
             )
             for flow in flows
         ]
-        return FlowsPublic(data=flow_list, count=len(flow_list))
+        return FlowsPublic(
+            data=flow_list,
+            count=len(flow_list),
+            default_flow=settings.LANGFLOW_DEFAULT_FLOW,
+        )
 
     except LangflowError as e:
         logger.error(f"Failed to list flows: {e.message}")

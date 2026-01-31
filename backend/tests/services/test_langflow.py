@@ -109,32 +109,29 @@ class TestLangflowClient:
         """Test URL building for self-hosted Langflow."""
         client = LangflowClient(
             base_url="http://langflow.example.com",
-            flow_id="test-flow-123",
             langflow_id=None,
         )
 
-        url = client._get_run_url(stream=False)
+        url = client._get_run_url(flow_id="test-flow-123", stream=False)
         assert url == "http://langflow.example.com/api/v1/run/test-flow-123"
 
-        stream_url = client._get_run_url(stream=True)
+        stream_url = client._get_run_url(flow_id="test-flow-123", stream=True)
         assert stream_url == "http://langflow.example.com/api/v1/run/test-flow-123?stream=true"
 
     def test_build_url_langflow_cloud(self):
         """Test URL building for Langflow Cloud."""
         client = LangflowClient(
             base_url="https://api.langflow.astra.datastax.com",
-            flow_id="test-flow-123",
             langflow_id="my-project-id",
         )
 
-        url = client._get_run_url(stream=False)
+        url = client._get_run_url(flow_id="test-flow-123", stream=False)
         assert url == "https://api.langflow.astra.datastax.com/lf/my-project-id/api/v1/run/test-flow-123"
 
     def test_headers_without_api_key(self):
         """Test that headers are set correctly without API key."""
         client = LangflowClient(
             base_url="http://localhost",
-            flow_id="test",
             api_key=None,
         )
 
@@ -145,7 +142,6 @@ class TestLangflowClient:
         """Test that headers include authorization with API key."""
         client = LangflowClient(
             base_url="http://localhost",
-            flow_id="test",
             api_key="secret-key",
         )
 
@@ -153,7 +149,7 @@ class TestLangflowClient:
 
     def test_implements_protocol(self):
         """Test that LangflowClient implements the protocol."""
-        client = LangflowClient(base_url="http://localhost", flow_id="test")
+        client = LangflowClient(base_url="http://localhost")
         assert isinstance(client, LangflowClientProtocol)
 
 
@@ -164,7 +160,6 @@ class TestLangflowFactory:
         """Test that mock client is returned when URL is 'mock'."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = "mock"
-            mock_settings.LANGFLOW_FLOW_ID = "test"
 
             client = get_langflow_client()
             assert isinstance(client, MockLangflowClient)
@@ -178,12 +173,12 @@ class TestLangflowFactory:
             assert isinstance(client, MockLangflowClient)
 
     def test_returns_real_client_when_configured(self):
-        """Test that real client is returned when properly configured."""
+        """Test that real client is returned when URL is configured."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = "http://langflow.example.com"
             mock_settings.LANGFLOW_API_KEY = "secret"
             mock_settings.LANGFLOW_ID = None
-            mock_settings.LANGFLOW_FLOW_ID = "flow-123"
+            mock_settings.LANGFLOW_DEFAULT_FLOW = None
 
             client = get_langflow_client()
             assert isinstance(client, LangflowClient)
@@ -192,7 +187,6 @@ class TestLangflowFactory:
         """Test that mock client is returned when not configured (fallback)."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = None
-            mock_settings.LANGFLOW_FLOW_ID = None
 
             client = get_langflow_client()
             assert isinstance(client, MockLangflowClient)
@@ -201,15 +195,13 @@ class TestLangflowFactory:
         """Test is_langflow_configured returns True for mock."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = "mock"
-            mock_settings.LANGFLOW_FLOW_ID = None
 
             assert is_langflow_configured() is True
 
     def test_is_langflow_configured_real(self):
-        """Test is_langflow_configured returns True when configured."""
+        """Test is_langflow_configured returns True when URL is configured."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = "http://langflow.example.com"
-            mock_settings.LANGFLOW_FLOW_ID = "flow-123"
 
             assert is_langflow_configured() is True
 
@@ -217,6 +209,5 @@ class TestLangflowFactory:
         """Test is_langflow_configured returns False when not configured."""
         with patch("app.services.langflow.factory.settings") as mock_settings:
             mock_settings.LANGFLOW_URL = None
-            mock_settings.LANGFLOW_FLOW_ID = None
 
             assert is_langflow_configured() is False

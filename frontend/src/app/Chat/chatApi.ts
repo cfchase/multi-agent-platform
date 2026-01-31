@@ -60,6 +60,7 @@ export interface Flow {
 export interface FlowsResponse {
   data: Flow[];
   count: number;
+  default_flow?: string;
 }
 
 // =============================================================================
