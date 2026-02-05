@@ -1,5 +1,11 @@
 import apiClient from '@app/api/apiClient';
 
+export interface IntegrationStatus {
+  connected: string[];
+  expired: string[];
+  missing: string[];
+}
+
 export interface CurrentUser {
   id: number;
   email: string;
@@ -9,6 +15,7 @@ export interface CurrentUser {
   admin: boolean;
   created_at: string;
   last_login: string;
+  integration_status: IntegrationStatus;
 }
 
 export interface HealthCheckResponse {

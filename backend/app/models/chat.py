@@ -10,6 +10,7 @@ This module contains:
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import DateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -36,8 +37,14 @@ class Chat(ChatBase, table=True):
     """Chat database model."""
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", nullable=False, ondelete="CASCADE")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
 
     # Relationships
     user: Optional["User"] = Relationship(back_populates="chats")

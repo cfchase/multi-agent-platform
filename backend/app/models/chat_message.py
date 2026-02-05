@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import field_validator
+from sqlalchemy import DateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -47,7 +48,10 @@ class ChatMessage(ChatMessageBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     chat_id: int = Field(foreign_key="chat.id", nullable=False, ondelete="CASCADE")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
 
     # Relationship
     chat: Optional["Chat"] = Relationship(back_populates="messages")

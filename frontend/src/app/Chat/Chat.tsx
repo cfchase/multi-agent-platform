@@ -15,7 +15,6 @@ import {
   ChatbotContent,
   ChatbotDisplayMode,
   ChatbotFooter,
-  ChatbotFootnote,
   ChatbotHeader,
   ChatbotHeaderMain,
   ChatbotHeaderMenu,
@@ -25,10 +24,14 @@ import {
   Message,
   MessageBar,
   MessageBox,
-  MessageBoxHandle,
   MessageProps,
   Conversation,
 } from '@patternfly/chatbot';
+
+// MessageBox ref type - includes DOM properties and scroll method
+interface MessageBoxRef extends HTMLDivElement {
+  scrollToBottom?: (options?: { behavior?: 'auto' | 'smooth' }) => void;
+}
 import { ArrowDownIcon, RedoIcon, TrashIcon } from '@patternfly/react-icons';
 
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
@@ -77,7 +80,7 @@ function Chat(): React.ReactElement {
 
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
-  const messageBoxRef = React.useRef<MessageBoxHandle | null>(null);
+  const messageBoxRef = React.useRef<MessageBoxRef | null>(null);
   const [userScrolledUp, setUserScrolledUp] = React.useState(false);
   const scrollDetectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -207,9 +210,24 @@ function Chat(): React.ReactElement {
     }
   };
 
-  const handleSend = (message: string | number, retryMessageText?: string) => {
+  const handleSend = async (message: string | number, retryMessageText?: string) => {
     const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
-    if (!messageText.trim() || !selectedChatId || isSending) return;
+    if (!messageText.trim() || isSending) return;
+
+    // Create a new chat if none is selected
+    let chatId = selectedChatId;
+    if (!chatId) {
+      try {
+        const newChat = await ChatAPI.createChat({ title: 'New Chat' });
+        setChats((prev) => [newChat, ...prev]);
+        setSelectedChatId(newChat.id);
+        chatId = newChat.id;
+      } catch (err) {
+        console.error('Failed to create chat:', err);
+        setOperationError('Failed to create a new chat. Please try again.');
+        return;
+      }
+    }
 
     setIsSending(true);
     setLastError(null);
@@ -254,7 +272,7 @@ function Chat(): React.ReactElement {
     let accumulatedContent = '';
 
     const streamController = ChatAPI.createStreamingMessage(
-      selectedChatId,
+      chatId,
       messageText,
       (event: StreamingEvent) => {
         if (event.type === 'content' && event.content) {
@@ -270,14 +288,14 @@ function Chat(): React.ReactElement {
         } else if (event.type === 'done') {
           streamControllerRef.current = null;
           // Reload to get the saved message IDs
-          loadMessages(selectedChatId);
+          loadMessages(chatId);
           setIsSending(false);
           setAnnouncement(`Assistant: ${accumulatedContent}`);
 
           // Update chat title if first message
           if (messages.length === 0) {
             const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
-            ChatAPI.updateChat(selectedChatId, { title }).then(() => loadChats());
+            ChatAPI.updateChat(chatId, { title }).then(() => loadChats());
           }
         } else if (event.type === 'error') {
           streamControllerRef.current = null;
@@ -288,7 +306,7 @@ function Chat(): React.ReactElement {
                 : msg
             )
           );
-          setLastError({ message: messageText, chatId: selectedChatId });
+          setLastError({ message: messageText, chatId });
           setIsSending(false);
         }
       },
@@ -302,7 +320,7 @@ function Chat(): React.ReactElement {
               : msg
           )
         );
-        setLastError({ message: messageText, chatId: selectedChatId });
+        setLastError({ message: messageText, chatId });
         setIsSending(false);
       },
       () => {
@@ -478,11 +496,10 @@ function Chat(): React.ReactElement {
               <ChatbotFooter>
                 <MessageBar
                   onSendMessage={handleSend}
-                  isSendButtonDisabled={isSending || !selectedChatId}
+                  isSendButtonDisabled={isSending}
                   hasStopButton={isSending}
                   handleStopButton={handleStopStreaming}
                 />
-                <ChatbotFootnote label="AI-powered research assistant. Verify important information." />
               </ChatbotFooter>
             </>
           }
