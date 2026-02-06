@@ -1,6 +1,6 @@
 # Service Management Targets (LangFlow, Langfuse, MLFlow, OAuth)
 
-.PHONY: langflow-start langflow-stop langflow-status langflow-logs langflow-import langflow-reset
+.PHONY: langflow-start langflow-stop langflow-restart langflow-status langflow-logs langflow-import langflow-reset
 .PHONY: langfuse-start langfuse-stop langfuse-status langfuse-logs langfuse-reset
 .PHONY: mlflow-start mlflow-stop mlflow-status mlflow-logs mlflow-reset
 .PHONY: oauth-start oauth-stop oauth-status oauth-logs
@@ -25,6 +25,9 @@ langflow-import: ## Import flows from configured sources into LangFlow
 
 langflow-reset: ## Reset LangFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
+
+langflow-restart: ## Restart LangFlow (required after installing components)
+	@./scripts/dev-langflow.sh restart
 
 # Langfuse
 langfuse-start: ## Start Langfuse development stack

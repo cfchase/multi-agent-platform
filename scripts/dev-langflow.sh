@@ -139,6 +139,13 @@ case "$1" in
         fi
         ;;
 
+    restart)
+        log_info "Restarting LangFlow container..."
+        $0 stop
+        $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
+        $0 start
+        ;;
+
     logs)
         if [ "$2" = "-f" ] || [ "$2" = "--follow" ]; then
             log_info "Streaming LangFlow logs (Ctrl+C to exit)..."
@@ -168,16 +175,17 @@ case "$1" in
         ;;
 
     *)
-        echo "Usage: $0 {start|stop|remove|reset|logs|status|shell}"
+        echo "Usage: $0 {start|stop|restart|remove|reset|logs|status|shell}"
         echo ""
         echo "Commands:"
-        echo "  start  - Start the LangFlow container"
-        echo "  stop   - Stop the LangFlow container"
-        echo "  remove - Remove container (keeps data in .local/langflow)"
-        echo "  reset  - Remove container and all data"
-        echo "  logs   - Show LangFlow logs (use -f to follow)"
-        echo "  status - Check if LangFlow is running"
-        echo "  shell  - Open shell in container"
+        echo "  start   - Start the LangFlow container"
+        echo "  stop    - Stop the LangFlow container"
+        echo "  restart - Remove and recreate container (for env changes)"
+        echo "  remove  - Remove container (keeps data in .local/langflow)"
+        echo "  reset   - Remove container and all data"
+        echo "  logs    - Show LangFlow logs (use -f to follow)"
+        echo "  status  - Check if LangFlow is running"
+        echo "  shell   - Open shell in container"
         echo ""
         echo "Environment variables:"
         echo "  LANGFLOW_VERSION  - LangFlow version (default: latest)"
