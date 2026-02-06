@@ -22,6 +22,7 @@ Config options per source:
 import ast
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -220,6 +221,99 @@ def generate_init_py(category_dir: Path) -> int:
 
     log_info(f"  Generated {init_file.name} with {len(all_classes)} component(s)")
     return len(all_classes)
+
+
+def install_dependencies(dependencies: list[str], target_dir: Path) -> bool:
+    """Install pip dependencies to the target directory.
+
+    Returns True if all dependencies installed successfully.
+    """
+    if not dependencies:
+        return True
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    log_info(f"  Installing {len(dependencies)} pip dependency(ies)...")
+
+    cmd = [
+        sys.executable, "-m", "pip", "install",
+        "--target", str(target_dir),
+        "--upgrade",
+        "--quiet"
+    ] + dependencies
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            log_error(f"  pip install failed: {result.stderr}")
+            return False
+        log_info(f"  Dependencies installed to {target_dir}")
+        return True
+    except Exception as e:
+        log_error(f"  pip install error: {e}")
+        return False
+
+
+def install_components(source: dict) -> bool:
+    """Install components from a source entry.
+
+    Handles:
+    1. pip install dependencies to PACKAGES_DIR
+    2. Copy .py files to COMPONENTS_DIR/{category}/
+    3. Generate __init__.py for the category
+
+    Returns True if successful.
+    """
+    name = source.get("name", "unnamed")
+    path_str = source.get("path", "")
+    category = source.get("category", "custom")
+    dependencies = source.get("dependencies", [])
+
+    # Validate source path
+    source_path = validate_path(PROJECT_ROOT, path_str)
+    if source_path is None:
+        return False
+
+    if not source_path.is_dir():
+        log_error(f"Component source path not found: {source_path}")
+        return False
+
+    log_info(f"Installing components from: {source_path}")
+    log_info(f"  Category: {category}")
+
+    # Step 1: Install pip dependencies
+    if dependencies:
+        if not install_dependencies(dependencies, PACKAGES_DIR):
+            log_warn(f"  Some dependencies failed to install")
+
+    # Step 2: Create category directory
+    category_dir = COMPONENTS_DIR / category
+    category_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 3: Copy component files
+    py_files = list(source_path.glob("*.py"))
+    if not py_files:
+        log_warn(f"  No .py files found in {source_path}")
+        return False
+
+    copied = 0
+    for py_file in py_files:
+        if py_file.name == "__init__.py":
+            continue
+        dest = category_dir / py_file.name
+        shutil.copy2(py_file, dest)
+        log_info(f"  Copied: {py_file.name}")
+        copied += 1
+
+    if copied == 0:
+        log_warn(f"  No component files copied")
+        return False
+
+    # Step 4: Generate __init__.py
+    component_count = generate_init_py(category_dir)
+
+    log_info(f"Installed {copied} file(s), {component_count} component(s) for '{name}'")
+    return component_count > 0
 
 
 def authenticate() -> bool:
