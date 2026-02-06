@@ -9,8 +9,10 @@ Provides endpoints for:
 """
 
 import logging
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request
+from fastapi import status as http_status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -20,7 +22,6 @@ from app.crud.integration import (
     create_or_update_integration,
     delete_integration,
     get_integration_status,
-    get_missing_integrations,
     get_user_integrations,
 )
 from app.models import UserIntegrationPublic
@@ -111,7 +112,7 @@ async def list_integrations(
 
 
 @router.get("/status", response_model=IntegrationStatusResponse)
-async def get_status(
+async def get_integration_status_endpoint(
     current_user: CurrentUser,
     session: SessionDep,
 ) -> IntegrationStatusResponse:
@@ -122,15 +123,15 @@ async def get_status(
     Automatically attempts to refresh expired tokens before returning status.
     """
     supported = get_supported_services()
-    status = get_integration_status(
+    integration_status = get_integration_status(
         session=session,
         user_id=current_user.id,
         available_services=supported,
     )
 
     # Attempt to refresh any expired tokens
-    if status["expired"]:
-        for service_name in status["expired"]:
+    if integration_status["expired"]:
+        for service_name in integration_status["expired"]:
             logger.info(f"Attempting to refresh expired token for {service_name}")
             refreshed = await refresh_integration_token(
                 session=session,
@@ -143,16 +144,16 @@ async def get_status(
                 logger.warning(f"Failed to refresh token for {service_name}")
 
         # Re-fetch status after refresh attempts
-        status = get_integration_status(
+        integration_status = get_integration_status(
             session=session,
             user_id=current_user.id,
             available_services=supported,
         )
 
     return IntegrationStatusResponse(
-        connected_services=status["connected"],
-        expired_services=status["expired"],
-        missing_services=status["missing"],
+        connected_services=integration_status["connected"],
+        expired_services=integration_status["expired"],
+        missing_services=integration_status["missing"],
     )
 
 
@@ -190,7 +191,7 @@ async def start_oauth_flow(
     config = get_provider_config(service)
     if config is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown service or missing configuration: {service}",
         )
 
@@ -204,7 +205,7 @@ async def start_oauth_flow(
             )
         except DataverseRegistrationError as e:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Failed to register OAuth client with {service}: {e.message}",
             )
 
@@ -218,7 +219,7 @@ async def start_oauth_flow(
         )
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
 
@@ -242,15 +243,12 @@ def _build_settings_redirect(
     if success and service:
         params.append(f"connected={service}")
     if error_message:
-        # URL-encode the error message
-        from urllib.parse import quote
-
         params.append(f"error={quote(error_message)}")
 
     if params:
         redirect_url += "?" + "&".join(params)
 
-    return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url=redirect_url, status_code=http_status.HTTP_302_FOUND)
 
 
 @router.get("/oauth/callback/{service}")
@@ -360,7 +358,7 @@ async def disconnect_integration(
 
     if not deleted:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Integration not found: {service}",
         )
 

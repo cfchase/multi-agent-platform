@@ -130,7 +130,7 @@ describe('IntegrationSettings', () => {
     });
   });
 
-  it('redirects to OAuth URL when connect is clicked', async () => {
+  it('calls startOAuth when connect is clicked', async () => {
     const user = userEvent.setup();
 
     vi.mocked(integrationService.getStatus).mockResolvedValue({
@@ -149,12 +149,6 @@ describe('IntegrationSettings', () => {
       service: 'google_drive',
     });
 
-    // Mock window.location
-    const originalLocation = window.location;
-    // @ts-expect-error - mocking window.location
-    delete window.location;
-    window.location = { ...originalLocation, href: '' };
-
     render(<IntegrationSettings />);
 
     await waitFor(() => {
@@ -166,9 +160,6 @@ describe('IntegrationSettings', () => {
     await waitFor(() => {
       expect(integrationService.startOAuth).toHaveBeenCalledWith('google_drive');
     });
-
-    // Restore window.location
-    window.location = originalLocation;
   });
 
   it('calls disconnect and reloads data', async () => {

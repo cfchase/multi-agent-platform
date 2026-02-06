@@ -258,6 +258,50 @@ def cleanup_expired_states() -> int:
     return len(expired_states)
 
 
+def _build_authorization_params(
+    config: OAuthProviderConfig,
+    redirect_uri: str,
+    state: str,
+    provider_client_id: str | None = None,
+) -> tuple[dict, str | None]:
+    """
+    Build common OAuth authorization parameters.
+
+    Args:
+        config: OAuth provider configuration
+        redirect_uri: URL to redirect to after authorization
+        state: OAuth state parameter
+        provider_client_id: Dynamic client_id for RFC 7591 providers
+
+    Returns:
+        Tuple of (params dict, code_verifier or None)
+    """
+    # For dynamic registration providers, use the provided client_id
+    # Otherwise use the static client_id from config
+    client_id = provider_client_id if config.uses_dynamic_registration else config.client_id
+
+    code_verifier = None
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(config.scopes),
+        "state": state,
+    }
+
+    # Add PKCE parameters if required
+    if config.use_pkce:
+        code_verifier, code_challenge = generate_pkce_pair()
+        params["code_challenge"] = code_challenge
+        params["code_challenge_method"] = "S256"
+
+    # Add any extra parameters (like access_type=offline for Google)
+    if config.extra_params:
+        params.update(config.extra_params)
+
+    return params, code_verifier
+
+
 def build_authorization_url(
     service_name: str,
     redirect_uri: str,
@@ -284,10 +328,8 @@ def build_authorization_url(
     if config is None:
         raise ValueError(f"Unknown service or missing configuration: {service_name}")
 
-    # For dynamic registration providers, use the provided client_id
-    # Otherwise use the static client_id from config
+    # Validate client_id availability
     client_id = provider_client_id if config.uses_dynamic_registration else config.client_id
-
     if not client_id:
         raise ValueError(
             f"No client_id available for {service_name}. "
@@ -295,28 +337,14 @@ def build_authorization_url(
         )
 
     state = generate_oauth_state()
-    code_verifier = None
-
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(config.scopes),
-        "state": state,
-    }
-
-    # Add PKCE parameters if required
-    if config.use_pkce:
-        code_verifier, code_challenge = generate_pkce_pair()
-        params["code_challenge"] = code_challenge
-        params["code_challenge_method"] = "S256"
-
-    # Add any extra parameters (like access_type=offline for Google)
-    if config.extra_params:
-        params.update(config.extra_params)
+    params, code_verifier = _build_authorization_params(
+        config=config,
+        redirect_uri=redirect_uri,
+        state=state,
+        provider_client_id=provider_client_id,
+    )
 
     # Store state for validation on callback (bound to user for security)
-    # Include provider_client_id for dynamic registration providers
     state_data = OAuthStateData(
         service_name=service_name,
         redirect_uri=redirect_uri,
@@ -470,10 +498,8 @@ def build_authorization_url_db(
     if config is None:
         raise ValueError(f"Unknown service or missing configuration: {service_name}")
 
-    # For dynamic registration providers, use the provided client_id
-    # Otherwise use the static client_id from config
+    # Validate client_id availability
     client_id = provider_client_id if config.uses_dynamic_registration else config.client_id
-
     if not client_id:
         raise ValueError(
             f"No client_id available for {service_name}. "
@@ -481,28 +507,14 @@ def build_authorization_url_db(
         )
 
     state = generate_oauth_state()
-    code_verifier = None
-
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(config.scopes),
-        "state": state,
-    }
-
-    # Add PKCE parameters if required
-    if config.use_pkce:
-        code_verifier, code_challenge = generate_pkce_pair()
-        params["code_challenge"] = code_challenge
-        params["code_challenge_method"] = "S256"
-
-    # Add any extra parameters (like access_type=offline for Google)
-    if config.extra_params:
-        params.update(config.extra_params)
+    params, code_verifier = _build_authorization_params(
+        config=config,
+        redirect_uri=redirect_uri,
+        state=state,
+        provider_client_id=provider_client_id,
+    )
 
     # Store state in database for validation on callback
-    # Include provider_client_id for dynamic registration providers
     _store_oauth_state_db(
         session=session,
         state=state,
