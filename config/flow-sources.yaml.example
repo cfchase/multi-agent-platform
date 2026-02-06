@@ -5,6 +5,7 @@
 #   - file: Single JSON file (local path or URL)
 #   - local: Directory of JSON files (scans with pattern)
 #   - git: Git repository (clones and scans with pattern)
+#   - components: Custom component directory (installs deps, copies .py files)
 #
 # Common options:
 #   - project: LangFlow project name to import into (created if missing)
@@ -12,6 +13,15 @@
 #   - public: Set to true to make flows visible to all users (default: false)
 
 flow_sources:
+
+  # Example: Custom components directory
+  # - name: example-components
+  #   type: components
+  #   path: /path/to/langflow-examples/components/examples/
+  #   category: examples
+  #   dependencies:
+  #     - humanize>=4.0.0
+  #   enabled: true
   # Example: Direct file URL from GitHub
   - name: simple-ollama
     type: file
