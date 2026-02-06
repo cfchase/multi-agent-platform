@@ -350,6 +350,82 @@ def authenticate() -> bool:
     return False
 
 
+def list_all_flows() -> list[dict] | None:
+    """List all flows from LangFlow.
+
+    Returns list of flow objects with id, name, folder_id, etc.
+    Returns None on error.
+    """
+    headers = {}
+    if ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
+    resp = request_with_retry(
+        "GET",
+        f"{LANGFLOW_URL}/api/v1/flows/",
+        headers=headers,
+        params={"get_all": True},
+        timeout=30,
+    )
+
+    if resp is None:
+        return None
+
+    if resp.ok:
+        try:
+            return resp.json()
+        except json.JSONDecodeError as e:
+            log_error(f"Failed to parse flows response: {e}")
+            return None
+
+    log_error(f"Failed to list flows: {resp.status_code}")
+    return None
+
+
+def delete_flow(flow_id: str) -> bool:
+    """Delete a flow by ID.
+
+    Returns True if deleted successfully.
+    """
+    headers = {"Content-Type": "application/json"}
+    if ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
+    resp = request_with_retry(
+        "DELETE",
+        f"{LANGFLOW_URL}/api/v1/flows",
+        headers=headers,
+        json=[flow_id],  # API expects a list of IDs
+        timeout=10,
+    )
+
+    if resp is None:
+        return False
+
+    if resp.ok:
+        return True
+
+    log_warn(f"Failed to delete flow {flow_id[:8]}...: {resp.status_code}")
+    return False
+
+
+def find_flow_by_name(flows: list[dict], name: str, project_id: str | None = None) -> dict | None:
+    """Find a flow by name, optionally within a specific project.
+
+    Args:
+        flows: List of flow objects from list_all_flows()
+        name: Flow name to search for
+        project_id: Optional folder_id to filter by
+
+    Returns the flow dict if found, None otherwise.
+    """
+    for flow in flows:
+        if flow.get("name") == name:
+            if project_id is None or flow.get("folder_id") == project_id:
+                return flow
+    return None
+
+
 def create_project(project_name: str) -> str | None:
     """Create a new project and return its ID."""
     headers = {"Content-Type": "application/json"}
