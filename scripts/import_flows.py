@@ -525,10 +525,24 @@ def import_flow_data(
     project_id: str | None = None,
     public: bool = False,
 ) -> bool:
-    """Import flow data to LangFlow."""
+    """Import flow data to LangFlow, replacing existing flow if present.
+
+    Implements replace-on-import: if a flow with the same name exists in the
+    same project, it is deleted before importing the new version.
+    """
     headers = {"Content-Type": "application/json"}
     if ACCESS_TOKEN:
         headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
+    # Check for existing flow and delete if found
+    flows = list_all_flows()
+    if flows is not None:
+        existing = find_flow_by_name(flows, flow_name, project_id)
+        if existing:
+            existing_id = existing.get("id", "")
+            log_info(f"  Replacing existing flow: {flow_name}")
+            if not delete_flow(existing_id):
+                log_warn(f"  Could not delete existing flow, attempting import anyway")
 
     # Add project (folder_id) if specified
     if project_id:
@@ -549,12 +563,12 @@ def import_flow_data(
         return False
 
     if resp.ok and "id" in resp.text:
-        log_info(f"  ✓ Imported: {flow_name}")
+        log_info(f"  Imported: {flow_name}")
         return True
     elif resp.status_code == 409:
-        # Conflict - flow already exists
-        log_info(f"  ○ Skipped (already exists): {flow_name}")
-        return True  # Not a failure
+        # Should not happen with replace-on-import, but handle gracefully
+        log_warn(f"  Conflict importing {flow_name} (flow may have been recreated)")
+        return False
     else:
         log_warn(f"  Could not import {flow_name}: {resp.status_code}")
         log_warn(f"  Response: {resp.text[:200]}")
