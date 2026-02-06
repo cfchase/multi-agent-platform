@@ -24,14 +24,10 @@ import {
   Message,
   MessageBar,
   MessageBox,
+  MessageBoxHandle,
   MessageProps,
   Conversation,
 } from '@patternfly/chatbot';
-
-// MessageBox ref type - includes DOM properties and scroll method
-interface MessageBoxRef extends HTMLDivElement {
-  scrollToBottom?: (options?: { behavior?: 'auto' | 'smooth' }) => void;
-}
 import { ArrowDownIcon, RedoIcon, TrashIcon } from '@patternfly/react-icons';
 
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
@@ -80,7 +76,7 @@ function Chat(): React.ReactElement {
 
   const historyRef = React.useRef<HTMLButtonElement>(null);
   const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
-  const messageBoxRef = React.useRef<MessageBoxRef | null>(null);
+  const messageBoxRef = React.useRef<MessageBoxHandle | null>(null);
   const [userScrolledUp, setUserScrolledUp] = React.useState(false);
   const scrollDetectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
