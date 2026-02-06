@@ -634,12 +634,49 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
         log_warn("No flow sources configured")
         return 0, 0
 
-    log_info(f"Found {len(sources)} flow source(s)")
+    # Separate component sources from flow sources
+    component_sources = []
+    flow_sources = []
+    for source in sources:
+        if source.get("type") == "components":
+            component_sources.append(source)
+        else:
+            flow_sources.append(source)
+
+    log_info(f"Found {len(sources)} source(s): {len(component_sources)} component(s), {len(flow_sources)} flow(s)")
 
     total_success = 0
     total_failure = 0
+    components_installed = False
 
-    for source in sources:
+    # Pass 1: Process component sources first
+    if component_sources:
+        log_info("")
+        log_info("=== Installing Components ===")
+        for source in component_sources:
+            name = source.get("name", "unnamed")
+            enabled = source.get("enabled", True)
+
+            if not enabled:
+                log_info(f"Skipping disabled component source: {name}")
+                continue
+
+            log_info(f"Processing component source: {name}")
+            if install_components(source):
+                components_installed = True
+            else:
+                total_failure += 1
+            print()
+
+        if components_installed:
+            log_info("NOTE: Restart LangFlow to load new components")
+            print()
+
+    # Pass 2: Process flow sources
+    if flow_sources:
+        log_info("=== Importing Flows ===")
+
+    for source in flow_sources:
         name = source.get("name", "unnamed")
         source_type = source.get("type", "local")
         enabled = source.get("enabled", True)
