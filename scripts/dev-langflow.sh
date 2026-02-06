@@ -62,6 +62,8 @@ case "$1" in
 
             # Create data directory with write permissions
             mkdir -p "$DATA_DIR"
+            mkdir -p "$DATA_DIR/components"
+            mkdir -p "$DATA_DIR/packages"
 
             # Generate a secret key to avoid file permission issues
             SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
