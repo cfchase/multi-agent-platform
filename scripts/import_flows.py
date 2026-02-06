@@ -72,6 +72,9 @@ ACCESS_TOKEN: str | None = None
 # Cache for project name -> ID lookups
 PROJECT_CACHE: dict[str, str] = {}
 
+# Track installed component categories for validation
+INSTALLED_COMPONENTS: set[str] = set()
+
 
 def log_info(msg: str) -> None:
     print(f"\033[0;32m[INFO]\033[0m {msg}")
@@ -304,6 +307,11 @@ def install_components(source: dict) -> bool:
         shutil.copy2(py_file, dest)
         log_info(f"  Copied: {py_file.name}")
         copied += 1
+
+    # Track installed components for requires_components validation
+    for py_file in py_files:
+        if py_file.name != "__init__.py":
+            INSTALLED_COMPONENTS.add(py_file.stem)
 
     if copied == 0:
         log_warn(f"  No component files copied")
@@ -789,6 +797,13 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
 
         # Check if flows should be public
         public = source.get("public", False)
+
+        # Check for required components
+        required = source.get("requires_components", [])
+        missing = [c for c in required if c not in INSTALLED_COMPONENTS]
+        if missing:
+            log_warn(f"  Missing required components: {', '.join(missing)}")
+            log_warn(f"  Flow may not work correctly until components are installed")
 
         if source_type == "file":
             # Single file: local path or URL
