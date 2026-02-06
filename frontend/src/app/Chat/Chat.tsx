@@ -214,7 +214,13 @@ function Chat(): React.ReactElement {
     const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
     if (!messageText.trim() || isSending) return;
 
-    // Create a new chat if none is selected
+    // Require a flow to be selected
+    if (!selectedFlowName) {
+      setOperationError('Please select a flow before sending a message.');
+      return;
+    }
+
+    // Auto-create chat if none exists
     let chatId = selectedChatId;
     if (!chatId) {
       try {
@@ -306,7 +312,7 @@ function Chat(): React.ReactElement {
                 : msg
             )
           );
-          setLastError({ message: messageText, chatId });
+          setLastError({ message: messageText, chatId: chatId });
           setIsSending(false);
         }
       },
@@ -320,7 +326,7 @@ function Chat(): React.ReactElement {
               : msg
           )
         );
-        setLastError({ message: messageText, chatId });
+        setLastError({ message: messageText, chatId: chatId });
         setIsSending(false);
       },
       () => {
@@ -496,7 +502,7 @@ function Chat(): React.ReactElement {
               <ChatbotFooter>
                 <MessageBar
                   onSendMessage={handleSend}
-                  isSendButtonDisabled={isSending}
+                  isSendButtonDisabled={isSending || !selectedFlowName}
                   hasStopButton={isSending}
                   handleStopButton={handleStopStreaming}
                 />

@@ -113,7 +113,7 @@ def _build_dataverse_config() -> OAuthProviderConfig | None:
     return OAuthProviderConfig(
         authorize_url=f"{auth_url}/authorize",
         token_url=f"{auth_url}/token",
-        scopes=["openid"],
+        scopes=["openid", "offline_access"],  # offline_access needed for refresh tokens
         use_pkce=True,
         uses_dynamic_registration=True,
         is_public_client=True,  # Dataverse uses public clients with PKCE

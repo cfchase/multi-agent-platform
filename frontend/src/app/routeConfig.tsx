@@ -43,14 +43,12 @@ export const routes: AppRouteConfig[] = [
       {
         element: <GeneralSettings />,
         exact: true,
-        label: 'General',
         path: '/settings/general',
         title: 'Multi-Agent Platform | General Settings',
       },
       {
         element: <ProfileSettings />,
         exact: true,
-        label: 'Profile',
         path: '/settings/profile',
         title: 'Multi-Agent Platform | Profile Settings',
       },

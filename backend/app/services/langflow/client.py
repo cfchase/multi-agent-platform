@@ -29,16 +29,31 @@ def extract_chunk_from_sse_data(data: dict) -> str | None:
     """
     Extract the text chunk from an SSE data payload.
 
-    Handles two Langflow streaming formats:
+    Handles multiple Langflow streaming formats:
     - Token event: {"event": "token", "data": {"chunk": "..."}}
+    - Add message event: {"event": "add_message", "data": {"text": "...", "sender": "Machine"}}
     - Direct chunk: {"chunk": "..."}
+
+    For add_message events, only extracts text from AI/Machine responses (not user messages).
 
     Returns the chunk text or None if not found.
     """
-    if data.get("event") == "token":
+    event_type = data.get("event")
+
+    if event_type == "token":
         return data.get("data", {}).get("chunk") or None
+
+    if event_type == "add_message":
+        # Only extract text from AI/Machine responses, not user messages
+        event_data = data.get("data", {})
+        sender = event_data.get("sender", "")
+        if sender in ("Machine", "AI"):
+            return event_data.get("text") or None
+        return None
+
     if "chunk" in data:
         return data.get("chunk") or None
+
     return None
 
 

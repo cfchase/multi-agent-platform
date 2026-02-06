@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.crud.integration import (
     create_or_update_integration,
     delete_integration,
+    get_integration_status,
     get_missing_integrations,
     get_user_integrations,
 )
@@ -105,7 +106,7 @@ async def list_integrations(
 
 
 @router.get("/status", response_model=IntegrationStatusResponse)
-async def get_integration_status(
+async def get_status(
     current_user: CurrentUser,
     session: SessionDep,
 ) -> IntegrationStatusResponse:
@@ -115,28 +116,16 @@ async def get_integration_status(
     Returns lists of connected, expired, and missing services.
     """
     supported = get_supported_services()
-    missing = get_missing_integrations(
+    status = get_integration_status(
         session=session,
         user_id=current_user.id,
-        required_services=supported,
+        available_services=supported,
     )
 
-    # Get all user integrations to check expiration
-    integrations = get_user_integrations(session=session, user_id=current_user.id)
-
-    # Separate connected (valid) from expired
-    connected = []
-    expired = []
-    for integration in integrations:
-        if integration.is_expired():
-            expired.append(integration.service_name)
-        else:
-            connected.append(integration.service_name)
-
     return IntegrationStatusResponse(
-        connected_services=connected,
-        expired_services=expired,
-        missing_services=missing,
+        connected_services=status["connected"],
+        expired_services=status["expired"],
+        missing_services=status["missing"],
     )
 
 
