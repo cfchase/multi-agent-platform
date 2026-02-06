@@ -22,18 +22,25 @@ User → Frontend → /api/v1/integrations/oauth/start/{service}
 
 1. **OAuth Configuration Service** (`app/services/oauth_config.py`)
    - Provider configurations (URLs, scopes, PKCE)
-   - State management for CSRF protection
+   - Database-backed state management for multi-replica support
    - Authorization URL generation
 
 2. **Token Exchange Service** (`app/services/oauth_token.py`)
    - Authorization code exchange
    - Token refresh
+   - Handles both static and dynamic client credentials
 
-3. **Token Refresh Service** (`app/services/token_refresh.py`)
+3. **Dataverse OAuth Service** (`app/services/dataverse_oauth.py`)
+   - Dynamic client registration (RFC 7591)
+   - Automatic client creation per OAuth flow
+
+4. **Token Refresh Service** (`app/services/token_refresh.py`)
    - Automatic refresh before expiration
+   - Locking mechanism for multi-replica safety
+   - Rate limiting to prevent provider abuse
    - `get_valid_token()` for always-valid tokens
 
-4. **Flow Token Injection** (`app/services/flow_token_injection.py`)
+5. **Flow Token Injection** (`app/services/flow_token_injection.py`)
    - Injects user tokens into Langflow tweaks
    - Enables flows to access external services
 
@@ -58,18 +65,22 @@ User → Frontend → /api/v1/integrations/oauth/start/{service}
 
 ### Dataverse
 
-- **OAuth Type**: OAuth 2.0 with PKCE
-- **Scopes**: `openid`
+- **OAuth Type**: OAuth 2.0 with PKCE + Dynamic Client Registration (RFC 7591)
+- **Scopes**: `openid`, `offline_access` (for refresh tokens)
 - **PKCE**: Required (S256)
 
+Dataverse uses **dynamic client registration** - no static client credentials needed. A new OAuth client is registered automatically for each OAuth flow.
+
 **Setup:**
-1. Contact your Dataverse administrator for OAuth credentials
-2. Set environment variables:
+1. Set the Dataverse auth URL:
    ```
-   DATAVERSE_CLIENT_ID=your-client-id
-   DATAVERSE_CLIENT_SECRET=your-client-secret
-   DATAVERSE_SERVER_URL=https://your-dataverse-instance.org
+   DATAVERSE_AUTH_URL=https://mcp.dataverse.redhat.com/auth
    ```
+
+   The following endpoints are derived automatically:
+   - Authorization: `{DATAVERSE_AUTH_URL}/authorize`
+   - Token: `{DATAVERSE_AUTH_URL}/token`
+   - Registration: `{DATAVERSE_AUTH_URL}/register`
 
 ## API Endpoints
 
@@ -102,8 +113,24 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 1. **Initial Authorization**: User clicks Connect, redirects to provider
 2. **Token Storage**: Authorization code exchanged, tokens encrypted and stored
-3. **Token Refresh**: Automatic refresh 5 minutes before expiration
+3. **Token Refresh**: Automatic refresh when token is expired or expiring soon
 4. **Token Access**: `get_valid_token()` always returns a valid token
+
+### Token Refresh Mechanism
+
+The refresh service includes safeguards for multi-replica deployments:
+
+- **Locking**: A `refresh_locked_at` timestamp prevents concurrent refresh attempts
+  - Lock expires after 30 seconds if not released
+  - Only one replica can refresh a token at a time
+
+- **Rate Limiting**: A `last_refresh_attempt` timestamp prevents rapid retries
+  - 60-second cooldown between refresh attempts
+  - Prevents hammering the OAuth provider on persistent failures
+
+- **Service-specific thresholds**: Different services have different refresh windows
+  - Google Drive: 5 minutes before expiration
+  - Dataverse: 5 minutes before expiration
 
 ## Flow Integration
 
@@ -159,9 +186,7 @@ The Integration Settings page is available at `/settings/integrations`:
 | `TOKEN_ENCRYPTION_KEY` | Yes | Fernet key for token encryption |
 | `GOOGLE_CLIENT_ID` | For Google | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | For Google | Google OAuth client secret |
-| `DATAVERSE_CLIENT_ID` | For Dataverse | Dataverse OAuth client ID |
-| `DATAVERSE_CLIENT_SECRET` | For Dataverse | Dataverse OAuth client secret |
-| `DATAVERSE_SERVER_URL` | For Dataverse | Dataverse server URL |
+| `DATAVERSE_AUTH_URL` | For Dataverse | Dataverse OAuth auth base URL (e.g., `https://mcp.dataverse.redhat.com/auth`) |
 
 ## Troubleshooting
 
