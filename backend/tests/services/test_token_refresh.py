@@ -382,3 +382,355 @@ class TestServiceSpecificRefreshThreshold:
             # Should NOT have refreshed
             assert token == "valid-for-30-mins"
             mock_refresh.assert_not_called()
+
+
+class TestRefreshRaceCondition:
+    """Tests for preventing race conditions on concurrent token refresh."""
+
+    @pytest.mark.asyncio
+    async def test_refresh_skipped_when_lock_held(self, session: Session):
+        """Refresh is skipped when another refresh is in progress (lock held)."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration
+        from app.services.token_refresh import refresh_integration_token
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        # Manually set expires_at to past and set a refresh lock
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        integration.refresh_locked_at = datetime.now(timezone.utc)  # Lock is active
+        session.add(integration)
+        session.commit()
+
+        # Attempt to refresh should be skipped due to lock
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            # Should return False because refresh was skipped (lock held)
+            assert result is False
+            # OAuth provider should NOT have been called
+            mock_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_proceeds_when_lock_expired(self, session: Session):
+        """Refresh proceeds when the lock has expired (stale lock)."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration
+        from app.services.token_refresh import refresh_integration_token, REFRESH_LOCK_TIMEOUT_SECONDS
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        # Set expired lock (older than timeout)
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        integration.refresh_locked_at = datetime.now(timezone.utc) - timedelta(
+            seconds=REFRESH_LOCK_TIMEOUT_SECONDS + 10
+        )
+        session.add(integration)
+        session.commit()
+
+        # Refresh should proceed because lock is stale
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            # Should succeed
+            assert result is True
+            mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_clears_lock_on_success(self, session: Session):
+        """Lock is cleared after successful refresh."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration, get_user_integration
+        from app.services.token_refresh import refresh_integration_token
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token (no lock)
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        session.add(integration)
+        session.commit()
+
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            assert result is True
+
+        # Lock should be cleared after success
+        integration = get_user_integration(
+            session=session, user_id=user.id, service_name="google_drive"
+        )
+        assert integration.refresh_locked_at is None
+
+    @pytest.mark.asyncio
+    async def test_refresh_clears_lock_on_failure(self, session: Session):
+        """Lock is cleared even if refresh fails."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration, get_user_integration
+        from app.services.token_refresh import refresh_integration_token
+        from app.services.oauth_token import OAuthTokenError
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        session.add(integration)
+        session.commit()
+
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.side_effect = OAuthTokenError("invalid_grant", "Token revoked")
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            assert result is False
+
+        # Lock should be cleared even on failure
+        integration = get_user_integration(
+            session=session, user_id=user.id, service_name="google_drive"
+        )
+        assert integration.refresh_locked_at is None
+
+
+class TestRefreshRateLimiting:
+    """Tests for rate limiting on token refresh."""
+
+    @pytest.mark.asyncio
+    async def test_refresh_skipped_when_recently_attempted(self, session: Session):
+        """Refresh is skipped if attempted too recently."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration
+        from app.services.token_refresh import refresh_integration_token, RATE_LIMIT_SECONDS
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        # Set expired token and recent refresh attempt
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        integration.last_refresh_attempt = datetime.now(timezone.utc) - timedelta(seconds=30)
+        session.add(integration)
+        session.commit()
+
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            # Should return False because rate limited
+            assert result is False
+            mock_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_proceeds_after_rate_limit_expires(self, session: Session):
+        """Refresh proceeds after rate limit period has passed."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration
+        from app.services.token_refresh import refresh_integration_token, RATE_LIMIT_SECONDS
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        # Set expired token and old refresh attempt (beyond rate limit)
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        integration.last_refresh_attempt = datetime.now(timezone.utc) - timedelta(
+            seconds=RATE_LIMIT_SECONDS + 10
+        )
+        session.add(integration)
+        session.commit()
+
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            result = await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+            # Should succeed
+            assert result is True
+            mock_refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_updates_last_attempt_timestamp(self, session: Session):
+        """Last refresh attempt timestamp is updated on attempt."""
+        os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+        os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+        from app.crud.integration import create_or_update_integration, get_user_integration
+        from app.services.token_refresh import refresh_integration_token
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        # Create integration with expired token
+        integration = create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="expired-token",  # noqa
+            refresh_token="refresh-token",
+            expires_in=3600,
+        )
+
+        integration.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        session.add(integration)
+        session.commit()
+
+        before_refresh = datetime.now(timezone.utc)
+
+        with patch("app.services.token_refresh.refresh_access_token") as mock_refresh:
+            mock_refresh.return_value = {
+                "access_token": "new-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600,
+            }
+
+            await refresh_integration_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+        # Check that last_refresh_attempt was updated
+        integration = get_user_integration(
+            session=session, user_id=user.id, service_name="google_drive"
+        )
+        assert integration.last_refresh_attempt is not None
+        # Handle naive datetime from SQLite in tests
+        last_attempt = integration.last_refresh_attempt
+        if last_attempt.tzinfo is None:
+            last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+        assert last_attempt >= before_refresh

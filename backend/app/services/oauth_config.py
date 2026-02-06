@@ -186,9 +186,32 @@ def generate_pkce_pair() -> tuple[str, str]:
     return code_verifier, code_challenge
 
 
-def store_oauth_state(state: str, state_data: OAuthStateData) -> None:
+# =============================================================================
+# DEPRECATED: In-memory state management functions
+# =============================================================================
+# These functions are DEPRECATED and should not be used in production.
+# They only work for single-instance deployments.
+#
+# For production multi-replica deployments, use the database-backed functions:
+# - store_oauth_state_db()
+# - get_oauth_state_db()
+# - consume_oauth_state_db()
+# - cleanup_expired_states_db()
+# - build_authorization_url_db()
+#
+# These in-memory functions are kept for:
+# 1. Testing purposes (simpler setup without database)
+# 2. Backward compatibility during migration
+# =============================================================================
+
+
+def _store_oauth_state_memory(state: str, state_data: OAuthStateData) -> None:
     """
-    Store OAuth state data for later validation.
+    DEPRECATED: Store OAuth state data in memory.
+
+    .. deprecated::
+        Use store_oauth_state_db() for production deployments.
+        In-memory storage only works for single-instance deployments.
 
     Args:
         state: The state parameter to use as key
@@ -197,9 +220,13 @@ def store_oauth_state(state: str, state_data: OAuthStateData) -> None:
     _oauth_states[state] = state_data
 
 
-def get_oauth_state(state: str) -> OAuthStateData | None:
+def _get_oauth_state_memory(state: str) -> OAuthStateData | None:
     """
-    Retrieve OAuth state data without removing it.
+    DEPRECATED: Retrieve OAuth state data from memory without removing it.
+
+    .. deprecated::
+        Use get_oauth_state_db() for production deployments.
+        In-memory storage only works for single-instance deployments.
 
     Args:
         state: The state parameter
@@ -210,9 +237,13 @@ def get_oauth_state(state: str) -> OAuthStateData | None:
     return _oauth_states.get(state)
 
 
-def consume_oauth_state(state: str, user_id: int | None = None) -> OAuthStateData | None:
+def _consume_oauth_state_memory(state: str, user_id: int | None = None) -> OAuthStateData | None:
     """
-    Retrieve and remove OAuth state data with expiration and user validation.
+    DEPRECATED: Retrieve and remove OAuth state data from memory.
+
+    .. deprecated::
+        Use consume_oauth_state_db() for production deployments.
+        In-memory storage only works for single-instance deployments.
 
     Args:
         state: The state parameter
@@ -237,11 +268,13 @@ def consume_oauth_state(state: str, user_id: int | None = None) -> OAuthStateDat
     return state_data
 
 
-def cleanup_expired_states() -> int:
+def _cleanup_expired_states_memory() -> int:
     """
-    Remove expired OAuth states from memory.
+    DEPRECATED: Remove expired OAuth states from memory.
 
-    Call this periodically to prevent memory leaks from abandoned OAuth flows.
+    .. deprecated::
+        Use cleanup_expired_states_db() for production deployments.
+        In-memory storage only works for single-instance deployments.
 
     Returns:
         Number of expired states removed
@@ -256,6 +289,14 @@ def cleanup_expired_states() -> int:
     for state in expired_states:
         _oauth_states.pop(state, None)
     return len(expired_states)
+
+
+# Backward compatibility aliases (deprecated)
+# These will be removed in a future version
+store_oauth_state = _store_oauth_state_memory
+get_oauth_state = _get_oauth_state_memory
+consume_oauth_state = _consume_oauth_state_memory
+cleanup_expired_states = _cleanup_expired_states_memory
 
 
 def _build_authorization_params(
@@ -309,7 +350,11 @@ def build_authorization_url(
     provider_client_id: str | None = None,
 ) -> tuple[str, str]:
     """
-    Build OAuth authorization URL for a service.
+    DEPRECATED: Build OAuth authorization URL with in-memory state storage.
+
+    .. deprecated::
+        Use build_authorization_url_db() for production deployments.
+        In-memory storage only works for single-instance deployments.
 
     Args:
         service_name: Name of the service
@@ -352,7 +397,7 @@ def build_authorization_url(
         code_verifier=code_verifier,
         provider_client_id=provider_client_id if config.uses_dynamic_registration else None,
     )
-    store_oauth_state(state, state_data)
+    _store_oauth_state_memory(state, state_data)
 
     url = f"{config.authorize_url}?{urlencode(params)}"
     return url, state

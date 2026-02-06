@@ -60,6 +60,18 @@ class UserIntegration(SQLModel, table=True):
     # (e.g., Dataverse). This is needed for token refresh with dynamic clients.
     provider_client_id: str | None = Field(default=None, max_length=255)
 
+    # Token refresh locking (prevents race conditions)
+    # Set when a refresh starts, cleared when it completes or fails
+    refresh_locked_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+
+    # Rate limiting for token refresh
+    # Tracks the last time a refresh was attempted to prevent rapid polling
+    last_refresh_attempt: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+
     # Timestamps
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

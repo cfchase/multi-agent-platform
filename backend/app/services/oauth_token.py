@@ -39,12 +39,26 @@ async def _post_token_request(token_url: str, data: dict) -> dict:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
-    result = response.json()
-
+    # Handle non-200 status codes with graceful JSON parsing
     if response.status_code != 200:
-        error = result.get("error", "unknown_error")
-        description = result.get("error_description")
+        try:
+            result = response.json()
+            error = result.get("error", "server_error")
+            description = result.get("error_description")
+        except (ValueError, TypeError):
+            # Response body is not valid JSON (e.g., HTML error page)
+            error = "server_error"
+            description = f"HTTP {response.status_code}: {response.text[:200]}"
         raise OAuthTokenError(error, description)
+
+    # Parse successful response
+    try:
+        result = response.json()
+    except (ValueError, TypeError) as e:
+        raise OAuthTokenError(
+            "invalid_response",
+            f"Failed to parse token response as JSON: {e}",
+        )
 
     return result
 

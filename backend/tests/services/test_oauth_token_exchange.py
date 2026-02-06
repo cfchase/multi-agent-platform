@@ -226,3 +226,93 @@ class TestTokenRefresh:
             # Verify no client_secret (public client)
             assert "client_secret" not in request_data
             assert tokens["access_token"] == "new-dataverse-access-token"
+
+
+class TestNonJsonErrorResponses:
+    """Tests for handling non-JSON error responses from OAuth providers."""
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_handles_html_error_response(self):
+        """exchange_code_for_tokens handles HTML error responses gracefully."""
+        from app.services.oauth_token import exchange_code_for_tokens, OAuthTokenError
+        import json
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "<html><body>Internal Server Error</body></html>"
+        # Simulate json() raising an error when response is HTML
+        mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value = mock_response
+            mock_instance.__aenter__.return_value = mock_instance
+            mock_instance.__aexit__.return_value = None
+            mock_client.return_value = mock_instance
+
+            with pytest.raises(OAuthTokenError) as exc_info:
+                await exchange_code_for_tokens(
+                    service_name="google_drive",
+                    code="some-code",
+                    redirect_uri="http://localhost:8000/callback",
+                    code_verifier=None,
+                )
+
+            # Should contain status code and text in error
+            assert "500" in str(exc_info.value) or "server_error" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_handles_empty_response(self):
+        """exchange_code_for_tokens handles empty response body."""
+        from app.services.oauth_token import exchange_code_for_tokens, OAuthTokenError
+        import json
+
+        mock_response = MagicMock()
+        mock_response.status_code = 502
+        mock_response.text = ""
+        mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value = mock_response
+            mock_instance.__aenter__.return_value = mock_instance
+            mock_instance.__aexit__.return_value = None
+            mock_client.return_value = mock_instance
+
+            with pytest.raises(OAuthTokenError) as exc_info:
+                await exchange_code_for_tokens(
+                    service_name="google_drive",
+                    code="some-code",
+                    redirect_uri="http://localhost:8000/callback",
+                    code_verifier=None,
+                )
+
+            # Should handle gracefully with status code info
+            assert "502" in str(exc_info.value) or "server_error" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_handles_html_error_response(self):
+        """refresh_access_token handles HTML error responses gracefully."""
+        from app.services.oauth_token import refresh_access_token, OAuthTokenError
+        import json
+
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+        mock_response.text = "<html>Service Unavailable</html>"
+        mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value = mock_response
+            mock_instance.__aenter__.return_value = mock_instance
+            mock_instance.__aexit__.return_value = None
+            mock_client.return_value = mock_instance
+
+            with pytest.raises(OAuthTokenError) as exc_info:
+                await refresh_access_token(
+                    service_name="google_drive",
+                    refresh_token="some-token",
+                )
+
+            # Should contain status code info
+            assert "503" in str(exc_info.value) or "server_error" in str(exc_info.value).lower()
