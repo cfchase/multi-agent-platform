@@ -77,8 +77,12 @@ case "$1" in
                 -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true \
                 -e LANGFLOW_LOG_LEVEL=info \
                 -e LANGFLOW_PORT=7860 \
+                -e LANGFLOW_COMPONENTS_PATH=/app/langflow/components \
+                -e PYTHONPATH=/app/langflow/packages \
                 -p $LANGFLOW_PORT:7860 \
                 -v "${DATA_DIR}:/app/langflow" \
+                -v "${DATA_DIR}/components:/app/langflow/components:z" \
+                -v "${DATA_DIR}/packages:/app/langflow/packages:z" \
                 --add-host=host.docker.internal:host-gateway \
                 --add-host=host.containers.internal:host-gateway \
                 docker.io/langflowai/langflow:$LANGFLOW_VERSION
