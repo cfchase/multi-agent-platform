@@ -39,6 +39,10 @@ LANGFLOW_USER = os.environ.get("LANGFLOW_USER", "dev@localhost.local")
 LANGFLOW_PASSWORD = os.environ.get("LANGFLOW_PASSWORD", "devpassword123")
 CACHE_DIR = Path(os.environ.get("FLOW_CACHE_DIR", "/tmp/flow-cache"))
 
+# Component installation paths (relative to project root)
+COMPONENTS_DIR = Path(os.environ.get("LANGFLOW_COMPONENTS_DIR", str(PROJECT_ROOT / ".local" / "langflow" / "components")))
+PACKAGES_DIR = Path(os.environ.get("LANGFLOW_PACKAGES_DIR", str(PROJECT_ROOT / ".local" / "langflow" / "packages")))
+
 # Retry configuration
 MAX_RETRIES = 3
 RETRY_DELAY = 1.0  # seconds, doubles each retry
