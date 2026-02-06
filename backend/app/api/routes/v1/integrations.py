@@ -8,6 +8,8 @@ Provides endpoints for:
 - Disconnecting integrations
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -33,6 +35,9 @@ from app.services.dataverse_oauth import (
     DataverseRegistrationError,
 )
 from app.services.oauth_token import exchange_code_for_tokens, OAuthTokenError
+from app.services.token_refresh import refresh_integration_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -114,6 +119,7 @@ async def get_status(
     Get integration status for the current user.
 
     Returns lists of connected, expired, and missing services.
+    Automatically attempts to refresh expired tokens before returning status.
     """
     supported = get_supported_services()
     status = get_integration_status(
@@ -121,6 +127,27 @@ async def get_status(
         user_id=current_user.id,
         available_services=supported,
     )
+
+    # Attempt to refresh any expired tokens
+    if status["expired"]:
+        for service_name in status["expired"]:
+            logger.info(f"Attempting to refresh expired token for {service_name}")
+            refreshed = await refresh_integration_token(
+                session=session,
+                user_id=current_user.id,
+                service_name=service_name,
+            )
+            if refreshed:
+                logger.info(f"Successfully refreshed token for {service_name}")
+            else:
+                logger.warning(f"Failed to refresh token for {service_name}")
+
+        # Re-fetch status after refresh attempts
+        status = get_integration_status(
+            session=session,
+            user_id=current_user.id,
+            available_services=supported,
+        )
 
     return IntegrationStatusResponse(
         connected_services=status["connected"],
