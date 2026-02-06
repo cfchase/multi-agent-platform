@@ -120,6 +120,25 @@ class Settings(BaseSettings):
     LANGFLOW_ID: str | None = None  # Langflow Cloud project ID (optional)
     LANGFLOW_DEFAULT_FLOW: str | None = None  # Default flow name to execute
 
+    # OAuth Integration Configuration
+    # Token encryption key for secure storage of OAuth tokens
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    TOKEN_ENCRYPTION_KEY: str | None = None
+
+    # Google Drive OAuth
+    # Register at: https://console.cloud.google.com/apis/credentials
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+
+    # Dataverse OAuth
+    # Dataverse uses dynamic client registration (RFC 7591), so no pre-configured
+    # client credentials are required. Only DATAVERSE_AUTH_URL is needed.
+    # The client_id is obtained dynamically when starting the OAuth flow.
+    # Endpoints: {auth_url}/authorize, {auth_url}/token, {auth_url}/register
+    DATAVERSE_CLIENT_ID: str | None = None  # NOT USED - dynamic registration
+    DATAVERSE_CLIENT_SECRET: str | None = None  # NOT USED - public client (PKCE)
+    DATAVERSE_AUTH_URL: str | None = None  # OAuth server (e.g., https://mcp.dataverse.redhat.com/auth)
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:

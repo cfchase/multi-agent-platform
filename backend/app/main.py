@@ -8,8 +8,10 @@ This module sets up the FastAPI application with:
 - GraphQL endpoint
 - Admin panel (SQLAdmin)
 - Lifespan handler with configuration logging
+- Background task for OAuth state cleanup
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -25,11 +27,12 @@ from app.admin import setup_admin
 from app.api.router import router as api_router
 from app.api.deps import get_db, get_current_user
 from app.core.config import settings
-from app.core.db import engine
+from app.core.db import engine, get_session
 from app.core.logging import setup_logging
 from app.core.middleware import RequestLoggingMiddleware
 from app.graphql_api.schema import schema
 from app.graphql_api.loaders import create_loaders
+from app.services.oauth_state_cleanup import run_cleanup_task
 
 # Setup logging before anything else
 setup_logging()
@@ -52,9 +55,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Database: {settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}")
     logger.info(f"CORS Origins: {settings.all_cors_origins}")
     logger.info("=" * 60)
+
+    # Start background cleanup task for expired OAuth states
+    stop_event = asyncio.Event()
+    cleanup_task = asyncio.create_task(
+        run_cleanup_task(
+            get_session=get_session,
+            interval_seconds=300,  # 5 minutes
+            stop_event=stop_event,
+        )
+    )
+
     yield
-    # Shutdown (if needed)
+
+    # Shutdown
     logger.info(f"{settings.PROJECT_NAME} - Shutting Down")
+
+    # Stop the cleanup task gracefully
+    stop_event.set()
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 # GraphQL context using FastAPI dependency injection

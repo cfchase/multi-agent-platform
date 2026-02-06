@@ -2,6 +2,7 @@ import * as React from 'react';
 
 import { Chat } from '@app/Chat/Chat';
 import { GeneralSettings } from '@app/Settings/General/GeneralSettings';
+import { IntegrationSettings } from '@app/Settings/Integrations/IntegrationSettings';
 import { ProfileSettings } from '@app/Settings/Profile/ProfileSettings';
 
 // =============================================================================
@@ -42,16 +43,21 @@ export const routes: AppRouteConfig[] = [
       {
         element: <GeneralSettings />,
         exact: true,
-        label: 'General',
         path: '/settings/general',
         title: 'Multi-Agent Platform | General Settings',
       },
       {
         element: <ProfileSettings />,
         exact: true,
-        label: 'Profile',
         path: '/settings/profile',
         title: 'Multi-Agent Platform | Profile Settings',
+      },
+      {
+        element: <IntegrationSettings />,
+        exact: true,
+        label: 'Integrations',
+        path: '/settings/integrations',
+        title: 'Multi-Agent Platform | Integration Settings',
       },
     ],
   },

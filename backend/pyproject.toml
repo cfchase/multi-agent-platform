@@ -37,6 +37,8 @@ dependencies = [
     # HTTP client for Langflow integration
     "httpx>=0.28.1",
     "sse-starlette>=2.2.1",
+    # Token encryption
+    "cryptography>=46.0.4",
 ]
 
 [project.optional-dependencies]

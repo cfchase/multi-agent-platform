@@ -6,12 +6,13 @@ This package contains SQLModel database models and Pydantic schemas:
 - Item models and schemas
 - Chat models and schemas
 - ChatMessage models and schemas
+- UserIntegration models and schemas
 - Shared base models
 
 All models are re-exported here for backward compatibility.
 Import from this module for convenience:
 
-    from app.models import User, Item, Chat, ChatMessage, Message
+    from app.models import User, Item, Chat, ChatMessage, UserIntegration, Message
 
 Or import from specific modules for clarity:
 
@@ -19,6 +20,7 @@ Or import from specific modules for clarity:
     from app.models.item import Item, ItemCreate
     from app.models.chat import Chat, ChatCreate
     from app.models.chat_message import ChatMessage, ChatMessageCreate
+    from app.models.user_integration import UserIntegration
 """
 
 # Re-export SQLModel for Alembic migrations
@@ -32,6 +34,8 @@ from app.models.user import (
     User,
     UserBase,
     UserPublic,
+    UserMeResponse,
+    IntegrationStatus,
     UsersPublic,
     UserUpdate,
 )
@@ -65,6 +69,18 @@ from app.models.chat_message import (
     ChatMessagesPublic,
 )
 
+# Integration models
+from app.models.user_integration import (
+    UserIntegration,
+    UserIntegrationPublic,
+)
+
+# OAuth state model
+from app.models.oauth_state import (
+    OAuthState,
+    STATE_EXPIRATION_MINUTES,
+)
+
 __all__ = [
     # SQLModel for migrations
     "SQLModel",
@@ -74,6 +90,8 @@ __all__ = [
     "User",
     "UserBase",
     "UserPublic",
+    "UserMeResponse",
+    "IntegrationStatus",
     "UsersPublic",
     "UserUpdate",
     # Item
@@ -96,4 +114,10 @@ __all__ = [
     "ChatMessageCreate",
     "ChatMessagePublic",
     "ChatMessagesPublic",
+    # Integration
+    "UserIntegration",
+    "UserIntegrationPublic",
+    # OAuth State
+    "OAuthState",
+    "STATE_EXPIRATION_MINUTES",
 ]

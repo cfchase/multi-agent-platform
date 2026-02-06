@@ -15,6 +15,21 @@ os.environ["TESTING"] = "1"
 # Use mock Langflow client for tests
 os.environ["LANGFLOW_URL"] = "mock"
 
+# Set a test encryption key for token encryption tests
+# Generate a proper Fernet key for tests
+from cryptography.fernet import Fernet
+os.environ["TOKEN_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+
+# OAuth test credentials - explicit values for test isolation
+os.environ["GOOGLE_CLIENT_ID"] = "test-google-client-id"
+os.environ["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret"
+# Dataverse uses dynamic client registration (RFC 7591) - no static credentials needed
+# Only DATAVERSE_AUTH_URL is required
+os.environ["DATAVERSE_AUTH_URL"] = "https://test.dataverse.org"
+
+# Frontend host for OAuth redirect tests
+os.environ["FRONTEND_HOST"] = "http://localhost:8080"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine

@@ -10,11 +10,13 @@ This module contains:
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from sqlalchemy import DateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from app.models.item import Item
     from app.models.chat import Chat
+    from app.models.user_integration import UserIntegration
 
 
 class UserBase(SQLModel):
@@ -47,11 +49,23 @@ class User(UserBase, table=True):
     Admin access is controlled by the 'admin' boolean field.
     """
     id: int | None = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_login: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
+    last_login: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
     chats: list["Chat"] = Relationship(back_populates="user", cascade_delete=True)
+    integrations: list["UserIntegration"] = Relationship(
+        back_populates="user", cascade_delete=True
+    )
 
     def __str__(self) -> str:
         """Display format for admin dropdowns and references."""
@@ -65,6 +79,18 @@ class UserPublic(UserBase):
     id: int
     created_at: datetime
     last_login: datetime
+
+
+class IntegrationStatus(SQLModel):
+    """Status of user's OAuth integrations."""
+    connected: list[str] = []  # Services with valid tokens
+    expired: list[str] = []  # Services with expired tokens (need reauth)
+    missing: list[str] = []  # Services not connected
+
+
+class UserMeResponse(UserPublic):
+    """Response for /users/me endpoint with integration status."""
+    integration_status: IntegrationStatus
 
 
 class UsersPublic(SQLModel):

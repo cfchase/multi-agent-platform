@@ -15,7 +15,6 @@ import {
   ChatbotContent,
   ChatbotDisplayMode,
   ChatbotFooter,
-  ChatbotFootnote,
   ChatbotHeader,
   ChatbotHeaderMain,
   ChatbotHeaderMenu,
@@ -207,9 +206,30 @@ function Chat(): React.ReactElement {
     }
   };
 
-  const handleSend = (message: string | number, retryMessageText?: string) => {
+  const handleSend = async (message: string | number, retryMessageText?: string) => {
     const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
-    if (!messageText.trim() || !selectedChatId || isSending) return;
+    if (!messageText.trim() || isSending) return;
+
+    // Require a flow to be selected
+    if (!selectedFlowName) {
+      setOperationError('Please select a flow before sending a message.');
+      return;
+    }
+
+    // Auto-create chat if none exists
+    let chatId = selectedChatId;
+    if (!chatId) {
+      try {
+        const newChat = await ChatAPI.createChat({ title: 'New Chat' });
+        setChats((prev) => [newChat, ...prev]);
+        setSelectedChatId(newChat.id);
+        chatId = newChat.id;
+      } catch (err) {
+        console.error('Failed to create chat:', err);
+        setOperationError('Failed to create a new chat. Please try again.');
+        return;
+      }
+    }
 
     setIsSending(true);
     setLastError(null);
@@ -254,7 +274,7 @@ function Chat(): React.ReactElement {
     let accumulatedContent = '';
 
     const streamController = ChatAPI.createStreamingMessage(
-      selectedChatId,
+      chatId,
       messageText,
       (event: StreamingEvent) => {
         if (event.type === 'content' && event.content) {
@@ -270,14 +290,14 @@ function Chat(): React.ReactElement {
         } else if (event.type === 'done') {
           streamControllerRef.current = null;
           // Reload to get the saved message IDs
-          loadMessages(selectedChatId);
+          loadMessages(chatId);
           setIsSending(false);
           setAnnouncement(`Assistant: ${accumulatedContent}`);
 
           // Update chat title if first message
           if (messages.length === 0) {
             const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
-            ChatAPI.updateChat(selectedChatId, { title }).then(() => loadChats());
+            ChatAPI.updateChat(chatId, { title }).then(() => loadChats());
           }
         } else if (event.type === 'error') {
           streamControllerRef.current = null;
@@ -288,7 +308,7 @@ function Chat(): React.ReactElement {
                 : msg
             )
           );
-          setLastError({ message: messageText, chatId: selectedChatId });
+          setLastError({ message: messageText, chatId: chatId });
           setIsSending(false);
         }
       },
@@ -302,7 +322,7 @@ function Chat(): React.ReactElement {
               : msg
           )
         );
-        setLastError({ message: messageText, chatId: selectedChatId });
+        setLastError({ message: messageText, chatId: chatId });
         setIsSending(false);
       },
       () => {
@@ -478,11 +498,10 @@ function Chat(): React.ReactElement {
               <ChatbotFooter>
                 <MessageBar
                   onSendMessage={handleSend}
-                  isSendButtonDisabled={isSending || !selectedChatId}
+                  isSendButtonDisabled={isSending || !selectedFlowName}
                   hasStopButton={isSending}
                   handleStopButton={handleStopStreaming}
                 />
-                <ChatbotFootnote label="AI-powered research assistant. Verify important information." />
               </ChatbotFooter>
             </>
           }

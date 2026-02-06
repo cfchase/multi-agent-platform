@@ -4,9 +4,25 @@ CRUD operations for User model.
 
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.models import User
+
+
+def get_user_by_email(*, session: Session, email: str) -> User | None:
+    """
+    Get a user by email.
+
+    Args:
+        session: Database session
+        email: Email to search for
+
+    Returns:
+        User if found, None otherwise
+    """
+    statement = select(User).where(User.email == email)
+    return session.exec(statement).first()
 
 
 def get_user_by_username(*, session: Session, username: str) -> User | None:
@@ -80,9 +96,12 @@ def get_or_create_user(
     Get an existing user or create a new one if it doesn't exist.
     Updates last_login timestamp for existing users.
 
+    Handles the case where a user's username might change but email stays the same
+    (e.g., different OAuth provider or username change in provider).
+
     Args:
         session: Database session
-        username: User's username (from OAuth header, used as unique identifier)
+        username: User's username (from OAuth header)
         email: User's email (from OAuth X-Forwarded-Email header)
 
     Returns:
@@ -90,18 +109,45 @@ def get_or_create_user(
         - created=True if user was created
         - created=False if user already existed
     """
+    # First try to find by username
     user = get_user_by_username(session=session, username=username)
 
     if user:
-        # User exists, update email in case it changed and update last login
+        # User exists by username, update email in case it changed
         user.email = email
         update_user_last_login(session=session, user=user)
         return user, False
 
+    # Try to find by email (handles username changes)
+    user = get_user_by_email(session=session, email=email)
+
+    if user:
+        # User exists by email, update username in case it changed
+        user.username = username
+        update_user_last_login(session=session, user=user)
+        return user, False
+
     # User doesn't exist, create it
-    user = create_user(
-        session=session,
-        username=username,
-        email=email,
-    )
-    return user, True
+    # Handle race condition where another request creates the user simultaneously
+    try:
+        user = create_user(
+            session=session,
+            username=username,
+            email=email,
+        )
+        return user, True
+    except IntegrityError:
+        # Race condition: another request created the user
+        session.rollback()
+        # Try to fetch the user that was created by the other request
+        user = get_user_by_email(session=session, email=email)
+        if user:
+            update_user_last_login(session=session, user=user)
+            return user, False
+        # Try by username as fallback
+        user = get_user_by_username(session=session, username=username)
+        if user:
+            update_user_last_login(session=session, user=user)
+            return user, False
+        # This shouldn't happen, but re-raise if we still can't find the user
+        raise

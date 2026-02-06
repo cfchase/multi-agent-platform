@@ -72,3 +72,4 @@ config/flow-sources.yaml
 
 # Playwright MCP
 .playwright-mcp/
+.planning/
