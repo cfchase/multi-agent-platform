@@ -125,6 +125,13 @@ class Settings(BaseSettings):
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     TOKEN_ENCRYPTION_KEY: str | None = None
 
+    # LLM API Keys (forwarded to LangFlow container as global variables)
+    # These enable flows to use platform-provided API keys instead of hardcoding
+    OPENAI_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+
     # Google Drive OAuth
     # Register at: https://console.cloud.google.com/apis/credentials
     GOOGLE_CLIENT_ID: str | None = None

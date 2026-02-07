@@ -40,6 +40,13 @@ get_db_host() {
 DB_HOST=$(get_db_host)
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
+# Load API keys from backend/.env if present
+if [ -f "$PROJECT_ROOT/backend/.env" ]; then
+    set -a  # automatically export all variables
+    source "$PROJECT_ROOT/backend/.env"
+    set +a
+fi
+
 case "$1" in
     start)
         log_info "Starting LangFlow development server..."
@@ -79,6 +86,12 @@ case "$1" in
                 -e LANGFLOW_PORT=7860 \
                 -e LANGFLOW_COMPONENTS_PATH=/app/langflow/components \
                 -e PYTHONPATH=/app/langflow/packages \
+                -e LANGFLOW_VARIABLES_TO_GET_FROM_ENVIRONMENT="OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,OLLAMA_BASE_URL" \
+                -e LANGFLOW_FALLBACK_TO_ENV_VAR=true \
+                -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+                -e GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
+                -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+                -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.containers.internal:11434}" \
                 -p $LANGFLOW_PORT:7860 \
                 -v "${DATA_DIR}:/app/langflow" \
                 -v "${DATA_DIR}/components:/app/langflow/components:z" \
