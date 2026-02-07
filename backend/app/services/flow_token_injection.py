@@ -208,7 +208,7 @@ def get_required_services_for_flow(flow_name: str) -> dict[str, str]:
         },
         # Test flows for settings validation (Phase 2)
         "test-google-drive": {
-            "google_drive": "GoogleDriveSearch.access_token",
+            "google_drive": "GoogleDriveSearchComponent.token_string",
         },
         "test-dataverse": {
             "dataverse": "DataverseSearchTool.api_token",
