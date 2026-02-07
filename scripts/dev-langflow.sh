@@ -40,10 +40,10 @@ get_db_host() {
 DB_HOST=$(get_db_host)
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
-# Load API keys from backend/.env if present
-if [ -f "$PROJECT_ROOT/backend/.env" ]; then
+# Load LangFlow-specific env vars (API keys for global variables, etc.)
+if [ -f "$PROJECT_ROOT/config/langflow.env" ]; then
     set -a  # automatically export all variables
-    source "$PROJECT_ROOT/backend/.env"
+    source "$PROJECT_ROOT/config/langflow.env"
     set +a
 fi
 

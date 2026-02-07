@@ -31,6 +31,7 @@ from app.models import (
 )
 from app.core.config import settings
 from app.services.flow_token_injection import (
+    build_app_tweaks,
     build_flow_tweaks,
     get_required_services_for_flow,
     MissingTokenError,
@@ -205,17 +206,21 @@ async def stream_message(
     session.commit()
     session.refresh(user_message)
 
-    # Build tweaks with user's OAuth tokens if flow requires them
+    # Build tweaks: application-level API keys + user OAuth tokens
     flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
-    token_config = get_required_services_for_flow(flow_name) if flow_name else {}
 
-    tweaks = None
+    # Application-level tweaks (API keys from backend config)
+    tweaks = build_app_tweaks(flow_name) if flow_name else None
+
+    # User-level tweaks (OAuth tokens from database)
+    token_config = get_required_services_for_flow(flow_name) if flow_name else {}
     if token_config:
         try:
             tweaks = await build_flow_tweaks(
                 session=session,
                 user_id=current_user.id,
                 token_config=token_config,
+                existing_tweaks=tweaks,
             )
         except MissingTokenError as e:
             raise HTTPException(

@@ -125,8 +125,9 @@ class Settings(BaseSettings):
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     TOKEN_ENCRYPTION_KEY: str | None = None
 
-    # LLM API Keys (forwarded to LangFlow container as global variables)
-    # These enable flows to use platform-provided API keys instead of hardcoding
+    # LLM API Keys
+    # Used by the backend to inject application-level API keys into flows via tweaks.
+    # Also available as LangFlow global variables (via config/langflow.env) for direct UI testing.
     OPENAI_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None

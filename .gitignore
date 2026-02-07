@@ -62,6 +62,9 @@ helm/*/secrets-*.yaml
 # Flow sources config (keep .example, ignore actual config)
 config/flow-sources.yaml
 
+# LangFlow env vars (API keys for global variables — keep .example)
+config/langflow.env
+
 # Local development overrides
 .local/
 

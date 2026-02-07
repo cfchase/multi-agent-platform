@@ -113,6 +113,67 @@ async def build_flow_tweaks(
     return tweaks
 
 
+def get_app_tweaks_for_flow(flow_name: str) -> dict[str, str]:
+    """
+    Get application-level API key tweaks for a flow.
+
+    Returns a mapping of tweak_path to settings attribute name.
+    The backend injects these from its own config (backend/.env),
+    so each application sharing a LangFlow server can provide its own keys.
+
+    Args:
+        flow_name: Name of the Langflow flow
+
+    Returns:
+        Mapping of tweak_path to settings attribute name
+        e.g., {"OpenAIModel.openai_api_key": "OPENAI_API_KEY"}
+    """
+    # Maps flow names to application-level API keys they need injected.
+    # These are read from backend settings (not user tokens from the database).
+    app_configs: dict[str, dict[str, str]] = {
+        "test-llm-credentials": {
+            "OpenAIModel.openai_api_key": "OPENAI_API_KEY",
+        },
+    }
+
+    return app_configs.get(flow_name, {})
+
+
+def build_app_tweaks(flow_name: str) -> dict:
+    """
+    Build tweaks dict with application-level API keys from backend settings.
+
+    Unlike user token injection (which reads from the database per-user),
+    this reads from the backend's own configuration. This allows multiple
+    applications sharing a LangFlow server to inject their own API keys.
+
+    Args:
+        flow_name: Name of the Langflow flow
+
+    Returns:
+        Tweaks dict with API keys, or empty dict if no keys configured
+    """
+    from app.core.config import settings
+
+    app_config = get_app_tweaks_for_flow(flow_name)
+    if not app_config:
+        return {}
+
+    tweaks: dict[str, dict[str, str]] = {}
+    for tweak_path, settings_attr in app_config.items():
+        value = getattr(settings, settings_attr, None)
+        if value is None:
+            continue
+
+        component_name, field_name = parse_tweak_path(tweak_path)
+        if component_name not in tweaks:
+            tweaks[component_name] = {}
+        tweaks[component_name][field_name] = value
+        logger.debug("Injected app setting %s into %s", settings_attr, tweak_path)
+
+    return tweaks
+
+
 def get_required_services_for_flow(flow_name: str) -> dict[str, str]:
     """
     Get the token configuration for a flow.
