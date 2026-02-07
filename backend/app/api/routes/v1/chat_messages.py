@@ -31,8 +31,9 @@ from app.models import (
 )
 from app.core.config import settings
 from app.services.flow_token_injection import (
-    build_app_tweaks,
-    build_flow_tweaks,
+    build_app_settings_data,
+    build_generic_tweaks,
+    build_user_settings_data,
     get_required_services_for_flow,
     MissingTokenError,
 )
@@ -206,28 +207,32 @@ async def stream_message(
     session.commit()
     session.refresh(user_message)
 
-    # Build tweaks: application-level API keys + user OAuth tokens
+    # Build generic tweaks: UserSettings + AppSettings
+    # API keys are in langflow.env, not sent via tweaks
     flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
 
-    # Application-level tweaks (API keys from backend config)
-    tweaks = build_app_tweaks(flow_name) if flow_name else None
+    # Get required OAuth services for this flow
+    required_services = get_required_services_for_flow(flow_name) if flow_name else []
 
-    # User-level tweaks (OAuth tokens from database)
-    token_config = get_required_services_for_flow(flow_name) if flow_name else {}
-    if token_config:
-        try:
-            tweaks = await build_flow_tweaks(
-                session=session,
-                user_id=current_user.id,
-                token_config=token_config,
-                existing_tweaks=tweaks,
-            )
-        except MissingTokenError as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Missing integration: {e.service_name}. "
-                       "Please connect the service in Settings.",
-            )
+    # Build user data with OAuth tokens
+    try:
+        user_data = await build_user_settings_data(
+            session=session,
+            user_id=current_user.id,
+            services=required_services if required_services else None,
+        )
+    except MissingTokenError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing integration: {e.service_name}. "
+                   "Please connect the service in Settings.",
+        )
+
+    # Build app data (feature flags, config)
+    app_data = build_app_settings_data()
+
+    # Always send generic tweaks - flows opt in via components
+    tweaks = build_generic_tweaks(user_data=user_data, app_data=app_data)
 
     async def generate_stream() -> AsyncGenerator[str, None]:
         """Generate SSE events from Langflow streaming response."""
