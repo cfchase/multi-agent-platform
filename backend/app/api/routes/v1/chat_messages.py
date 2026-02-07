@@ -29,6 +29,12 @@ from app.models import (
     ChatMessagesPublic,
     Message,
 )
+from app.core.config import settings
+from app.services.flow_token_injection import (
+    build_flow_tweaks,
+    get_required_services_for_flow,
+    MissingTokenError,
+)
 from app.services.langflow import LangflowError, get_langflow_client
 
 logger = logging.getLogger(__name__)
@@ -199,6 +205,25 @@ async def stream_message(
     session.commit()
     session.refresh(user_message)
 
+    # Build tweaks with user's OAuth tokens if flow requires them
+    flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
+    token_config = get_required_services_for_flow(flow_name) if flow_name else {}
+
+    tweaks = None
+    if token_config:
+        try:
+            tweaks = await build_flow_tweaks(
+                session=session,
+                user_id=current_user.id,
+                token_config=token_config,
+            )
+        except MissingTokenError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing integration: {e.service_name}. "
+                       "Please connect the service in Settings.",
+            )
+
     async def generate_stream() -> AsyncGenerator[str, None]:
         """Generate SSE events from Langflow streaming response."""
         client = get_langflow_client()
@@ -211,6 +236,7 @@ async def stream_message(
                 session_id=str(chat_id),
                 flow_id=request.flow_id,
                 flow_name=request.flow_name,
+                tweaks=tweaks,
             ):
                 accumulated_content += chunk
                 yield format_sse_event({"type": "content", "content": chunk})
