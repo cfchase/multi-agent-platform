@@ -401,9 +401,8 @@ def delete_flow(flow_id: str) -> bool:
 
     resp = request_with_retry(
         "DELETE",
-        f"{LANGFLOW_URL}/api/v1/flows",
+        f"{LANGFLOW_URL}/api/v1/flows/{flow_id}",
         headers=headers,
-        json=[flow_id],  # API expects a list of IDs
         timeout=10,
     )
 
