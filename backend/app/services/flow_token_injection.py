@@ -1,12 +1,16 @@
 """
 Flow token injection service for Langflow integration.
 
-Injects user OAuth tokens into Langflow flow tweaks, enabling flows
-to access external services on behalf of the user.
+Injects user OAuth tokens into Langflow flow tweaks via the generic
+UserSettings component. This decouples the backend from flow internals.
+
+Architecture:
+- API keys (OPENAI_API_KEY, etc.) -> langflow.env global variables
+- User tokens (OAuth) -> UserSettings.data via tweaks
+- App context (feature flags, etc.) -> AppSettings.data via tweaks
 """
 
 import logging
-from copy import deepcopy
 from sqlmodel import Session
 
 from app.services.token_refresh import get_valid_token
@@ -23,196 +27,130 @@ class MissingTokenError(Exception):
         super().__init__(message or default_msg)
 
 
-def parse_tweak_path(path: str) -> tuple[str, str]:
-    """
-    Parse a tweak path into component and field names.
-
-    Args:
-        path: Dot-separated path like "ComponentName.field_name"
-
-    Returns:
-        Tuple of (component_name, field_name)
-
-    Raises:
-        ValueError: If path format is invalid
-    """
-    parts = path.split(".", 1)
-    if len(parts) != 2:
-        raise ValueError(f"Invalid tweak path format: {path}. Expected 'Component.field'")
-
-    return parts[0], parts[1]
-
-
-async def build_flow_tweaks(
+async def build_user_settings_data(
     *,
     session: Session,
     user_id: int,
-    token_config: dict[str, str],
-    existing_tweaks: dict | None = None,
+    services: list[str] | None = None,
 ) -> dict:
     """
-    Build Langflow tweaks dict with user tokens for required services.
+    Build user settings dict with OAuth tokens for specified services.
 
     Args:
         session: Database session
         user_id: User ID
-        token_config: Mapping of service_name to tweak_path
-                      e.g., {"google_drive": "GoogleDriveComponent.api_key"}
-        existing_tweaks: Optional existing tweaks to merge with
+        services: List of service names to include tokens for.
+                  If None, includes all available tokens.
 
     Returns:
-        Tweaks dict ready to pass to Langflow
+        Dict suitable for UserSettings.data injection
 
     Raises:
         MissingTokenError: If a required service token is not available
 
     Example:
-        token_config = {
-            "google_drive": "GoogleDrive.access_token",
-            "dataverse": "DataverseLoader.api_token",
-        }
-
-        tweaks = await build_flow_tweaks(
+        user_data = await build_user_settings_data(
             session=session,
             user_id=user.id,
-            token_config=token_config,
+            services=["google_drive"],
         )
-
-        # Result:
-        # {
-        #     "GoogleDrive": {"access_token": "user's-google-token"},
-        #     "DataverseLoader": {"api_token": "user's-dataverse-token"},
-        # }
+        # Result: {"google_drive_token": "...", "user_id": 123}
     """
-    # Start with existing tweaks or empty dict
-    tweaks = deepcopy(existing_tweaks) if existing_tweaks else {}
+    user_data: dict = {"user_id": user_id}
 
-    for service_name, tweak_path in token_config.items():
-        # Get valid token (refreshes if needed)
+    # Default services to check if none specified
+    if services is None:
+        services = ["google_drive", "dataverse"]
+
+    for service_name in services:
         token = await get_valid_token(
             session=session,
             user_id=user_id,
             service_name=service_name,
         )
 
-        if token is None:
-            logger.error("Missing token for service %s for user %s", service_name, user_id)
-            raise MissingTokenError(service_name)
+        if token is not None:
+            # Use consistent key naming: {service_name}_token
+            user_data[f"{service_name}_token"] = token
+            logger.debug("Added token for %s to user settings", service_name)
 
-        # Parse the tweak path
-        component_name, field_name = parse_tweak_path(tweak_path)
+    return user_data
 
-        # Add or update the component's tweaks
-        if component_name not in tweaks:
-            tweaks[component_name] = {}
 
-        tweaks[component_name][field_name] = token
+def build_app_settings_data() -> dict:
+    """
+    Build app settings dict with application context.
 
-        logger.debug("Injected token for %s into %s", service_name, tweak_path)
+    Returns non-secret application configuration:
+    - App name
+    - Feature flags
+    - Version info
+
+    API keys are NOT included - they go in langflow.env.
+
+    Returns:
+        Dict suitable for AppSettings.data injection
+    """
+    return {
+        "app_name": "multi-agent-platform",
+        "features": {
+            "rag_enabled": True,
+            "safety_check": True,
+        },
+    }
+
+
+def build_generic_tweaks(
+    user_data: dict | None = None,
+    app_data: dict | None = None,
+) -> dict:
+    """
+    Build tweaks dict with generic UserSettings and AppSettings.
+
+    This is the only tweak structure the backend sends. Flows opt in
+    to receive settings by including UserSettings/AppSettings components.
+
+    Args:
+        user_data: User context dict (tokens, preferences)
+        app_data: App context dict (feature flags)
+
+    Returns:
+        Tweaks dict ready for Langflow
+    """
+    tweaks = {}
+
+    if user_data:
+        tweaks["UserSettings"] = {"data": user_data}
+
+    if app_data:
+        tweaks["AppSettings"] = {"data": app_data}
 
     return tweaks
 
 
-def get_app_tweaks_for_flow(flow_name: str) -> dict[str, str]:
+def get_required_services_for_flow(flow_name: str) -> list[str]:
     """
-    Get application-level API key tweaks for a flow.
+    Get list of OAuth services required by a flow.
 
-    Returns a mapping of tweak_path to settings attribute name.
-    The backend injects these from its own config (backend/.env),
-    so each application sharing a LangFlow server can provide its own keys.
+    This is the minimal configuration - just which services need tokens.
+    The injection target is always UserSettings.data.
 
     Args:
         flow_name: Name of the Langflow flow
 
     Returns:
-        Mapping of tweak_path to settings attribute name
-        e.g., {"OpenAIModel.openai_api_key": "OPENAI_API_KEY"}
+        List of service names (e.g., ["google_drive", "dataverse"])
     """
-    # Maps flow names to application-level API keys they need injected.
-    # These are read from backend settings (not user tokens from the database).
-    app_configs: dict[str, dict[str, str]] = {
-        "test-llm-credentials": {
-            "Language Model.api_key": "OPENAI_API_KEY",
-        },
+    # Map flow names to required OAuth services
+    # The injection target is always UserSettings.data
+    flow_services: dict[str, list[str]] = {
+        # Enterprise agent needs Google Drive
+        "enterprise-agent": ["google_drive"],
+        # Test flows for validation
+        "test-google-drive": ["google_drive"],
+        "test-dataverse": ["dataverse"],
+        # Flows that need both
+        "multi-source-rag": ["google_drive", "dataverse"],
     }
 
-    return app_configs.get(flow_name, {})
-
-
-def build_app_tweaks(flow_name: str) -> dict:
-    """
-    Build tweaks dict with application-level API keys from backend settings.
-
-    Unlike user token injection (which reads from the database per-user),
-    this reads from the backend's own configuration. This allows multiple
-    applications sharing a LangFlow server to inject their own API keys.
-
-    Args:
-        flow_name: Name of the Langflow flow
-
-    Returns:
-        Tweaks dict with API keys, or empty dict if no keys configured
-    """
-    from app.core.config import settings
-
-    app_config = get_app_tweaks_for_flow(flow_name)
-    if not app_config:
-        return {}
-
-    tweaks: dict[str, dict[str, str]] = {}
-    for tweak_path, settings_attr in app_config.items():
-        value = getattr(settings, settings_attr, None)
-        if value is None:
-            continue
-
-        component_name, field_name = parse_tweak_path(tweak_path)
-        if component_name not in tweaks:
-            tweaks[component_name] = {}
-        tweaks[component_name][field_name] = value
-        logger.debug("Injected app setting %s into %s", settings_attr, tweak_path)
-
-    return tweaks
-
-
-def get_required_services_for_flow(flow_name: str) -> dict[str, str]:
-    """
-    Get the token configuration for a flow.
-
-    This defines which services a flow requires and where to inject the tokens.
-
-    Args:
-        flow_name: Name of the Langflow flow
-
-    Returns:
-        Mapping of service_name to tweak_path
-
-    Note:
-        In a future iteration, this could be stored in the database
-        or read from a configuration file. For now, it's hardcoded.
-    """
-    # Default configurations for common flows
-    # This maps flow names to their required service tokens
-    flow_configs = {
-        # Example: A flow that needs Google Drive access
-        "google_drive_rag": {
-            "google_drive": "GoogleDriveLoader.credentials",
-        },
-        # Example: A flow that needs Dataverse access
-        "dataverse_search": {
-            "dataverse": "DataverseSearchTool.api_token",
-        },
-        # Example: A flow that needs both services
-        "multi_source_rag": {
-            "google_drive": "GoogleDriveLoader.credentials",
-            "dataverse": "DataverseSearchTool.api_token",
-        },
-        # Test flows for settings validation (Phase 2)
-        "test-google-drive": {
-            "google_drive": "GoogleDriveSearchComponent.token_string",
-        },
-        "test-dataverse": {
-            "dataverse": "DataverseSearchTool.api_token",
-        },
-    }
-
-    return flow_configs.get(flow_name, {})
+    return flow_services.get(flow_name, [])
