@@ -132,7 +132,7 @@ def get_app_tweaks_for_flow(flow_name: str) -> dict[str, str]:
     # These are read from backend settings (not user tokens from the database).
     app_configs: dict[str, dict[str, str]] = {
         "test-llm-credentials": {
-            "OpenAIModel.openai_api_key": "OPENAI_API_KEY",
+            "Language Model.api_key": "OPENAI_API_KEY",
         },
     }
 
