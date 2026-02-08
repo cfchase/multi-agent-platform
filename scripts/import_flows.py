@@ -75,6 +75,9 @@ PROJECT_CACHE: dict[str, str] = {}
 # Track installed component categories for validation
 INSTALLED_COMPONENTS: set[str] = set()
 
+# Track created MCP servers to avoid duplicate creation attempts
+CREATED_MCP_SERVERS: set[str] = set()
+
 
 def log_info(msg: str) -> None:
     print(f"\033[0;32m[INFO]\033[0m {msg}")
@@ -224,6 +227,115 @@ def generate_init_py(category_dir: Path) -> int:
 
     log_info(f"  Generated {init_file.name} with {len(all_classes)} component(s)")
     return len(all_classes)
+
+
+def create_mcp_server(server_config: dict) -> bool:
+    """Create an MCP server via LangFlow API.
+
+    Args:
+        server_config: Dict with name, type (stdio/http), command, args, env, url
+
+    Returns True if server exists or was created successfully, False on failure.
+    """
+    name = server_config.get("name")
+    if not name:
+        log_error("MCP server config missing 'name' field")
+        return False
+
+    # Skip if already created in this session
+    if name in CREATED_MCP_SERVERS:
+        log_info(f"  MCP server '{name}' already processed this session")
+        return True
+
+    headers = {"Content-Type": "application/json"}
+    if ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
+    # Check if server already exists
+    check_resp = request_with_retry(
+        "GET",
+        f"{LANGFLOW_URL}/api/v2/mcp/servers/{name}",
+        headers=headers,
+        timeout=10,
+    )
+
+    if check_resp is not None and check_resp.ok:
+        log_info(f"  MCP server '{name}' already exists, skipping creation")
+        CREATED_MCP_SERVERS.add(name)
+        return True
+
+    # Build server config for API
+    server_type = server_config.get("type", "stdio")
+    api_config: dict = {
+        "name": name,
+        "type": server_type,
+    }
+
+    if server_type == "stdio":
+        command = server_config.get("command")
+        if not command:
+            log_error(f"MCP server '{name}' missing 'command' for stdio type")
+            return False
+        api_config["command"] = command
+        if "args" in server_config:
+            api_config["args"] = server_config["args"]
+        if "env" in server_config:
+            api_config["env"] = server_config["env"]
+    elif server_type == "http":
+        url = server_config.get("url")
+        if not url:
+            log_error(f"MCP server '{name}' missing 'url' for http type")
+            return False
+        api_config["url"] = url
+    else:
+        log_error(f"MCP server '{name}' has unknown type: {server_type}")
+        return False
+
+    # Create server via API
+    log_info(f"  Creating MCP server '{name}' (type: {server_type})...")
+    create_resp = request_with_retry(
+        "POST",
+        f"{LANGFLOW_URL}/api/v2/mcp/servers",
+        headers=headers,
+        json=api_config,
+        timeout=10,
+    )
+
+    if create_resp is None:
+        log_error(f"  Failed to create MCP server '{name}': no response")
+        return False
+
+    if create_resp.ok:
+        log_info(f"  Created MCP server '{name}'")
+        CREATED_MCP_SERVERS.add(name)
+        return True
+    else:
+        log_error(f"  Failed to create MCP server '{name}': {create_resp.status_code}")
+        log_error(f"  Response: {create_resp.text[:200]}")
+        return False
+
+
+def process_mcp_servers(source: dict) -> bool:
+    """Process MCP server configs from a source entry.
+
+    Args:
+        source: Source config dict that may contain 'mcp_servers' key
+
+    Returns True if all servers were created successfully (or no servers defined).
+    """
+    mcp_servers = source.get("mcp_servers", [])
+    if not mcp_servers:
+        return True
+
+    name = source.get("name", "unnamed")
+    log_info(f"Processing {len(mcp_servers)} MCP server(s) for source '{name}'...")
+
+    all_success = True
+    for server_config in mcp_servers:
+        if not create_mcp_server(server_config):
+            all_success = False
+
+    return all_success
 
 
 def install_dependencies(dependencies: list[str], target_dir: Path) -> bool:
@@ -803,6 +915,10 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
         if missing:
             log_warn(f"  Missing required components: {', '.join(missing)}")
             log_warn(f"  Flow may not work correctly until components are installed")
+
+        # Process MCP servers before importing the flow
+        if not process_mcp_servers(source):
+            log_warn(f"  Some MCP servers failed to create, flow may not work correctly")
 
         if source_type == "file":
             # Single file: local path or URL
