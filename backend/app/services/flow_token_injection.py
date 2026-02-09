@@ -120,10 +120,10 @@ def build_generic_tweaks(
     tweaks = {}
 
     if user_data:
-        tweaks["UserSettings"] = {"data": user_data}
+        tweaks["User Settings"] = {"settings_data": user_data}
 
     if app_data:
-        tweaks["AppSettings"] = {"data": app_data}
+        tweaks["App Settings"] = {"settings_data": app_data}
 
     return tweaks
 
