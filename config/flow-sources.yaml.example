@@ -14,6 +14,19 @@
 
 flow_sources:
 
+  # Platform components (UserSettings, AppSettings)
+  # Required for any flow that receives user context (OAuth tokens,
+  # preferences) or app context (feature flags) from the platform.
+  # The platform injects data via LangFlow tweaks API:
+  #   {"User Settings": {"settings_data": {"google_drive_token": "..."}}}
+  #   {"App Settings": {"settings_data": {"features": {...}}}}
+  - name: platform-components
+    type: components
+    path: /path/to/langflow-examples/components/platform
+    category: platform
+    dependencies: []
+    enabled: true
+
   # Example: Custom components directory
   # - name: example-components
   #   type: components
@@ -22,6 +35,7 @@ flow_sources:
   #   dependencies:
   #     - humanize>=4.0.0
   #   enabled: true
+
   # Example: Direct file URL from GitHub
   - name: simple-ollama
     type: file
