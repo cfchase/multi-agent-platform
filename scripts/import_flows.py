@@ -229,90 +229,104 @@ def generate_init_py(category_dir: Path) -> int:
     return len(all_classes)
 
 
+
+def _build_mcp_entry(server_config: dict) -> dict | None:
+    """Build MCP server entry for LangFlow config JSON.
+
+    Returns the entry dict or None on validation failure.
+    """
+    server_type = server_config.get("type", "stdio")
+
+    if server_type == "stdio":
+        command = server_config.get("command")
+        if not command:
+            log_error(f"MCP server missing 'command' for stdio type")
+            return None
+        entry: dict = {"command": command}
+        if "args" in server_config:
+            entry["args"] = server_config["args"]
+        # Always include PYTHONPATH so packages on the PVC are importable
+        env = server_config.get("env", {})
+        env.setdefault("PYTHONPATH", "/app/langflow/packages")
+        entry["env"] = env
+        return entry
+    elif server_type == "http":
+        url = server_config.get("url")
+        if not url:
+            log_error(f"MCP server missing 'url' for http type")
+            return None
+        return {"url": url}
+    else:
+        log_error(f"MCP server has unknown type: {server_type}")
+        return None
+
+
+# LangFlow data dir on the host (PVC mount point)
+LANGFLOW_DATA_DIR = Path(os.environ.get(
+    "LANGFLOW_DATA_DIR",
+    str(PROJECT_ROOT / ".local" / "langflow"),
+))
+
+
 def create_mcp_server(server_config: dict) -> bool:
-    """Create an MCP server via LangFlow API.
+    """Add an MCP server to all LangFlow project config files on the PVC.
 
-    Args:
-        server_config: Dict with name, type (stdio/http), command, args, env, url
+    LangFlow stores MCP server configs in per-project JSON files at:
+        {data_dir}/{project_uuid}/_mcp_servers_{project_uuid}.json
 
-    Returns True if server exists or was created successfully, False on failure.
+    This function scans for all such files and adds the server entry
+    if it doesn't already exist. Also installs pip dependencies to
+    PACKAGES_DIR so they're available on the container's PYTHONPATH.
+
+    Returns True if server was added (or already exists) in all projects.
     """
     name = server_config.get("name")
     if not name:
         log_error("MCP server config missing 'name' field")
         return False
 
+    # Install pip dependencies to PACKAGES_DIR (PVC-backed, on PYTHONPATH)
+    dependencies = server_config.get("dependencies", [])
+    if dependencies:
+        if not install_dependencies(dependencies, PACKAGES_DIR):
+            log_warn(f"  Some MCP server dependencies failed to install for '{name}'")
+
     # Skip if already created in this session
     if name in CREATED_MCP_SERVERS:
         log_info(f"  MCP server '{name}' already processed this session")
         return True
 
-    headers = {"Content-Type": "application/json"}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    # Build the MCP server entry
+    entry = _build_mcp_entry(server_config)
+    if entry is None:
+        return False
 
-    # Check if server already exists
-    check_resp = request_with_retry(
-        "GET",
-        f"{LANGFLOW_URL}/api/v2/mcp/servers/{name}",
-        headers=headers,
-        timeout=10,
-    )
+    # Find all per-project MCP config files on the PVC
+    config_files = list(LANGFLOW_DATA_DIR.glob("*/_mcp_servers_*.json"))
+    if not config_files:
+        log_warn(f"  No MCP config files found in {LANGFLOW_DATA_DIR}")
+        log_warn(f"  MCP server '{name}' will need to be added manually in LangFlow Settings")
+        return False
 
-    if check_resp is not None and check_resp.ok:
-        log_info(f"  MCP server '{name}' already exists, skipping creation")
-        CREATED_MCP_SERVERS.add(name)
-        return True
+    added = 0
+    for config_file in config_files:
+        try:
+            data = json.loads(config_file.read_text())
+            servers = data.setdefault("mcpServers", {})
+            if name not in servers:
+                servers[name] = entry
+                config_file.write_text(json.dumps(data, indent=4))
+                added += 1
+        except (json.JSONDecodeError, OSError) as e:
+            log_warn(f"  Failed to update {config_file.name}: {e}")
 
-    # Build server config for API
-    server_type = server_config.get("type", "stdio")
-    api_config: dict = {
-        "name": name,
-        "type": server_type,
-    }
-
-    if server_type == "stdio":
-        command = server_config.get("command")
-        if not command:
-            log_error(f"MCP server '{name}' missing 'command' for stdio type")
-            return False
-        api_config["command"] = command
-        if "args" in server_config:
-            api_config["args"] = server_config["args"]
-        if "env" in server_config:
-            api_config["env"] = server_config["env"]
-    elif server_type == "http":
-        url = server_config.get("url")
-        if not url:
-            log_error(f"MCP server '{name}' missing 'url' for http type")
-            return False
-        api_config["url"] = url
+    if added > 0:
+        log_info(f"  Added MCP server '{name}' to {added} project config(s)")
     else:
-        log_error(f"MCP server '{name}' has unknown type: {server_type}")
-        return False
+        log_info(f"  MCP server '{name}' already exists in all project configs")
 
-    # Create server via API
-    log_info(f"  Creating MCP server '{name}' (type: {server_type})...")
-    create_resp = request_with_retry(
-        "POST",
-        f"{LANGFLOW_URL}/api/v2/mcp/servers",
-        headers=headers,
-        json=api_config,
-        timeout=10,
-    )
-
-    if create_resp is None:
-        log_error(f"  Failed to create MCP server '{name}': no response")
-        return False
-
-    if create_resp.ok:
-        log_info(f"  Created MCP server '{name}'")
-        CREATED_MCP_SERVERS.add(name)
-        return True
-    else:
-        log_error(f"  Failed to create MCP server '{name}': {create_resp.status_code}")
-        log_error(f"  Response: {create_resp.text[:200]}")
-        return False
+    CREATED_MCP_SERVERS.add(name)
+    return True
 
 
 def process_mcp_servers(source: dict) -> bool:
@@ -341,6 +355,15 @@ def process_mcp_servers(source: dict) -> bool:
 def install_dependencies(dependencies: list[str], target_dir: Path) -> bool:
     """Install pip dependencies to the target directory.
 
+    In local dev, runs pip inside the LangFlow container so that binary
+    packages (C extensions) are compiled for Linux. The target_dir is
+    PVC-mounted at /app/langflow/packages inside the container.
+
+    Falls back to host pip if no container is available (CI, etc).
+
+    After install, removes packages already provided by LangFlow's venv
+    to avoid shadowing (pydantic, starlette, httpx, etc).
+
     Returns True if all dependencies installed successfully.
     """
     if not dependencies:
@@ -350,23 +373,84 @@ def install_dependencies(dependencies: list[str], target_dir: Path) -> bool:
 
     log_info(f"  Installing {len(dependencies)} pip dependency(ies)...")
 
-    cmd = [
-        sys.executable, "-m", "pip", "install",
-        "--target", str(target_dir),
-        "--upgrade",
-        "--quiet"
-    ] + dependencies
+    # Try to install inside the container for correct platform binaries
+    container_tool = os.environ.get("CONTAINER_TOOL", "docker")
+    container_name = os.environ.get("LANGFLOW_CONTAINER_NAME", "app-langflow-dev")
+    container_target = "/app/langflow/packages"
+
+    use_container = False
+    try:
+        check = subprocess.run(
+            [container_tool, "inspect", container_name],
+            capture_output=True, text=True,
+        )
+        use_container = check.returncode == 0
+    except FileNotFoundError:
+        pass
+
+    if use_container:
+        cmd = [
+            container_tool, "exec", container_name,
+            "pip", "install",
+            "--target", container_target,
+            "--upgrade",
+            "--quiet",
+        ] + dependencies
+    else:
+        cmd = [
+            sys.executable, "-m", "pip", "install",
+            "--target", str(target_dir),
+            "--upgrade",
+            "--quiet",
+        ] + dependencies
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             log_error(f"  pip install failed: {result.stderr}")
             return False
+        # Remove packages that LangFlow's venv already provides to avoid
+        # shadowing them via PYTHONPATH
+        _cleanup_shadowed_packages(target_dir)
         log_info(f"  Dependencies installed to {target_dir}")
         return True
     except Exception as e:
         log_error(f"  pip install error: {e}")
         return False
+
+
+# Packages provided by LangFlow's venv that must not be shadowed.
+# If pip installs these as transitive deps into the --target dir,
+# they override LangFlow's versions and cause crashes.
+_LANGFLOW_PROVIDED = {
+    "annotated_types", "anyio", "certifi", "charset_normalizer", "click",
+    "cryptography", "h11", "httpcore", "httpx", "idna", "mcp",
+    "pydantic", "pydantic_core", "pydantic_settings",
+    "requests", "sniffio", "sse_starlette", "starlette",
+    "typing_extensions", "typing_inspection", "urllib3", "uvicorn",
+    "cffi", "pycparser", "python_dotenv", "dotenv", "python_multipart",
+    "multipart", "six",
+}
+
+
+def _cleanup_shadowed_packages(target_dir: Path) -> None:
+    """Remove packages from target_dir that LangFlow already provides."""
+    removed = []
+    for item in target_dir.iterdir():
+        name = item.name
+        # Match package dirs and .dist-info dirs
+        base = name.split("-")[0].replace(".dist", "").replace(".py", "")
+        # Also handle .so files like _cffi_backend.cpython-313-darwin.so
+        if name.endswith(".so"):
+            base = name.split(".")[0]
+        if base.lower() in _LANGFLOW_PROVIDED or base.lstrip("_") in _LANGFLOW_PROVIDED:
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+            removed.append(name)
+    if removed:
+        log_info(f"  Cleaned {len(removed)} shadowed package(s) from target dir")
 
 
 def install_components(source: dict) -> bool:

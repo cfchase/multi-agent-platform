@@ -44,6 +44,23 @@ flow_sources:
     public: true                    # Optional: make flow visible to all users
     enabled: true
 
+  # Example: Flow with MCP server and auto-installed dependencies
+  # - name: my-mcp-flow
+  #   type: file
+  #   path: /path/to/flow.json
+  #   project: "Examples"
+  #   public: true
+  #   enabled: true
+  #   mcp_servers:
+  #     - name: server-fetch
+  #       type: stdio
+  #       command: python
+  #       args:
+  #         - "-m"
+  #         - "mcp_server_fetch"
+  #       dependencies:              # pip packages installed automatically
+  #         - mcp-server-fetch
+
   # Example: Local file
   # - name: my-flow
   #   type: file
