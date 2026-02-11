@@ -461,6 +461,10 @@ def install_components(source: dict) -> bool:
     2. Copy .py files to COMPONENTS_DIR/{category}/
     3. Generate __init__.py for the category
 
+    Supports both local paths and git repos. For git repos, specify
+    'git' (URL) and 'branch' instead of 'path'. The 'path' field
+    then becomes the subdirectory within the cloned repo.
+
     Returns True if successful.
     """
     name = source.get("name", "unnamed")
@@ -468,10 +472,20 @@ def install_components(source: dict) -> bool:
     category = source.get("category", "custom")
     dependencies = source.get("dependencies", [])
 
-    # Validate source path
-    source_path = validate_path(PROJECT_ROOT, path_str)
-    if source_path is None:
-        return False
+    # If git URL provided, clone/pull first then resolve path within repo
+    git_url = source.get("git")
+    if git_url:
+        branch = source.get("branch", "main")
+        repo_dir = sync_git_repo(git_url, branch, f"components-{name}")
+        if repo_dir is None:
+            return False
+        # path is relative within the cloned repo
+        source_path = repo_dir / path_str if path_str else repo_dir
+    else:
+        # Validate local source path
+        source_path = validate_path(PROJECT_ROOT, path_str)
+        if source_path is None:
+            return False
 
     if not source_path.is_dir():
         log_error(f"Component source path not found: {source_path}")
@@ -922,21 +936,49 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
         log_warn("Empty config file")
         return 0, 0
 
-    sources = config.get("flow_sources", [])
-    if not sources:
+    if not isinstance(config, dict):
+        log_error("Config must be a YAML mapping")
+        return 0, 0
+
+    # Support both new structured format (components/mcp_servers/flows keys)
+    # and legacy single-list format (flow_sources key)
+    if "components" in config or "flows" in config or "mcp_servers" in config:
+        # New structured format
+        component_sources = config.get("components", []) or []
+        mcp_server_configs = config.get("mcp_servers", []) or []
+        flow_sources = config.get("flows", []) or []
+    elif "flow_sources" in config:
+        # Legacy format: single list with type-based separation
+        sources = config.get("flow_sources", [])
+        if not sources:
+            log_warn("No flow sources configured")
+            return 0, 0
+        component_sources = []
+        mcp_server_configs = []
+        flow_sources = []
+        for source in sources:
+            if source.get("type") == "components":
+                component_sources.append(source)
+            else:
+                # Extract MCP servers nested under flow sources (legacy pattern)
+                for mcp in source.get("mcp_servers", []):
+                    mcp_server_configs.append(mcp)
+                flow_sources.append(source)
+    else:
         log_warn("No flow sources configured")
         return 0, 0
 
-    # Separate component sources from flow sources
-    component_sources = []
-    flow_sources = []
-    for source in sources:
-        if source.get("type") == "components":
-            component_sources.append(source)
-        else:
-            flow_sources.append(source)
+    total_items = len(component_sources) + len(mcp_server_configs) + len(flow_sources)
+    if total_items == 0:
+        log_warn("No flow sources configured")
+        return 0, 0
 
-    log_info(f"Found {len(sources)} source(s): {len(component_sources)} component(s), {len(flow_sources)} flow(s)")
+    log_info(
+        f"Found {total_items} item(s): "
+        f"{len(component_sources)} component(s), "
+        f"{len(mcp_server_configs)} MCP server(s), "
+        f"{len(flow_sources)} flow(s)"
+    )
 
     total_success = 0
     total_failure = 0
@@ -965,7 +1007,15 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
             log_info("NOTE: Restart LangFlow to load new components")
             print()
 
-    # Pass 2: Process flow sources
+    # Pass 2: Process top-level MCP servers (new format)
+    if mcp_server_configs:
+        log_info("=== Registering MCP Servers ===")
+        for server_config in mcp_server_configs:
+            if not create_mcp_server(server_config):
+                total_failure += 1
+        print()
+
+    # Pass 3: Process flow sources
     if flow_sources:
         log_info("=== Importing Flows ===")
 

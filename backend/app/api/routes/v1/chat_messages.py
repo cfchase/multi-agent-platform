@@ -219,7 +219,7 @@ async def stream_message(
         user_data = await build_user_settings_data(
             session=session,
             user_id=current_user.id,
-            services=required_services if required_services else None,
+            services=required_services,
         )
     except MissingTokenError as e:
         raise HTTPException(
