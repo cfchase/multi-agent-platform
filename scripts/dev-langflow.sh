@@ -92,9 +92,10 @@ case "$1" in
                 -e GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
                 -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
                 -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.containers.internal:11434}" \
-                -e LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-}" \
-                -e LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-}" \
+                -e LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-sk-dev-secret-key}" \
+                -e LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-pk-dev-public-key}" \
                 -e LANGFUSE_HOST="${LANGFUSE_HOST:-http://${DB_HOST}:${LANGFUSE_WEB_PORT:-3000}}" \
+                -e TZ="${TZ:-UTC}" \
                 -p $LANGFLOW_PORT:7860 \
                 -v "${DATA_DIR}:/app/langflow" \
                 -v "${DATA_DIR}/components:/app/langflow/components:z" \
