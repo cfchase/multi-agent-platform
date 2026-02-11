@@ -29,6 +29,14 @@ from app.models import (
     ChatMessagesPublic,
     Message,
 )
+from app.core.config import settings
+from app.services.flow_token_injection import (
+    build_app_settings_data,
+    build_generic_tweaks,
+    build_user_settings_data,
+    get_required_services_for_flow,
+    MissingTokenError,
+)
 from app.services.langflow import LangflowError, get_langflow_client
 
 logger = logging.getLogger(__name__)
@@ -185,6 +193,9 @@ async def stream_message(
     # Verify chat exists and user has access
     chat = get_chat_with_permission(session, current_user, chat_id)
 
+    # Resolve flow name
+    flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
+
     # Save user message
     user_message = ChatMessage(
         chat_id=chat_id,
@@ -195,9 +206,37 @@ async def stream_message(
 
     # Update chat's updated_at timestamp
     chat.updated_at = datetime.now(timezone.utc)
+
+    # Lock flow to chat on first message
+    if not chat.flow_name and flow_name:
+        chat.flow_name = flow_name
+
     session.add(chat)
     session.commit()
     session.refresh(user_message)
+
+    # Get required OAuth services for this flow
+    required_services = get_required_services_for_flow(flow_name) if flow_name else []
+
+    # Build user data with OAuth tokens
+    try:
+        user_data = await build_user_settings_data(
+            session=session,
+            user_id=current_user.id,
+            services=required_services,
+        )
+    except MissingTokenError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing integration: {e.service_name}. "
+                   "Please connect the service in Settings.",
+        )
+
+    # Build app data (feature flags, config)
+    app_data = build_app_settings_data()
+
+    # Always send generic tweaks - flows opt in via components
+    tweaks = build_generic_tweaks(user_data=user_data, app_data=app_data)
 
     async def generate_stream() -> AsyncGenerator[str, None]:
         """Generate SSE events from Langflow streaming response."""
@@ -211,6 +250,7 @@ async def stream_message(
                 session_id=str(chat_id),
                 flow_id=request.flow_id,
                 flow_name=request.flow_name,
+                tweaks=tweaks,
             ):
                 accumulated_content += chunk
                 yield format_sse_event({"type": "content", "content": chunk})

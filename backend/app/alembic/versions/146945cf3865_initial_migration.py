@@ -1,8 +1,8 @@
 """initial migration
 
-Revision ID: 6dba80a8a984
+Revision ID: 146945cf3865
 Revises: 
-Create Date: 2026-02-05 17:42:31.469868
+Create Date: 2026-02-11 10:11:44.166012
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 
 # revision identifiers, used by Alembic.
-revision = '6dba80a8a984'
+revision = '146945cf3865'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -46,6 +46,7 @@ def upgrade():
     op.create_index(op.f('ix_user_username'), 'user', ['username'], unique=True)
     op.create_table('chat',
     sa.Column('title', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+    sa.Column('flow_name', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -71,6 +72,8 @@ def upgrade():
     sa.Column('scopes', sqlmodel.sql.sqltypes.AutoString(length=1000), nullable=True),
     sa.Column('token_type', sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
     sa.Column('provider_client_id', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
+    sa.Column('refresh_locked_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_refresh_attempt', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),

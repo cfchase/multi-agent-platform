@@ -1,27 +1,89 @@
 # Flow Sources Configuration
-# Copy to flow-sources.yaml and customize for your environment
+# Copy to flow-sources.yaml to use as-is, or customize for your environment.
 #
-# Supported source types:
+# Three top-level sections:
+#   components:   Custom LangFlow component directories (installs deps, copies .py files)
+#   mcp_servers:  MCP server configurations to register in LangFlow
+#   flows:        Flow definitions to import into LangFlow
+#
+# Flow types:
 #   - file: Single JSON file (local path or URL)
 #   - local: Directory of JSON files (scans with pattern)
 #   - git: Git repository (clones and scans with pattern)
 #
-# Common options:
+# Common flow options:
 #   - project: LangFlow project name to import into (created if missing)
 #   - pattern: Glob pattern for finding flow files (default: **/*.json)
 #   - public: Set to true to make flows visible to all users (default: false)
 
-flow_sources:
-  # Example: Direct file URL from GitHub
-  - name: simple-ollama
-    type: file
-    path: https://raw.githubusercontent.com/cfchase/langflow-examples/main/simple-ollama/simple-ollama.json
-    project: "Examples"             # Optional: target project in LangFlow
-    public: true                    # Optional: make flow visible to all users
+# --- Components: custom LangFlow components to install ---
+# Components can load from a local path or a git repo.
+# For git: specify 'git' (URL) and 'branch', with 'path' as subdirectory.
+components:
+
+  # Platform components (UserSettings, AppSettings, GoogleDriveValidator)
+  # Required for any flow that receives user context (OAuth tokens,
+  # preferences) or app context (feature flags) from the platform.
+  - name: platform-components
+    git: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: components/platform
+    category: platform
+    dependencies: []
     enabled: true
 
-  # Example: Local file
+  # Example components (HelloWorldEcho, HelloWorldDep)
+  - name: example-components
+    git: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: components/examples
+    category: examples
+    dependencies:
+      - humanize>=4.0.0
+    enabled: true
+
+  # Example: Local path instead of git
+  # - name: my-components
+  #   path: /path/to/my/components
+  #   category: custom
+  #   dependencies: []
+  #   enabled: true
+
+# --- MCP Servers: MCP server configurations to register ---
+mcp_servers:
+
+  - name: server-fetch
+    type: stdio
+    command: python
+    args:
+      - "-m"
+      - "mcp_server_fetch"
+    dependencies:
+      - mcp-server-fetch
+
+# --- Flows: flow definitions to import into LangFlow ---
+flows:
+
+  # Import all flows from langflow-examples via git
+  - name: langflow-examples
+    type: git
+    url: https://github.com/cfchase/langflow-examples
+    branch: main
+    pattern: "**/*.json"
+    project: "Examples"
+    public: true
+    enabled: true
+
+  # Example: Single file from URL
   # - name: my-flow
+  #   type: file
+  #   path: https://raw.githubusercontent.com/user/repo/main/flow.json
+  #   project: "Examples"
+  #   public: true
+  #   enabled: true
+
+  # Example: Local file
+  # - name: my-local-flow
   #   type: file
   #   path: ./langflow-flows/my-flow.json
   #   project: "Development"
@@ -31,26 +93,16 @@ flow_sources:
   # - name: local-dev
   #   type: local
   #   path: ./langflow-flows/dev
-  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
+  #   pattern: "**/*.json"
   #   project: "Development"
-  #   enabled: true
-
-  # Example: Git repository (public flows)
-  # - name: examples
-  #   type: git
-  #   url: https://github.com/cfchase/langflow-examples
-  #   branch: main
-  #   pattern: "**/*.json"          # Optional: glob pattern (default: **/*.json)
-  #   project: "Examples"
-  #   public: true                  # Make all imported flows public
   #   enabled: true
 
   # Example: Private git repository
   # - name: enterprise
   #   type: git
-  #   url: https://github.com/your-org/your-langflow-flows
+  #   url: https://github.com/your-org/your-flows
   #   branch: main
-  #   pattern: "**/flows/*.json"    # Only import from flows/ subdirectories
+  #   pattern: "**/flows/*.json"
   #   project: "Enterprise"
   #   auth:
   #     env_var: GITHUB_FLOW_TOKEN

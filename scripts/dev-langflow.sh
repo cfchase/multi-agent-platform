@@ -40,6 +40,13 @@ get_db_host() {
 DB_HOST=$(get_db_host)
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
+# Load LangFlow-specific env vars (API keys for global variables, etc.)
+if [ -f "$PROJECT_ROOT/config/langflow.env" ]; then
+    set -a  # automatically export all variables
+    source "$PROJECT_ROOT/config/langflow.env"
+    set +a
+fi
+
 case "$1" in
     start)
         log_info "Starting LangFlow development server..."
@@ -62,6 +69,8 @@ case "$1" in
 
             # Create data directory with write permissions
             mkdir -p "$DATA_DIR"
+            mkdir -p "$DATA_DIR/components"
+            mkdir -p "$DATA_DIR/packages"
 
             # Generate a secret key to avoid file permission issues
             SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
@@ -75,8 +84,22 @@ case "$1" in
                 -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true \
                 -e LANGFLOW_LOG_LEVEL=info \
                 -e LANGFLOW_PORT=7860 \
+                -e LANGFLOW_COMPONENTS_PATH=/app/langflow/components \
+                -e PYTHONPATH=/app/langflow/packages \
+                -e LANGFLOW_VARIABLES_TO_GET_FROM_ENVIRONMENT="OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,OLLAMA_BASE_URL" \
+                -e LANGFLOW_FALLBACK_TO_ENV_VAR=true \
+                -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+                -e GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
+                -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+                -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.containers.internal:11434}" \
+                -e LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-sk-dev-secret-key}" \
+                -e LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-pk-dev-public-key}" \
+                -e LANGFUSE_HOST="${LANGFUSE_HOST:-http://${DB_HOST}:${LANGFUSE_WEB_PORT:-3000}}" \
+                -e TZ="${TZ:-UTC}" \
                 -p $LANGFLOW_PORT:7860 \
                 -v "${DATA_DIR}:/app/langflow" \
+                -v "${DATA_DIR}/components:/app/langflow/components:z" \
+                -v "${DATA_DIR}/packages:/app/langflow/packages:z" \
                 --add-host=host.docker.internal:host-gateway \
                 --add-host=host.containers.internal:host-gateway \
                 docker.io/langflowai/langflow:$LANGFLOW_VERSION
@@ -133,6 +156,13 @@ case "$1" in
         fi
         ;;
 
+    restart)
+        log_info "Restarting LangFlow container..."
+        $0 stop
+        $CONTAINER_TOOL rm -f $CONTAINER_NAME 2>/dev/null || true
+        $0 start
+        ;;
+
     logs)
         if [ "$2" = "-f" ] || [ "$2" = "--follow" ]; then
             log_info "Streaming LangFlow logs (Ctrl+C to exit)..."
@@ -162,16 +192,17 @@ case "$1" in
         ;;
 
     *)
-        echo "Usage: $0 {start|stop|remove|reset|logs|status|shell}"
+        echo "Usage: $0 {start|stop|restart|remove|reset|logs|status|shell}"
         echo ""
         echo "Commands:"
-        echo "  start  - Start the LangFlow container"
-        echo "  stop   - Stop the LangFlow container"
-        echo "  remove - Remove container (keeps data in .local/langflow)"
-        echo "  reset  - Remove container and all data"
-        echo "  logs   - Show LangFlow logs (use -f to follow)"
-        echo "  status - Check if LangFlow is running"
-        echo "  shell  - Open shell in container"
+        echo "  start   - Start the LangFlow container"
+        echo "  stop    - Stop the LangFlow container"
+        echo "  restart - Remove and recreate container (for env changes)"
+        echo "  remove  - Remove container (keeps data in .local/langflow)"
+        echo "  reset   - Remove container and all data"
+        echo "  logs    - Show LangFlow logs (use -f to follow)"
+        echo "  status  - Check if LangFlow is running"
+        echo "  shell   - Open shell in container"
         echo ""
         echo "Environment variables:"
         echo "  LANGFLOW_VERSION  - LangFlow version (default: latest)"

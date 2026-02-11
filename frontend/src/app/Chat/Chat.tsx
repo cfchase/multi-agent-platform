@@ -116,10 +116,17 @@ function Chat(): React.ReactElement {
       const flowData = response?.data || [];
       setFlows(flowData);
       if (flowData.length > 0 && !selectedFlowName) {
-        // Use configured default flow, or first flow as fallback
-        const defaultFlow = response?.default_flow;
-        const flowExists = defaultFlow && flowData.some((f) => f.name === defaultFlow);
-        setSelectedFlowName(flowExists ? defaultFlow : flowData[0].name);
+        // Check localStorage for cached flow preference
+        const cachedFlow = localStorage.getItem('selectedFlowName');
+        const cachedFlowExists = cachedFlow && flowData.some((f) => f.name === cachedFlow);
+        if (cachedFlowExists) {
+          setSelectedFlowName(cachedFlow);
+        } else {
+          // Fall back to server default or first flow
+          const defaultFlow = response?.default_flow;
+          const flowExists = defaultFlow && flowData.some((f) => f.name === defaultFlow);
+          setSelectedFlowName(flowExists ? defaultFlow : flowData[0].name);
+        }
       }
     } catch (err) {
       console.error('Failed to load flows:', err);
@@ -127,9 +134,13 @@ function Chat(): React.ReactElement {
     }
   };
 
-  // Load messages when chat changes
+  // Load messages and restore flow when chat changes
   React.useEffect(() => {
     if (selectedChatId) {
+      const chat = chats.find((c) => c.id === selectedChatId);
+      if (chat?.flow_name) {
+        setSelectedFlowName(chat.flow_name);
+      }
       loadMessages(selectedChatId);
     } else {
       setMessages([]);
@@ -210,9 +221,14 @@ function Chat(): React.ReactElement {
     const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
     if (!messageText.trim() || isSending) return;
 
-    // Require a flow to be selected
-    if (!selectedFlowName) {
-      setOperationError('Please select a flow before sending a message.');
+    // Require a valid flow to be selected
+    const sendFlowName = isFlowLocked ? selectedChat?.flow_name : selectedFlowName;
+    if (!sendFlowName || !flows.some((f) => f.name === sendFlowName)) {
+      setOperationError(
+        isFlowLocked
+          ? 'This chat is locked to a flow that is no longer available.'
+          : 'Please select a flow before sending a message.'
+      );
       return;
     }
 
@@ -294,10 +310,16 @@ function Chat(): React.ReactElement {
           setIsSending(false);
           setAnnouncement(`Assistant: ${accumulatedContent}`);
 
-          // Update chat title if first message
+          // Update chat title and lock flow on first message
           if (messages.length === 0) {
             const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
             ChatAPI.updateChat(chatId, { title }).then(() => loadChats());
+            // Update local state so dropdown locks immediately
+            setChats((prev) =>
+              prev.map((c) =>
+                c.id === chatId ? { ...c, flow_name: sendFlowName } : c
+              )
+            );
           }
         } else if (event.type === 'error') {
           streamControllerRef.current = null;
@@ -329,7 +351,7 @@ function Chat(): React.ReactElement {
         streamControllerRef.current = null;
         setIsSending(false);
       },
-      selectedFlowName || undefined
+      sendFlowName || undefined
     );
 
     streamControllerRef.current = streamController;
@@ -354,6 +376,14 @@ function Chat(): React.ReactElement {
       handleSend('', lastError.message);
     }
   };
+
+  // Derived state for flow availability
+  // Use the chat's locked flow_name as the source of truth when locked,
+  // to avoid race conditions where loadFlows overwrites selectedFlowName.
+  const selectedChat = chats.find((c) => c.id === selectedChatId);
+  const isFlowLocked = !!selectedChat?.flow_name;
+  const effectiveFlowName = isFlowLocked ? selectedChat.flow_name : selectedFlowName;
+  const isFlowAvailable = !!effectiveFlowName && flows.some((f) => f.name === effectiveFlowName);
 
   // Build conversations for the drawer
   const conversations: Conversation[] = chats.map((chat) => ({
@@ -411,9 +441,9 @@ function Chat(): React.ReactElement {
                         ref={toggleRef}
                         onClick={() => setIsFlowMenuOpen(!isFlowMenuOpen)}
                         isExpanded={isFlowMenuOpen}
-                        isDisabled={flows.length === 0}
+                        isDisabled={flows.length === 0 || isFlowLocked}
                       >
-                        {selectedFlowName || 'Select Flow'}
+                        {effectiveFlowName || 'Select Flow'}
                       </MenuToggle>
                     )}
                   >
@@ -421,7 +451,10 @@ function Chat(): React.ReactElement {
                       {flows.map((flow) => (
                         <DropdownItem
                           key={flow.id}
-                          onClick={() => setSelectedFlowName(flow.name)}
+                          onClick={() => {
+                            setSelectedFlowName(flow.name);
+                            localStorage.setItem('selectedFlowName', flow.name);
+                          }}
                           description={flow.description}
                         >
                           {flow.name}
@@ -496,9 +529,17 @@ function Chat(): React.ReactElement {
                 </MessageBox>
               </ChatbotContent>
               <ChatbotFooter>
+                {isFlowLocked && !isFlowAvailable && (
+                  <Alert
+                    variant="warning"
+                    title={`This chat is locked to "${effectiveFlowName}" which is no longer available.`}
+                    isInline
+                    isPlain
+                  />
+                )}
                 <MessageBar
                   onSendMessage={handleSend}
-                  isSendButtonDisabled={isSending || !selectedFlowName}
+                  isSendButtonDisabled={isSending || !isFlowAvailable}
                   hasStopButton={isSending}
                   handleStopButton={handleStopStreaming}
                 />
