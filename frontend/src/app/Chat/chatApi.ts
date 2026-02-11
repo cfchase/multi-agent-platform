@@ -16,6 +16,7 @@ export interface Chat {
   id: number;
   title: string;
   user_id: number;
+  flow_name: string | null;
   created_at: string;
   updated_at: string;
 }

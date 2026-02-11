@@ -116,10 +116,17 @@ function Chat(): React.ReactElement {
       const flowData = response?.data || [];
       setFlows(flowData);
       if (flowData.length > 0 && !selectedFlowName) {
-        // Use configured default flow, or first flow as fallback
-        const defaultFlow = response?.default_flow;
-        const flowExists = defaultFlow && flowData.some((f) => f.name === defaultFlow);
-        setSelectedFlowName(flowExists ? defaultFlow : flowData[0].name);
+        // Check localStorage for cached flow preference
+        const cachedFlow = localStorage.getItem('selectedFlowName');
+        const cachedFlowExists = cachedFlow && flowData.some((f) => f.name === cachedFlow);
+        if (cachedFlowExists) {
+          setSelectedFlowName(cachedFlow);
+        } else {
+          // Fall back to server default or first flow
+          const defaultFlow = response?.default_flow;
+          const flowExists = defaultFlow && flowData.some((f) => f.name === defaultFlow);
+          setSelectedFlowName(flowExists ? defaultFlow : flowData[0].name);
+        }
       }
     } catch (err) {
       console.error('Failed to load flows:', err);
@@ -127,9 +134,13 @@ function Chat(): React.ReactElement {
     }
   };
 
-  // Load messages when chat changes
+  // Load messages and restore flow when chat changes
   React.useEffect(() => {
     if (selectedChatId) {
+      const chat = chats.find((c) => c.id === selectedChatId);
+      if (chat?.flow_name) {
+        setSelectedFlowName(chat.flow_name);
+      }
       loadMessages(selectedChatId);
     } else {
       setMessages([]);
@@ -294,10 +305,16 @@ function Chat(): React.ReactElement {
           setIsSending(false);
           setAnnouncement(`Assistant: ${accumulatedContent}`);
 
-          // Update chat title if first message
+          // Update chat title and lock flow on first message
           if (messages.length === 0) {
             const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
             ChatAPI.updateChat(chatId, { title }).then(() => loadChats());
+            // Update local state so dropdown locks immediately
+            setChats((prev) =>
+              prev.map((c) =>
+                c.id === chatId ? { ...c, flow_name: selectedFlowName } : c
+              )
+            );
           }
         } else if (event.type === 'error') {
           streamControllerRef.current = null;
@@ -411,7 +428,7 @@ function Chat(): React.ReactElement {
                         ref={toggleRef}
                         onClick={() => setIsFlowMenuOpen(!isFlowMenuOpen)}
                         isExpanded={isFlowMenuOpen}
-                        isDisabled={flows.length === 0}
+                        isDisabled={flows.length === 0 || !!chats.find((c) => c.id === selectedChatId)?.flow_name}
                       >
                         {selectedFlowName || 'Select Flow'}
                       </MenuToggle>
@@ -421,7 +438,10 @@ function Chat(): React.ReactElement {
                       {flows.map((flow) => (
                         <DropdownItem
                           key={flow.id}
-                          onClick={() => setSelectedFlowName(flow.name)}
+                          onClick={() => {
+                            setSelectedFlowName(flow.name);
+                            localStorage.setItem('selectedFlowName', flow.name);
+                          }}
                           description={flow.description}
                         >
                           {flow.name}

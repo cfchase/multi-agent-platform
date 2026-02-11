@@ -193,6 +193,9 @@ async def stream_message(
     # Verify chat exists and user has access
     chat = get_chat_with_permission(session, current_user, chat_id)
 
+    # Resolve flow name
+    flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
+
     # Save user message
     user_message = ChatMessage(
         chat_id=chat_id,
@@ -203,13 +206,14 @@ async def stream_message(
 
     # Update chat's updated_at timestamp
     chat.updated_at = datetime.now(timezone.utc)
+
+    # Lock flow to chat on first message
+    if not chat.flow_name and flow_name:
+        chat.flow_name = flow_name
+
     session.add(chat)
     session.commit()
     session.refresh(user_message)
-
-    # Build generic tweaks: UserSettings + AppSettings
-    # API keys are in langflow.env, not sent via tweaks
-    flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
 
     # Get required OAuth services for this flow
     required_services = get_required_services_for_flow(flow_name) if flow_name else []

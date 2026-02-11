@@ -102,6 +102,26 @@ class TestChatCRUD:
         data = response.json()
         assert data["title"] == "Updated Title"
 
+    def test_create_chat_has_null_flow_name(self, client: TestClient, dev_user: User):
+        """Test that a newly created chat has flow_name as null."""
+        response = client.post(
+            "/api/v1/chats/",
+            json={"title": "New Chat"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["flow_name"] is None
+
+    def test_update_chat_flow_name(self, client: TestClient, test_chat: Chat):
+        """Test updating a chat's flow_name."""
+        response = client.put(
+            f"/api/v1/chats/{test_chat.id}",
+            json={"flow_name": "my-flow"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["flow_name"] == "my-flow"
+
     def test_update_chat_not_found(self, client: TestClient, dev_user: User):
         """Test updating a non-existent chat returns 404."""
         response = client.put(
@@ -337,6 +357,49 @@ class TestMessageStreaming:
         assert len(messages) == 1
         # Mock client returns canned responses
         assert len(messages[0].content) > 0
+
+    def test_stream_message_sets_flow_name_on_chat(
+        self, client: TestClient, session: Session, test_chat: Chat
+    ):
+        """Test that streaming a message sets flow_name on the chat."""
+        # Chat should start with no flow_name
+        assert test_chat.flow_name is None
+
+        # Stream a message with a specific flow
+        client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "Hello!", "flow_name": "test-flow"},
+        )
+
+        # Refresh and check flow_name was set
+        session.expire_all()
+        updated_chat = session.get(Chat, test_chat.id)
+        assert updated_chat.flow_name == "test-flow"
+
+    def test_stream_message_does_not_overwrite_flow_name(
+        self, client: TestClient, session: Session, dev_user: User
+    ):
+        """Test that streaming does not overwrite an existing flow_name."""
+        # Create a chat with flow_name already set
+        chat = Chat(
+            title="Locked Flow Chat",
+            user_id=dev_user.id,
+            flow_name="original-flow",
+        )
+        session.add(chat)
+        session.commit()
+        session.refresh(chat)
+
+        # Stream a message with a different flow
+        client.post(
+            f"/api/v1/chats/{chat.id}/messages/stream",
+            json={"content": "Hello!", "flow_name": "different-flow"},
+        )
+
+        # flow_name should remain unchanged
+        session.expire_all()
+        updated_chat = session.get(Chat, chat.id)
+        assert updated_chat.flow_name == "original-flow"
 
     def test_stream_message_langflow_error(
         self, client: TestClient, session: Session, test_chat: Chat, monkeypatch

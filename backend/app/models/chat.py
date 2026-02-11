@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 class ChatBase(SQLModel):
     """Shared properties for Chat."""
     title: str = Field(min_length=1, max_length=255)
+    flow_name: str | None = Field(default=None, max_length=255)
 
 
 class ChatCreate(ChatBase):
@@ -31,6 +32,7 @@ class ChatCreate(ChatBase):
 class ChatUpdate(SQLModel):
     """Properties to receive on chat update."""
     title: str | None = Field(default=None, min_length=1, max_length=255)
+    flow_name: str | None = Field(default=None, max_length=255)
 
 
 class Chat(ChatBase, table=True):

@@ -215,13 +215,13 @@ make undeploy             # Remove development deployment
 - `GET /api/v1/chats/` - List user's chats with pagination
 - `GET /api/v1/chats/{id}` - Get chat by ID (ownership check)
 - `POST /api/v1/chats/` - Create new chat
-- `PUT /api/v1/chats/{id}` - Update chat title
+- `PUT /api/v1/chats/{id}` - Update chat title and/or flow_name
 - `DELETE /api/v1/chats/{id}` - Delete chat (cascades to messages)
 
 **Chat Messages API (REST):**
 - `GET /api/v1/chats/{chat_id}/messages/` - List messages in a chat
 - `POST /api/v1/chats/{chat_id}/messages/` - Create message (non-streaming)
-- `POST /api/v1/chats/{chat_id}/messages/stream` - Stream AI response via SSE
+- `POST /api/v1/chats/{chat_id}/messages/stream` - Stream AI response via SSE (locks flow_name on first message)
 
 **Flows API (REST):**
 - `GET /api/v1/flows/` - List available Langflow flows (includes `default_flow` from LANGFLOW_DEFAULT_FLOW)

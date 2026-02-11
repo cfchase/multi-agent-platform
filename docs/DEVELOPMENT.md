@@ -238,6 +238,8 @@ LANGFLOW_API_KEY=your-api-key
 
 - The Chat UI allows selecting different flows from a dropdown
 - Flow names are preferred over IDs as they're stable across imports
+- Once a message is sent, the flow is locked to the chat (`flow_name` persisted on the Chat model)
+- The user's last-selected flow is cached in `localStorage` and used as the default for new chats
 
 **Langfuse** - LLM observability
 - Full stack: Redis, ClickHouse, MinIO, PostgreSQL
