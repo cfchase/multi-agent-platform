@@ -221,9 +221,13 @@ function Chat(): React.ReactElement {
     const messageText = retryMessageText || (typeof message === 'string' ? message : message.toString());
     if (!messageText.trim() || isSending) return;
 
-    // Require a flow to be selected
-    if (!selectedFlowName) {
-      setOperationError('Please select a flow before sending a message.');
+    // Require a valid flow to be selected
+    if (!selectedFlowName || !flows.some((f) => f.name === selectedFlowName)) {
+      setOperationError(
+        isFlowLocked
+          ? 'This chat is locked to a flow that is no longer available.'
+          : 'Please select a flow before sending a message.'
+      );
       return;
     }
 
@@ -372,6 +376,11 @@ function Chat(): React.ReactElement {
     }
   };
 
+  // Derived state for flow availability
+  const selectedChat = chats.find((c) => c.id === selectedChatId);
+  const isFlowLocked = !!selectedChat?.flow_name;
+  const isFlowAvailable = !!selectedFlowName && flows.some((f) => f.name === selectedFlowName);
+
   // Build conversations for the drawer
   const conversations: Conversation[] = chats.map((chat) => ({
     id: chat.id.toString(),
@@ -428,7 +437,7 @@ function Chat(): React.ReactElement {
                         ref={toggleRef}
                         onClick={() => setIsFlowMenuOpen(!isFlowMenuOpen)}
                         isExpanded={isFlowMenuOpen}
-                        isDisabled={flows.length === 0 || !!chats.find((c) => c.id === selectedChatId)?.flow_name}
+                        isDisabled={flows.length === 0 || isFlowLocked}
                       >
                         {selectedFlowName || 'Select Flow'}
                       </MenuToggle>
@@ -516,9 +525,17 @@ function Chat(): React.ReactElement {
                 </MessageBox>
               </ChatbotContent>
               <ChatbotFooter>
+                {isFlowLocked && !isFlowAvailable && (
+                  <Alert
+                    variant="warning"
+                    title={`This chat is locked to "${selectedFlowName}" which is no longer available.`}
+                    isInline
+                    isPlain
+                  />
+                )}
                 <MessageBar
                   onSendMessage={handleSend}
-                  isSendButtonDisabled={isSending || !selectedFlowName}
+                  isSendButtonDisabled={isSending || !isFlowAvailable}
                   hasStopButton={isSending}
                   handleStopButton={handleStopStreaming}
                 />
