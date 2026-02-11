@@ -222,7 +222,8 @@ function Chat(): React.ReactElement {
     if (!messageText.trim() || isSending) return;
 
     // Require a valid flow to be selected
-    if (!selectedFlowName || !flows.some((f) => f.name === selectedFlowName)) {
+    const sendFlowName = isFlowLocked ? selectedChat?.flow_name : selectedFlowName;
+    if (!sendFlowName || !flows.some((f) => f.name === sendFlowName)) {
       setOperationError(
         isFlowLocked
           ? 'This chat is locked to a flow that is no longer available.'
@@ -316,7 +317,7 @@ function Chat(): React.ReactElement {
             // Update local state so dropdown locks immediately
             setChats((prev) =>
               prev.map((c) =>
-                c.id === chatId ? { ...c, flow_name: selectedFlowName } : c
+                c.id === chatId ? { ...c, flow_name: sendFlowName } : c
               )
             );
           }
@@ -350,7 +351,7 @@ function Chat(): React.ReactElement {
         streamControllerRef.current = null;
         setIsSending(false);
       },
-      selectedFlowName || undefined
+      sendFlowName || undefined
     );
 
     streamControllerRef.current = streamController;
@@ -377,9 +378,12 @@ function Chat(): React.ReactElement {
   };
 
   // Derived state for flow availability
+  // Use the chat's locked flow_name as the source of truth when locked,
+  // to avoid race conditions where loadFlows overwrites selectedFlowName.
   const selectedChat = chats.find((c) => c.id === selectedChatId);
   const isFlowLocked = !!selectedChat?.flow_name;
-  const isFlowAvailable = !!selectedFlowName && flows.some((f) => f.name === selectedFlowName);
+  const effectiveFlowName = isFlowLocked ? selectedChat.flow_name : selectedFlowName;
+  const isFlowAvailable = !!effectiveFlowName && flows.some((f) => f.name === effectiveFlowName);
 
   // Build conversations for the drawer
   const conversations: Conversation[] = chats.map((chat) => ({
@@ -439,7 +443,7 @@ function Chat(): React.ReactElement {
                         isExpanded={isFlowMenuOpen}
                         isDisabled={flows.length === 0 || isFlowLocked}
                       >
-                        {selectedFlowName || 'Select Flow'}
+                        {effectiveFlowName || 'Select Flow'}
                       </MenuToggle>
                     )}
                   >
@@ -528,7 +532,7 @@ function Chat(): React.ReactElement {
                 {isFlowLocked && !isFlowAvailable && (
                   <Alert
                     variant="warning"
-                    title={`This chat is locked to "${selectedFlowName}" which is no longer available.`}
+                    title={`This chat is locked to "${effectiveFlowName}" which is no longer available.`}
                     isInline
                     isPlain
                   />
