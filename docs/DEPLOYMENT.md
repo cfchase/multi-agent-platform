@@ -26,6 +26,7 @@ make deploy                    # Deploy to dev environment
 make deploy-prod               # Deploy to prod environment
 make undeploy                  # Remove dev deployment
 make undeploy-prod             # Remove prod deployment
+make verify-deploy             # Check deployment health
 
 # Database in cluster
 make db-init-cluster           # Run migrations + seed data
@@ -93,6 +94,12 @@ make push-prod  # Uses TAG=prod
 ### Directory Structure
 
 ```
+config/
+├── local/                          # Local development configs
+│   └── .env.*.example             # Per-service config templates
+├── dev/                            # Cluster deployment configs
+│   └── .env.*.example             # Per-service config templates
+│
 k8s/
 ├── app/                            # Deep Research app (Kustomize)
 │   ├── base/
@@ -121,18 +128,21 @@ helm/
 │   ├── values-dev.yaml
 │   └── secrets-dev.yaml            # Auto-generated (gitignored)
 ├── langflow/                       # LangFlow Helm values
-│   └── values-dev.yaml
+│   ├── values-dev.yaml
+│   └── post-renderer/              # Kustomize post-renderer for OAuth sidecar
 └── mlflow/                         # MLFlow Helm values
     └── values-dev.yaml
 │
-scripts/
-├── deploy.sh                       # Full deployment orchestrator
-├── deploy-db.sh                    # PostgreSQL deployment
-├── deploy-app.sh                   # App deployment
-├── deploy-langflow.sh              # LangFlow Helm deployment
-├── deploy-mlflow.sh                # MLFlow Helm deployment
-├── deploy-langfuse.sh              # Langfuse Helm deployment
-└── undeploy.sh                     # Full cleanup
+scripts/                               # Called via make targets (not directly)
+├── generate-config.sh              # make config-setup
+├── verify-deployment.sh            # make verify-deploy
+├── deploy.sh                       # make deploy
+├── deploy-db.sh                    # make deploy-db
+├── deploy-app.sh                   # make deploy-app
+├── deploy-langflow.sh              # make deploy-langflow
+├── deploy-mlflow.sh                # make deploy-mlflow
+├── deploy-langfuse.sh              # make deploy-langfuse
+└── undeploy.sh                     # make undeploy
 ```
 
 ### Architecture
@@ -147,30 +157,30 @@ The application uses a **consolidated pod deployment** with multiple containers:
                                │
                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                           App Pod                                 │
+│                           App Pod                                │
 │  ┌────────────────┐                                              │
-│  │  OAuth2 Proxy  │◄── All external requests enter here         │
+│  │  OAuth2 Proxy  │◄── All external requests enter here          │
 │  │  (Port 4180)   │                                              │
 │  │                │    - Authenticates users                     │
 │  │  ENTRY POINT   │    - Sets X-Forwarded-User headers           │
 │  └───────┬────────┘    - Redirects to OAuth provider             │
-│          │                                                        │
-│          ▼                                                        │
+│          │                                                       │
+│          ▼                                                       │
 │  ┌────────────────┐                                              │
 │  │    Frontend    │    - Serves React static files               │
 │  │  (Port 8080)   │    - Proxies /api/* to backend               │
 │  │                │                                              │
 │  │  Nginx Proxy   │                                              │
 │  └───────┬────────┘                                              │
-│          │                                                        │
-│          ▼                                                        │
+│          │                                                       │
+│          ▼                                                       │
 │  ┌────────────────┐                                              │
 │  │    Backend     │    - FastAPI application                     │
 │  │  (Port 8000)   │    - GraphQL + REST APIs                     │
 │  │                │    - Admin panel                             │
-│  │ INTERNAL ONLY  │◄── Cluster-internal, NOT directly exposed   │
+│  │ INTERNAL ONLY  │◄── Cluster-internal, NOT directly exposed    │
 │  └────────────────┘                                              │
-│                                                                   │
+│                                                                  │
 │  Init Container: db-migration (runs alembic upgrade head)        │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -205,13 +215,13 @@ The application uses a **consolidated pod deployment** with multiple containers:
 
 **CRITICAL**: Before deploying, you must create the OAuth2 proxy secret file.
 
-1. **Copy the example file:**
+1. **Generate config files from templates:**
    ```bash
-   # For development
-   cp k8s/overlays/dev/oauth-proxy-secret.env.example k8s/overlays/dev/oauth-proxy-secret.env
+   # For development (generates all config/dev/ files)
+   make config-setup
 
-   # For production
-   cp k8s/overlays/prod/oauth-proxy-secret.env.example k8s/overlays/prod/oauth-proxy-secret.env
+   # Or manually copy the OAuth proxy config:
+   cp config/dev/.env.oauth-proxy.example config/dev/.env.oauth-proxy
    ```
 
 2. **Generate a cookie secret:**
@@ -219,15 +229,15 @@ The application uses a **consolidated pod deployment** with multiple containers:
    openssl rand -base64 32 | tr -- '+/' '-_'
    ```
 
-3. **Edit the secret file with your OAuth provider credentials:**
+3. **Edit the config file with your OAuth provider credentials:**
    ```bash
-   # oauth-proxy-secret.env
+   # config/dev/.env.oauth-proxy
    client-id=your-oauth-client-id
    client-secret=your-oauth-client-secret
    cookie-secret=<generated-cookie-secret>
    ```
 
-4. **The secret file is gitignored** - never commit OAuth secrets!
+4. **The config file is gitignored** - never commit OAuth secrets!
 
 See [AUTHENTICATION.md](AUTHENTICATION.md) for OAuth provider configuration details.
 
@@ -235,12 +245,17 @@ See [AUTHENTICATION.md](AUTHENTICATION.md) for OAuth provider configuration deta
 
 ```bash
 # Preview manifests
-make kustomize       # Dev environment
-make kustomize-prod  # Prod environment
+make kustomize-app       # Preview app manifests
+make kustomize-postgres  # Preview postgres manifests
+make kustomize-langflow  # Preview langflow manifests
+make kustomize-mlflow    # Preview mlflow manifests
 
 # Apply to cluster
 make deploy          # Dev environment
 make deploy-prod     # Prod environment
+
+# Verify deployment health
+make verify-deploy
 
 # Remove deployment
 make undeploy
@@ -253,9 +268,9 @@ The deployment includes three AI/ML services, all deployed via Helm:
 
 | Service | Purpose | Authentication | Helm Chart |
 |---------|---------|----------------|------------|
-| **LangFlow** | Visual workflow builder | Shared admin credentials | `langflow/langflow-ide` |
+| **LangFlow** | Visual workflow builder | OpenShift OAuth (SAR-based) | `langflow/langflow-ide` |
 | **Langfuse** | LLM observability | Built-in email/password | `langfuse/langfuse` |
-| **MLFlow** | Experiment tracking | Shared admin credentials (HTTP Basic) | `community-charts/mlflow` |
+| **MLFlow** | Experiment tracking | OpenShift OAuth (SAR-based) | `community-charts/mlflow` |
 
 ### Deployment
 
@@ -297,18 +312,38 @@ All AI/ML services are deployed via Helm and share the PostgreSQL database.
 **LangFlow** (`langflow/langflow-ide`)
 - StatefulSet deployment with frontend + backend
 - Uses shared PostgreSQL for metadata
-- Admin credentials from `admin-credentials` secret
+- External access via OpenShift OAuth proxy sidecar (SAR: namespace pods update)
+- Internal backend access via `langflow-service-backend:7860` bypasses OAuth
 
 **MLFlow** (`community-charts/mlflow`)
 - Deployment with PostgreSQL backend store
-- HTTP Basic authentication enabled
-- Admin credentials from `admin-credentials` secret
+- External access via OpenShift OAuth proxy sidecar (SAR: namespace pods update)
+- Internal backend access via `mlflow:5000` bypasses OAuth
 
 **Langfuse** (`langfuse/langfuse`)
 - Includes Redis, ClickHouse, Zookeeper subcharts
 - Uses shared PostgreSQL for application data
 - Built-in authentication (email/password signup)
 - Secrets auto-generated on first deploy
+
+### Supporting Services OAuth Architecture
+
+Langflow and MLflow are protected by OpenShift OAuth proxy sidecars that enforce namespace-scoped access control.
+
+**Access Pattern:**
+- External access (via Route) goes through OAuth proxy on port 4180
+- Internal access (via ClusterIP Service) bypasses OAuth entirely
+- SAR rule: `{"namespace":"<namespace>","resource":"pods","verb":"update"}` restricts access to namespace admins
+
+**Dual Service Pattern:**
+Each protected service has two Kubernetes Services:
+- Internal: `langflow-service-backend:7860` / `mlflow:5000` (direct access, no auth)
+- External: `langflow-external:4180` / `mlflow-external:4180` (OAuth proxy, Route points here)
+
+**Shared Resources:**
+- ServiceAccount: `supporting-services-proxy` (shared by all OAuth-protected services)
+- Session Secret: `supporting-services-proxy-session` (preserves sessions across redeploys)
+- OAuth redirect annotations on ServiceAccount for route-based callback URLs
 
 ### Individual Component Deployment
 

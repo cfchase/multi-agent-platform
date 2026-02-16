@@ -14,13 +14,20 @@ source "$SCRIPT_DIR/lib/common.sh"
 init_container_tool || exit 1
 
 # Configuration
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+
+# Load config from centralized config directory
+POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
+if [ -f "$POSTGRES_CONFIG" ]; then
+    set -a; source "$POSTGRES_CONFIG"; set +a
+fi
+
 POSTGRES_VERSION="${POSTGRES_VERSION:-15-alpine}"
 CONTAINER_NAME="app-postgres-dev"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${POSTGRES_USER:-app}"
 DB_PASS="${POSTGRES_PASSWORD:-changethis}"
 DB_NAME="${POSTGRES_DB:-app}"
-PROJECT_ROOT="${SCRIPT_DIR}/.."
 DATA_DIR="${PROJECT_ROOT}/.local/postgres"
 
 # Additional databases for supporting services

@@ -1,10 +1,11 @@
 # Kubernetes/OpenShift Deployment Targets
 
 .PHONY: kustomize-app kustomize-postgres kustomize-langflow kustomize-mlflow
-.PHONY: deploy deploy-prod undeploy undeploy-prod
+.PHONY: deploy deploy-prod undeploy undeploy-prod verify-deploy
 .PHONY: deploy-db deploy-app deploy-langflow deploy-mlflow deploy-langfuse
 .PHONY: generate-k8s-secrets generate-k8s-secrets-dev generate-k8s-secrets-prod
 .PHONY: generate-langfuse-secrets-dev generate-admin-secret-dev get-admin-credentials
+.PHONY: config-setup config-reset
 
 # Generate K8s secrets from backend/.env (if they don't exist)
 generate-k8s-secrets-dev:
@@ -54,7 +55,7 @@ get-admin-credentials: ## Show admin credentials and URLs for LangFlow/Langfuse/
 	@echo "========================================"
 	@APPS_DOMAIN=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || echo ""); \
 	if [ -n "$$APPS_DOMAIN" ]; then \
-		echo "Platform:      https://multi-agent-platform-route-multi-agent-platform-dev.$$APPS_DOMAIN"; \
+		echo "Platform:      https://multi-agent-platform-multi-agent-platform-dev.$$APPS_DOMAIN"; \
 		echo "LangFlow:      https://langflow-multi-agent-platform-dev.$$APPS_DOMAIN"; \
 		echo "Langfuse:      https://langfuse-multi-agent-platform-dev.$$APPS_DOMAIN"; \
 		echo "MLFlow:        https://mlflow-multi-agent-platform-dev.$$APPS_DOMAIN"; \
@@ -66,6 +67,14 @@ get-admin-credentials: ## Show admin credentials and URLs for LangFlow/Langfuse/
 # Generate Langfuse Helm secrets (if they don't exist)
 generate-langfuse-secrets-dev:
 	@./scripts/generate-langfuse-secrets.sh
+
+# Config setup and reset
+config-setup: ## Generate cluster config from examples (skips existing files)
+	@./scripts/generate-config.sh dev
+
+config-reset: ## Delete and regenerate all cluster config (use when moving to a new cluster)
+	@./scripts/generate-config.sh reset dev
+	@./scripts/generate-config.sh dev
 
 # Individual component deployment targets
 deploy-db: ## Deploy PostgreSQL database only
@@ -97,7 +106,7 @@ kustomize-mlflow: ## Preview mlflow deployment manifests
 	kustomize build k8s/mlflow/overlays/dev
 
 # Full deployment targets
-deploy: generate-admin-secret-dev ## Deploy all components to development environment
+deploy: ## Deploy all components to development environment
 	@./scripts/deploy.sh dev
 	@echo ""
 	@$(MAKE) get-admin-credentials
@@ -105,8 +114,11 @@ deploy: generate-admin-secret-dev ## Deploy all components to development enviro
 deploy-prod: ## Deploy all components to production environment
 	@./scripts/deploy.sh prod
 
-undeploy: ## Remove all development deployments
-	@./scripts/undeploy.sh dev
+undeploy: ## Remove all development deployments (use CLEAN=1 to also delete PVCs and namespace)
+	@./scripts/undeploy.sh dev $(if $(CLEAN),--clean)
 
-undeploy-prod: ## Remove all production deployments
-	@./scripts/undeploy.sh prod
+undeploy-prod: ## Remove all production deployments (use CLEAN=1 to also delete PVCs and namespace)
+	@./scripts/undeploy.sh prod $(if $(CLEAN),--clean)
+
+verify-deploy: ## Verify deployment health (pod status, routes, secrets)
+	@./scripts/verify-deployment.sh dev

@@ -20,6 +20,12 @@ LANGFLOW_PORT="${LANGFLOW_PORT:-7860}"
 PROJECT_ROOT="${SCRIPT_DIR}/.."
 DATA_DIR="${PROJECT_ROOT}/.local/langflow"
 
+# Load PostgreSQL config from centralized config directory
+POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
+if [ -f "$POSTGRES_CONFIG" ]; then
+    set -a; source "$POSTGRES_CONFIG"; set +a
+fi
+
 # Database connection (connects to shared PostgreSQL)
 DB_USER="${POSTGRES_USER:-app}"
 DB_PASS="${POSTGRES_PASSWORD:-changethis}"
@@ -41,10 +47,9 @@ DB_HOST=$(get_db_host)
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
 # Load LangFlow-specific env vars (API keys for global variables, etc.)
-if [ -f "$PROJECT_ROOT/config/langflow.env" ]; then
-    set -a  # automatically export all variables
-    source "$PROJECT_ROOT/config/langflow.env"
-    set +a
+LANGFLOW_CONFIG="$PROJECT_ROOT/config/local/.env.langflow"
+if [ -f "$LANGFLOW_CONFIG" ]; then
+    set -a; source "$LANGFLOW_CONFIG"; set +a
 fi
 
 case "$1" in

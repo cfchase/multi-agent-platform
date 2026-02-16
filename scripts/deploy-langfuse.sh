@@ -55,12 +55,10 @@ if ! oc get secret admin-credentials -n "$NAMESPACE" &> /dev/null; then
     exit 1
 fi
 
-# Generate secrets file if it doesn't exist
+# Always regenerate secrets from source of truth (config/dev/.env.langfuse)
 SECRETS_FILE="$PROJECT_ROOT/helm/langfuse/secrets-${ENVIRONMENT}.yaml"
-if [[ ! -f "$SECRETS_FILE" ]]; then
-    echo "Generating Langfuse secrets..."
-    "$SCRIPT_DIR/generate-langfuse-secrets.sh"
-fi
+echo "Generating Langfuse secrets..."
+"$SCRIPT_DIR/generate-config.sh" helm-langfuse --force
 
 # Check secrets file exists
 if [[ ! -f "$SECRETS_FILE" ]]; then
@@ -86,50 +84,20 @@ oc exec -n "$NAMESPACE" deploy/postgres -- psql -U app -d postgres -tc \
     oc exec -n "$NAMESPACE" deploy/postgres -- psql -U app -d postgres -c \
     "CREATE DATABASE langfuse;" 2>/dev/null || echo "Database may already exist"
 
-# Install or upgrade Langfuse
+# Render and apply Langfuse manifests
 RELEASE_NAME="langfuse"
-if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
-    echo "Upgrading Langfuse..."
-    helm upgrade "$RELEASE_NAME" langfuse/langfuse \
-        --namespace "$NAMESPACE" \
-        -f "$VALUES_FILE" \
-        -f "$SECRETS_FILE"
-else
-    echo "Installing Langfuse..."
-    helm install "$RELEASE_NAME" langfuse/langfuse \
-        --namespace "$NAMESPACE" \
-        --create-namespace \
-        -f "$VALUES_FILE" \
-        -f "$SECRETS_FILE"
-fi
+echo "Rendering and applying Langfuse manifests..."
+helm template "$RELEASE_NAME" langfuse/langfuse \
+    --namespace "$NAMESPACE" \
+    --version 1.5.19 \
+    -f "$VALUES_FILE" \
+    -f "$SECRETS_FILE" \
+    | oc apply -n "$NAMESPACE" -f -
 
 # Create OpenShift route
 echo "Creating Langfuse route..."
 oc create route edge langfuse --service="${RELEASE_NAME}-web" --port=3000 -n "$NAMESPACE" 2>/dev/null || \
     echo "Route already exists"
-
-# Create langfuse-credentials secret for app consumption (if it doesn't exist)
-echo "Creating langfuse-credentials secret for app..."
-if ! oc get secret langfuse-credentials -n "$NAMESPACE" &> /dev/null; then
-    # Get the route URL for external access
-    ROUTE_URL=$(oc get route langfuse -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
-
-    # Note: For proper API key generation, you'd need to call Langfuse API after it's running
-    # For now, we set the internal URL - API keys need to be created via Langfuse UI
-    oc create secret generic langfuse-credentials \
-        --from-literal=LANGFUSE_HOST="http://${RELEASE_NAME}-web:3000" \
-        -n "$NAMESPACE"
-    echo "Created langfuse-credentials secret"
-    echo ""
-    echo "NOTE: To get API keys for the app:"
-    echo "  1. Log into Langfuse UI"
-    echo "  2. Go to Settings > API Keys"
-    echo "  3. Create a new API key"
-    echo "  4. Update the secret:"
-    echo "     oc patch secret langfuse-credentials -n $NAMESPACE -p '{\"stringData\":{\"LANGFUSE_PUBLIC_KEY\":\"pk-...\",\"LANGFUSE_SECRET_KEY\":\"sk-...\"}}'"
-else
-    echo "langfuse-credentials secret already exists"
-fi
 
 # Wait for Langfuse to be ready
 echo "Waiting for Langfuse to be ready..."
@@ -151,5 +119,5 @@ echo "  make get-admin-credentials"
 echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=langfuse"
 echo ""
-echo "NOTE: Restart the app to pick up langfuse-credentials:"
-echo "  oc rollout restart deployment/multi-agent-platform -n $NAMESPACE"
+echo "NOTE: Backend reads Langfuse URL from backend-config secret."
+echo "  Ensure config/dev/.env.backend has LANGFUSE_HOST set correctly."

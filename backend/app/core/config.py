@@ -145,7 +145,7 @@ class Settings(BaseSettings):
     # Endpoints: {auth_url}/authorize, {auth_url}/token, {auth_url}/register
     DATAVERSE_CLIENT_ID: str | None = None  # NOT USED - dynamic registration
     DATAVERSE_CLIENT_SECRET: str | None = None  # NOT USED - public client (PKCE)
-    DATAVERSE_AUTH_URL: str | None = None  # OAuth server (e.g., https://mcp.dataverse.redhat.com/auth)
+    DATAVERSE_AUTH_URL: str | None = "https://mcp.dataverse.redhat.com/auth"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -1,0 +1,8 @@
+- op: replace
+  path: /spec/template/spec/securityContext
+  value:
+    runAsNonRoot: true
+- op: remove
+  path: /spec/template/spec/containers/0/securityContext/runAsUser
+- op: remove
+  path: /spec/template/spec/containers/0/securityContext/runAsGroup

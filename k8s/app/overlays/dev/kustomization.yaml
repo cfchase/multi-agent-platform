@@ -21,11 +21,17 @@ configMapGenerator:
   - name: oauth-proxy-config
     envs:
       - oauth-proxy.env
+  - name: oauth2-proxy-email-allowlist
+    files:
+      - allowed-emails.txt
 
 secretGenerator:
   - name: oauth-proxy-secret
     envs:
       - oauth-proxy-secret.env
+  - name: backend-config
+    envs:
+      - backend-config.env
 
 generatorOptions:
   disableNameSuffixHash: true

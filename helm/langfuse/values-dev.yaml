@@ -14,18 +14,18 @@ postgresql:
     secretKeys:
       userPasswordKey: "POSTGRES_PASSWORD"
 
-# Deploy Redis via subchart
+# Deploy Redis (valkey) via subchart
 redis:
   deploy: true
   architecture: standalone
   auth:
     enabled: true
     password: ""  # Set via secrets-dev.yaml
-  master:
+  primary:
     persistence:
       enabled: true
       size: 1Gi
-    # OpenShift compatibility
+    # OpenShift compatibility - let SCC assign UIDs
     podSecurityContext:
       enabled: false
     containerSecurityContext:
@@ -42,13 +42,23 @@ clickhouse:
   persistence:
     enabled: true
     size: 10Gi
-  # OpenShift compatibility
+  # OpenShift compatibility - let SCC assign UIDs
   podSecurityContext:
     enabled: false
   containerSecurityContext:
     enabled: false
+  # Zookeeper sub-dependency also needs SCC overrides
+  zookeeper:
+    podSecurityContext:
+      enabled: false
+    containerSecurityContext:
+      enabled: false
+    containerSecurityContexts:
+      default:
+        enabled: false
 
 # Deploy MinIO via subchart for S3-compatible storage
+# Note: subchart alias is "s3" (not "minio"), so all minio chart values go under s3:
 s3:
   deploy: true
   bucket: "langfuse"
@@ -58,14 +68,11 @@ s3:
     value: ""  # Set via secrets-dev.yaml
   secretAccessKey:
     value: ""  # Set via secrets-dev.yaml
-
-minio:
-  enabled: true
   mode: standalone
   persistence:
     enabled: true
     size: 5Gi
-  # OpenShift compatibility
+  # OpenShift compatibility - let SCC assign UIDs
   podSecurityContext:
     enabled: false
   containerSecurityContext:

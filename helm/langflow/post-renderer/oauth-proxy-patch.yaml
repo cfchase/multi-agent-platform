@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langflow-service
+spec:
+  template:
+    spec:
+      serviceAccountName: supporting-services-proxy
+      containers:
+        - name: langflow-ide
+          env:
+            - name: XDG_CACHE_HOME
+              value: "/tmp/.cache"
+            - name: MEM0_DIR
+              value: "/tmp/.mem0"
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.17
+          imagePullPolicy: IfNotPresent
+          args:
+            - -provider=openshift
+            - -http-address=:4180
+            - -https-address=
+            - -email-domain=*
+            - -upstream=http://langflow-service:8080
+            - -cookie-secure=false
+            - -cookie-secret-file=/etc/proxy/secrets/session_secret
+            - -openshift-service-account=supporting-services-proxy
+            - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            - -openshift-sar={"namespace":"NAMESPACE_PLACEHOLDER","resource":"pods","verb":"update"}
+          ports:
+            - name: oauth-proxy
+              containerPort: 4180
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/proxy/secrets
+              name: proxy-session-secret
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+      volumes:
+        - name: proxy-session-secret
+          secret:
+            secretName: supporting-services-proxy-session

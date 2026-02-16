@@ -6,10 +6,26 @@ metadata:
     app: mlflow
 spec:
   selector:
-    app: mlflow
+    app.kubernetes.io/instance: mlflow
   ports:
   - name: http
     port: 5000
     targetPort: 5000
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-external
+  labels:
+    app: mlflow
+spec:
+  selector:
+    app.kubernetes.io/instance: mlflow
+  ports:
+  - name: proxy
+    port: 4180
+    targetPort: oauth-proxy
     protocol: TCP
   type: ClusterIP

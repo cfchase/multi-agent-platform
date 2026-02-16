@@ -20,10 +20,9 @@ cd multi-agent-platform
 # 2. Install all dependencies
 make setup
 
-# 3. Configure environment
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# Edit backend/.env: set ENVIRONMENT=local to bypass OAuth
+# 3. Configure environment (copies from config/local/)
+make env-setup
+# Edit config/local/.env.backend: set ENVIRONMENT=local to bypass OAuth
 
 # 4. Start PostgreSQL database
 make db-start
@@ -112,22 +111,28 @@ git status
 
 ### Environment Files
 
+Configuration templates live in `config/local/` (source of truth):
+
 ```
-backend/.env          # Backend configuration
-frontend/.env         # Frontend configuration
+config/local/.env.backend.example    # Backend configuration template
+config/local/.env.frontend.example   # Frontend configuration template
+config/local/.env.langflow.example   # Langflow configuration template
+config/local/.env.langfuse.example   # Langfuse configuration template
+config/local/.env.mlflow.example     # MLflow configuration template
+config/local/.env.oauth-proxy.example # OAuth proxy configuration template
+config/local/.env.postgres.example   # PostgreSQL configuration template
 ```
 
 Copy from examples:
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+make env-setup   # Copies config/local/.env.*.example to service directories
 ```
 
 ### Authentication Modes
 
 **Local Mode (recommended for development):**
 ```bash
-# In backend/.env
+# In config/local/.env.backend (or backend/.env after env-setup)
 ENVIRONMENT=local
 ```
 - No OAuth required
@@ -136,10 +141,12 @@ ENVIRONMENT=local
 
 **OAuth Mode (production-like):**
 ```bash
-# In backend/.env
+# In config/local/.env.backend (or backend/.env after env-setup)
 ENVIRONMENT=development
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
+
+# In config/local/.env.oauth-proxy
+OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+OAUTH_CLIENT_SECRET=your-client-secret
 OAUTH_COOKIE_SECRET=generate-a-random-key
 ```
 - Requires Google OAuth credentials
@@ -148,7 +155,7 @@ OAUTH_COOKIE_SECRET=generate-a-random-key
 
 ### Key Variables
 
-**Backend (`backend/.env`):**
+**Backend (`config/local/.env.backend`):**
 ```bash
 ENVIRONMENT=local              # local (no auth) or development (OAuth)
 POSTGRES_SERVER=localhost
@@ -158,7 +165,7 @@ POSTGRES_DB=app
 POSTGRES_PORT=5432
 ```
 
-**Frontend (`frontend/.env`):**
+**Frontend (`config/local/.env.frontend`):**
 ```bash
 VITE_API_URL=/api  # Proxy handled by Vite
 ```
@@ -222,7 +229,7 @@ make mlflow-stop
 - Configure flows for the Chat feature via environment variables:
 
 ```bash
-# In backend/.env for mock mode (no Langflow required):
+# In config/local/.env.backend for mock mode (no Langflow required):
 LANGFLOW_URL=mock
 
 # For local Langflow:
@@ -351,7 +358,7 @@ curl http://localhost:8000/api/v1/utils/health-check
 # (visible in terminal running `make dev-backend`)
 
 # Verify .env configuration
-cat backend/.env
+cat config/local/.env.backend
 ```
 
 ### Frontend Issues
