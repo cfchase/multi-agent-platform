@@ -15,6 +15,10 @@ spec:
         app: multi-agent-platform
     spec:
       serviceAccountName: multi-agent-platform-proxy
+      volumes:
+      - name: email-allowlist
+        configMap:
+          name: oauth2-proxy-email-allowlist
       initContainers:
       - name: db-migration
         image: quay.io/cfchase/multi-agent-platform-backend:latest
@@ -74,22 +78,13 @@ spec:
         env:
         - name: PORT
           value: "8000"
-        - name: ENVIRONMENT
-          value: "production"
         envFrom:
         # Required - database connection
         - secretRef:
             name: postgres-secret
-        # Optional - AI/ML component credentials (presence of values = enabled)
+        # Required - backend configuration (environment, security keys, service URLs)
         - secretRef:
-            name: langfuse-credentials
-            optional: true
-        - secretRef:
-            name: langflow-credentials
-            optional: true
-        - secretRef:
-            name: mlflow-credentials
-            optional: true
+            name: backend-config
         resources:
           requests:
             memory: "128Mi"
@@ -140,6 +135,10 @@ spec:
         envFrom:
         - configMapRef:
             name: oauth-proxy-config
+        volumeMounts:
+        - name: email-allowlist
+          mountPath: /etc/oauth2-proxy/email-allowlist
+          readOnly: true
         livenessProbe:
           tcpSocket:
             port: 4180

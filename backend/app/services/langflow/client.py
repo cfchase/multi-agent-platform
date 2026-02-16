@@ -124,7 +124,7 @@ class LangflowClient:
             "Content-Type": "application/json",
         }
         if self.api_key:
-            self.headers["Authorization"] = f"Bearer {self.api_key}"
+            self.headers["x-api-key"] = self.api_key
 
     async def get_flow_id_by_name(self, name: str) -> str | None:
         """

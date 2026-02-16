@@ -67,15 +67,35 @@ dev-backend-2: ## Run second backend instance (port 8001)
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 # Environment Setup
-env-setup: ## Copy environment example files (backend/.env is source of truth)
-	@echo "Setting up environment files..."
-	@if [ ! -f backend/.env ]; then cp backend/.env.example backend/.env; echo "Created backend/.env"; fi
-	@if [ ! -f frontend/.env ]; then cp frontend/.env.example frontend/.env; echo "Created frontend/.env"; fi
+env-setup: ## Copy config example files for local development
+	@echo "Setting up environment files from config/local/..."
+	@for example in config/local/.env.*.example; do \
+		actual=$${example%.example}; \
+		if [ ! -f "$$actual" ]; then \
+			cp "$$example" "$$actual"; \
+			echo "  Created $$(basename $$actual)"; \
+		fi; \
+	done
+	@if [ ! -f config/local/flow-sources.yaml ]; then \
+		cp config/local/flow-sources.yaml.example config/local/flow-sources.yaml; \
+		echo "  Created flow-sources.yaml"; \
+	fi
 	@echo ""
-	@echo "Edit backend/.env to configure:"
-	@echo "  - Database credentials"
-	@echo "  - OAuth credentials (OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET)"
-	@echo "  - Set ENVIRONMENT=local to bypass OAuth"
+	@echo "Copying component configs..."
+	@if [ ! -f backend/.env ]; then \
+		cp config/local/.env.backend backend/.env 2>/dev/null || true; \
+		echo "  Created backend/.env"; \
+	fi
+	@if [ ! -f frontend/.env ]; then \
+		cp config/local/.env.frontend frontend/.env 2>/dev/null || true; \
+		echo "  Created frontend/.env"; \
+	fi
+	@echo ""
+	@echo "Config files are in config/local/. Edit them to configure:"
+	@echo "  .env.backend   - Database, OAuth, Langflow settings"
+	@echo "  .env.postgres  - Database credentials"
+	@echo "  .env.langflow  - LLM API keys for Langflow"
+	@echo "  .env.langfuse  - Langfuse service credentials"
 
 # Version Management
 sync-version: ## Sync VERSION to pyproject.toml and package.json

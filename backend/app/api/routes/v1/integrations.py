@@ -17,7 +17,6 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
-from app.core.config import settings
 from app.crud.integration import (
     create_or_update_integration,
     delete_integration,
@@ -183,7 +182,8 @@ async def start_oauth_flow(
     For providers that use dynamic client registration (e.g., Dataverse),
     a new client is registered before starting the OAuth flow.
     """
-    # Build the callback URL
+    # Build the callback URL from the incoming request
+    # Requires --proxy-headers on uvicorn and X-Forwarded-Proto from nginx
     base_url = str(request.base_url).rstrip("/")
     redirect_uri = f"{base_url}/api/v1/integrations/oauth/callback/{service}"
 
@@ -230,12 +230,13 @@ async def start_oauth_flow(
 
 
 def _build_settings_redirect(
+    request: Request,
     success: bool = True,
     service: str | None = None,
     error_message: str | None = None,
 ) -> RedirectResponse:
     """Build redirect URL to frontend settings page with status."""
-    base_url = settings.FRONTEND_HOST.rstrip("/")
+    base_url = str(request.base_url).rstrip("/")
     redirect_url = f"{base_url}/settings/integrations"
 
     # Add query params for status feedback
@@ -254,6 +255,7 @@ def _build_settings_redirect(
 @router.get("/oauth/callback/{service}")
 async def oauth_callback(
     service: str,
+    request: Request,
     session: SessionDep,
     code: str | None = None,
     state: str | None = None,
@@ -274,18 +276,21 @@ async def oauth_callback(
     # Check for OAuth errors from provider
     if error:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message=f"OAuth error: {error}. {error_description or ''}",
         )
 
     if not code:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message="Missing authorization code",
         )
 
     if not state:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message="Missing state parameter",
         )
@@ -295,6 +300,7 @@ async def oauth_callback(
     state_data = consume_oauth_state_db(session=session, state=state)
     if state_data is None:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message="Invalid or expired state parameter",
         )
@@ -302,6 +308,7 @@ async def oauth_callback(
     # Verify service matches
     if state_data.service_name != service:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message="Service mismatch in callback",
         )
@@ -318,6 +325,7 @@ async def oauth_callback(
         )
     except OAuthTokenError as e:
         return _build_settings_redirect(
+            request,
             success=False,
             error_message=f"Token exchange failed: {e.error}",
         )
@@ -336,7 +344,7 @@ async def oauth_callback(
     )
 
     # Redirect back to settings page with success indicator
-    return _build_settings_redirect(success=True, service=service)
+    return _build_settings_redirect(request, success=True, service=service)
 
 
 @router.delete("/{service}", response_model=MessageResponse)

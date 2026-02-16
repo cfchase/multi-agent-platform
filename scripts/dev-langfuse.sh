@@ -15,10 +15,21 @@ source "$SCRIPT_DIR/lib/common.sh"
 init_container_tool || exit 1
 
 # Configuration
+PROJECT_ROOT="${SCRIPT_DIR}/.."
+
+# Load config from centralized config directory
+LANGFUSE_CONFIG="$PROJECT_ROOT/config/local/.env.langfuse"
+if [ -f "$LANGFUSE_CONFIG" ]; then
+    set -a; source "$LANGFUSE_CONFIG"; set +a
+fi
+POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
+if [ -f "$POSTGRES_CONFIG" ]; then
+    set -a; source "$POSTGRES_CONFIG"; set +a
+fi
+
 LANGFUSE_VERSION="${LANGFUSE_VERSION:-3}"
 LANGFUSE_WEB_PORT="${LANGFUSE_WEB_PORT:-3000}"
 LANGFUSE_WORKER_PORT="${LANGFUSE_WORKER_PORT:-3030}"
-PROJECT_ROOT="${SCRIPT_DIR}/.."
 DATA_DIR="${PROJECT_ROOT}/.local/langfuse"
 
 # Container names

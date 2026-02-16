@@ -4,7 +4,7 @@
 # Runs oauth2-proxy locally for testing OAuth authentication flow
 # Supports Google OAuth (default) or OIDC providers (Keycloak, Okta, etc.)
 #
-# Requires OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET in backend/.env
+# Requires OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET in config/local/.env.oauth-proxy
 
 set -e
 
@@ -20,13 +20,10 @@ OAUTH_PROXY_CONTAINER="app-oauth-proxy-dev"
 OAUTH_PORT="${OAUTH_PORT:-4180}"
 OAUTH_PROXY_IMAGE="quay.io/oauth2-proxy/oauth2-proxy:v7.6.0"
 
-# Load OAuth config from backend/.env
-ENV_FILE="${SCRIPT_DIR}/../backend/.env"
-if [ -f "$ENV_FILE" ]; then
-    OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:-$(grep -E '^OAUTH_CLIENT_ID=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)}"
-    OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-$(grep -E '^OAUTH_CLIENT_SECRET=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)}"
-    OAUTH_ISSUER_URL="${OAUTH_ISSUER_URL:-$(grep -E '^OAUTH_ISSUER_URL=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)}"
-    OAUTH_COOKIE_SECRET="${OAUTH_COOKIE_SECRET:-$(grep -E '^OAUTH_COOKIE_SECRET=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' || true)}"
+# Load OAuth config from centralized config directory
+OAUTH_CONFIG="${SCRIPT_DIR}/../config/local/.env.oauth-proxy"
+if [ -f "$OAUTH_CONFIG" ]; then
+    set -a; source "$OAUTH_CONFIG"; set +a
 fi
 
 # Ensure cookie secret exists
@@ -59,7 +56,7 @@ is_oauth_configured() {
 start_oauth() {
     if ! is_oauth_configured; then
         log_warn "OAuth not configured - skipping OAuth2 Proxy"
-        log_info "To enable OAuth, set OAUTH_CLIENT_ID/SECRET in backend/.env"
+        log_info "To enable OAuth, set OAUTH_CLIENT_ID/SECRET in config/local/.env.oauth-proxy"
         log_info "Using ENVIRONMENT=local with dev-user for local development"
         return 0
     fi
@@ -141,13 +138,13 @@ show_help() {
     echo "Usage: $0 {start|stop|status|logs|help}"
     echo ""
     echo "Commands:"
-    echo "  start   Start OAuth2 Proxy (requires credentials in backend/.env)"
+    echo "  start   Start OAuth2 Proxy (requires credentials in config/local/.env.oauth-proxy)"
     echo "  stop    Stop OAuth2 Proxy"
     echo "  status  Check OAuth2 Proxy status"
     echo "  logs    Follow OAuth2 Proxy logs"
     echo "  help    Show this help message"
     echo ""
-    echo "Required environment variables in backend/.env:"
+    echo "Required environment variables in config/local/.env.oauth-proxy:"
     echo "  OAUTH_CLIENT_ID      OAuth Client ID"
     echo "  OAUTH_CLIENT_SECRET  OAuth Client Secret"
     echo ""

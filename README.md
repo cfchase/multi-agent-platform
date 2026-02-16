@@ -59,8 +59,7 @@ A platform for hosting and orchestrating multiple LangFlow workflows, built on R
 git clone https://github.com/cfchase/multi-agent-platform
 cd multi-agent-platform
 make setup
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+make env-setup              # Copy config from config/local/
 make services-start
 make db-seed  # optional: load sample data
 make dev
@@ -80,7 +79,7 @@ OAuth is always enabled. Access app at <http://localhost:4180>.
 - **No OAuth credentials**: Uses mock OAuth server (any username/password works)
 - **With OAuth credentials**: Uses configured provider (Google, GitHub, Keycloak)
 
-Configure OAuth in `backend/.env`:
+Configure OAuth in `config/local/.env.oauth-proxy` (local) or `config/dev/.env.oauth-proxy` (cluster):
 
 ```bash
 OAUTH_CLIENT_ID=your-client-id
@@ -92,18 +91,27 @@ For setup details, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 ### Deploy to OpenShift
 
-> **Important:** Configure OAuth credentials before deploying. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md#openshift-deployment).
+> **Prerequisites:** OpenShift CLI (`oc`), Helm 3, and valid cluster login.
+> Configure Google OAuth credentials before deploying. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 
 ```bash
-# Login to your cluster
+# 1. Login to your cluster
 oc login --server=https://your-cluster
 
-# Configure OAuth secret (required)
-cp k8s/app/overlays/dev/oauth-proxy-secret.env.example k8s/app/overlays/dev/oauth-proxy-secret.env
-# Edit with your OAuth credentials
+# 2. Set up deployment config (creates config/dev/ files, auto-generates secrets)
+make config-setup
 
-# Deploy everything
+# 3. Configure OAuth credentials (required)
+#    Edit config/dev/.env.oauth-proxy with your Google OAuth Client ID and Secret
+#    Edit config/dev/.env.backend with the same OAuth credentials
+#    Edit config/dev/allowed-emails.txt with authorized email addresses
+#    Edit config/dev/namespace-admins.txt with OpenShift usernames for admin access
+
+# 4. Deploy everything
 make deploy
+
+# 5. Verify deployment
+make verify-deploy
 ```
 
 This deploys PostgreSQL, LangFlow, MLFlow, Langfuse, and the Multi-Agent Platform app.
@@ -119,6 +127,9 @@ make get-admin-credentials
 # Full deployment
 make deploy              # Deploy all components
 make undeploy            # Remove all components
+
+# Verification
+make verify-deploy       # Check deployment health
 
 # Individual components
 make deploy-db           # PostgreSQL only
@@ -177,10 +188,10 @@ make langflow-import
 
 | Service | Access | Method | Credentials |
 |---------|--------|--------|-------------|
-| Multi-Agent Platform | Users | OAuth2 Proxy | Mock OAuth or configured provider |
-| LangFlow | Developers/Admins | Built-in auth | `admin-credentials` secret |
-| MLFlow | Developers/Admins | HTTP Basic | `admin-credentials` secret |
-| Langfuse | Developers/Admins | Email/Password | Self-registration |
+| Multi-Agent Platform | Users | Google OAuth | Configured OAuth provider |
+| LangFlow | Admins | OpenShift OAuth | OpenShift cluster credentials |
+| MLFlow | Admins | OpenShift OAuth | OpenShift cluster credentials |
+| Langfuse | Admins | Built-in auth | `admin-credentials` secret (`make get-admin-credentials`) |
 
 ## Technology Stack
 

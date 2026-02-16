@@ -15,12 +15,8 @@ labels:
 
 secretGenerator:
   - name: postgres-secret
-    literals:
-      - POSTGRES_USER=app
-      - POSTGRES_PASSWORD=changethis
-      - POSTGRES_DB=app
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_PORT=5432
+    envs:
+      - postgres-secret.env
 
 generatorOptions:
   disableNameSuffixHash: true

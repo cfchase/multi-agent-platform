@@ -1,15 +1,24 @@
 #!/bin/bash
 
 # Undeploy all components from OpenShift
-# Usage: ./scripts/undeploy.sh [environment] [namespace]
+# Usage: ./scripts/undeploy.sh [environment] [--clean]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$SCRIPT_DIR/lib/common.sh"
 
-ENVIRONMENT=${1:-dev}
-NAMESPACE=${2:-multi-agent-platform-${ENVIRONMENT}}
+# Parse args: extract --clean flag, positional args for environment
+CLEAN=false
+ENVIRONMENT="dev"
+for arg in "$@"; do
+    case "$arg" in
+        --clean) CLEAN=true ;;
+        *) ENVIRONMENT="$arg" ;;
+    esac
+done
+NAMESPACE="multi-agent-platform-${ENVIRONMENT}"
 
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "Error: Environment must be 'dev' or 'prod'"
@@ -36,30 +45,36 @@ if ! oc whoami &> /dev/null; then
 fi
 
 # Undeploy in reverse order
-echo "Step 1/5: Uninstalling Langfuse..."
+# Services are deployed via helm template | oc apply, so delete by label
+echo "Step 1/5: Removing Langfuse..."
 oc delete route langfuse -n "$NAMESPACE" 2>/dev/null || true
-helm uninstall langfuse -n "$NAMESPACE" 2>/dev/null || echo "Langfuse not installed"
-oc delete secret langfuse-credentials -n "$NAMESPACE" 2>/dev/null || true
+oc delete statefulset -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete all,configmap,secret,serviceaccount,role,rolebinding -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 echo ""
 
 echo "Step 2/5: Removing MLFlow..."
 oc delete route mlflow -n "$NAMESPACE" 2>/dev/null || true
-helm uninstall mlflow -n "$NAMESPACE" 2>/dev/null || echo "MLFlow not installed via Helm"
-# Fallback: Try Kustomize if Helm not used
+oc delete service mlflow-external -n "$NAMESPACE" 2>/dev/null || true
+oc delete all,configmap,secret,serviceaccount -l app.kubernetes.io/instance=mlflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 oc delete -k "$PROJECT_ROOT/k8s/mlflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete secret mlflow-credentials mlflow-db-secret -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
 echo "Step 3/5: Removing LangFlow..."
 oc delete route langflow -n "$NAMESPACE" 2>/dev/null || true
-helm uninstall langflow -n "$NAMESPACE" 2>/dev/null || echo "LangFlow not installed via Helm"
-# Fallback: Try Kustomize if Helm not used
+oc delete service langflow-external -n "$NAMESPACE" 2>/dev/null || true
+oc delete statefulset -l release=langflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete all,configmap,secret,serviceaccount -l release=langflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 oc delete -k "$PROJECT_ROOT/k8s/langflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete secret langflow-credentials -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
 echo "Step 4/5: Removing Multi-Agent Platform App..."
 oc delete -k "$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete secret backend-config -n "$NAMESPACE" 2>/dev/null || true
+echo ""
+
+echo "Removing shared OAuth resources..."
+oc delete sa supporting-services-proxy -n "$NAMESPACE" 2>/dev/null || true
+oc delete secret supporting-services-proxy-session -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
 echo "Step 5/5: Removing PostgreSQL..."
@@ -70,9 +85,29 @@ echo ""
 echo "==================================="
 echo "All components removed!"
 echo "==================================="
-echo ""
-echo "Note: PVCs may still exist. To fully clean up:"
-echo "  oc delete pvc --all -n $NAMESPACE"
-echo ""
-echo "To delete the namespace entirely:"
-echo "  oc delete namespace $NAMESPACE"
+
+# Clean mode: delete PVCs and namespace
+if [[ "$CLEAN" == "true" ]]; then
+    echo ""
+    echo "Waiting for pods to terminate..."
+    oc wait --for=delete pod --all -n "$NAMESPACE" --timeout=60s 2>/dev/null || true
+
+    echo "Cleaning up PVCs..."
+    oc delete pvc --all -n "$NAMESPACE" 2>/dev/null || true
+
+    GROUP_NAME="${NAMESPACE}-admins"
+    echo "Removing admin group $GROUP_NAME..."
+    oc delete group "$GROUP_NAME" 2>/dev/null || true
+
+    echo "Deleting namespace $NAMESPACE..."
+    oc delete namespace "$NAMESPACE" 2>/dev/null || true
+
+    echo ""
+    echo "Full cleanup complete (PVCs, admin group, and namespace deleted)"
+else
+    echo ""
+    echo "Note: PVCs still exist. To fully clean up:"
+    echo "  oc delete pvc --all -n $NAMESPACE"
+    echo "  oc delete namespace $NAMESPACE"
+    echo "Or use: make undeploy-clean"
+fi

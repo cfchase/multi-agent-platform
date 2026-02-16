@@ -23,27 +23,27 @@ This application uses OAuth2 Proxy for authentication, enabling integration with
                                │
                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                           App Pod                                 │
+│                           App Pod                                │
 │  ┌────────────────┐                                              │
-│  │  OAuth2 Proxy  │◄── All external requests enter here         │
+│  │  OAuth2 Proxy  │◄── All external requests enter here          │
 │  │  (Port 4180)   │                                              │
 │  │                │    - Authenticates users                     │
 │  │  ENTRY POINT   │    - Sets X-Forwarded-User headers           │
 │  └───────┬────────┘    - Redirects to OAuth provider             │
-│          │                                                        │
-│          ▼                                                        │
+│          │                                                       │
+│          ▼                                                       │
 │  ┌────────────────┐                                              │
 │  │    Frontend    │    - Serves React static files               │
 │  │  (Port 8080)   │    - Proxies /api/* to backend               │
 │  │  Nginx Proxy   │                                              │
 │  └───────┬────────┘                                              │
-│          │                                                        │
-│          ▼                                                        │
+│          │                                                       │
+│          ▼                                                       │
 │  ┌────────────────┐                                              │
 │  │    Backend     │    - Reads X-Forwarded-User headers          │
 │  │  (Port 8000)   │    - Auto-creates users on first login       │
 │  │                │    - Trusts headers (internal only)          │
-│  │ INTERNAL ONLY  │◄── NOT directly accessible from outside     │
+│  │ INTERNAL ONLY  │◄── NOT directly accessible from outside      │
 │  └────────────────┘                                              │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -100,7 +100,7 @@ OAuth running - access app at: http://localhost:4180
 For quick UI development without OAuth overhead:
 
 ```bash
-# Edit backend/.env
+# Edit config/local/.env.backend (or backend/.env after make env-setup)
 ENVIRONMENT=local
 
 # Start the app (without services-start)
@@ -118,7 +118,7 @@ In local mode:
 
 ## Real OAuth Providers
 
-For testing with actual OAuth providers (Google, GitHub, Keycloak), configure credentials in `backend/.env`.
+For testing with actual OAuth providers (Google, GitHub, Keycloak), configure credentials in `config/local/.env.oauth-proxy` (local) or `config/dev/.env.oauth-proxy` (cluster).
 
 ### Environment Variables
 
@@ -200,13 +200,17 @@ Authorized redirect URIs:
 **Configure the Application:**
 
 ```bash
-# Edit backend/.env with your credentials
-cp backend/.env.example backend/.env
+# Set up environment from config/local/ templates
+make env-setup
 ```
 
-Add these values to `backend/.env`:
+Add these values to `config/local/.env.backend`:
 ```bash
 ENVIRONMENT=development
+```
+
+Add these values to `config/local/.env.oauth-proxy`:
+```bash
 OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 OAUTH_CLIENT_SECRET=your-client-secret
 # OAUTH_COOKIE_SECRET is auto-generated if not set
@@ -249,14 +253,15 @@ Authorized redirect URIs:
 **Configure the OAuth Secret:**
 
 ```bash
-# Copy the example file
-cp k8s/app/overlays/dev/oauth-proxy-secret.env.example \
-   k8s/app/overlays/dev/oauth-proxy-secret.env
+# Generate config files from templates
+make config-setup
 
+# Or manually copy:
+cp config/dev/.env.oauth-proxy.example config/dev/.env.oauth-proxy
 # Edit with your credentials
 ```
 
-Contents of `oauth-proxy-secret.env`:
+Contents of `config/dev/.env.oauth-proxy`:
 ```bash
 # Generate cookie secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
 cookie-secret=your-generated-cookie-secret
@@ -388,6 +393,45 @@ The GraphQL endpoint (`/api/graphql`) has built-in security:
 - Consider disabling GraphQL introspection for additional security
 - Monitor query complexity via logging middleware
 
+## OpenShift OAuth for Supporting Services
+
+Langflow and MLflow are protected by OpenShift OAuth proxy sidecars. This provides SSO via OpenShift credentials and namespace-scoped access control.
+
+### How It Works
+
+1. User accesses service via OpenShift Route (e.g., `https://langflow-<namespace>.apps.<cluster>`)
+2. OAuth proxy intercepts the request and redirects to OpenShift's built-in OAuth server
+3. User authenticates with their OpenShift credentials
+4. OAuth proxy performs a SubjectAccessReview (SAR) check
+5. If user has `pods update` permission in the namespace, access is granted
+
+### SAR Configuration
+
+The SubjectAccessReview rule restricts access to namespace administrators:
+
+```json
+{"namespace":"<namespace>","resource":"pods","verb":"update"}
+```
+
+This means only users with `edit` or `admin` ClusterRole bindings in the namespace can access the services. The `namespace-admins.txt` config file controls which OpenShift users get the `edit` role.
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `config/dev/namespace-admins.txt` | OpenShift usernames granted namespace edit access |
+| `helm/mlflow/values-dev.yaml` | MLflow OAuth proxy sidecar (via extraContainers) |
+| `helm/langflow/post-renderer/oauth-proxy-patch.yaml` | Langflow OAuth proxy sidecar (via Kustomize patch) |
+
+### Adding a New Admin
+
+1. Add the OpenShift username to `config/dev/namespace-admins.txt`
+2. Redeploy: `make deploy` (or run `oc adm groups add-users <namespace>-admins <username>`)
+
+### Langfuse Authentication
+
+Langfuse uses its built-in NextAuth authentication and cannot be configured with an external OAuth proxy. Users access Langfuse with the credentials shown by `make get-admin-credentials`.
+
 ## Troubleshooting
 
 ### User not being created
@@ -400,7 +444,7 @@ curl -H "X-Forwarded-User: test" -H "X-Forwarded-Email: test@example.com" \
 
 ### 401 errors in development
 
-Ensure `ENVIRONMENT=local` is set in your `.env` file.
+Ensure `ENVIRONMENT=local` is set in your `config/local/.env.backend` file (or `backend/.env`).
 
 ### Cookie issues
 

@@ -440,7 +440,7 @@ from app.models import Item, User
 ### API Development
 - ❌ Missing CORS configuration → Add origins to config
 - ❌ Not using Pydantic validation → Always define schemas
-- ❌ Hardcoding values → Use environment variables
+- ❌ Hardcoding values → Use environment variables (`config/local/.env.*` files)
 - ❌ Wrong HTTP status codes → Know 400 vs 404 vs 409
 
 ### Testing
@@ -569,7 +569,7 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-**IMPORTANT**: Never commit `.env` files with secrets! Use `.env.example` template.
+**IMPORTANT**: Never commit `.env` files with secrets! Config source of truth is in `config/local/.env.backend.example`. Copy to `config/local/.env.backend` and then to `backend/.env` via `make env-setup`. Templates are in `config/local/.env.*.example`.
 
 ## Additional Resources
 

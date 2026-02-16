@@ -73,36 +73,48 @@ oc exec -n "$NAMESPACE" deploy/postgres -- psql -U app -d postgres -tc \
     oc exec -n "$NAMESPACE" deploy/postgres -- psql -U app -d postgres -c \
     "CREATE DATABASE langflow;" 2>/dev/null || echo "Database may already exist"
 
-# Install or upgrade LangFlow
+# Shared OAuth resources — created by deploy.sh orchestrator
+# If running standalone, ensure they exist
+if ! oc get sa supporting-services-proxy -n "$NAMESPACE" &>/dev/null; then
+    echo "Warning: supporting-services-proxy SA not found. Run deploy.sh for full setup."
+    echo "Creating basic OAuth resources for standalone deployment..."
+    oc create sa supporting-services-proxy -n "$NAMESPACE"
+    oc annotate sa supporting-services-proxy -n "$NAMESPACE" --overwrite \
+        "serviceaccounts.openshift.io/oauth-redirectreference.langflow={\"kind\":\"OAuthRedirectReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"Route\",\"name\":\"langflow\"}}"
+    if ! oc get secret supporting-services-proxy-session -n "$NAMESPACE" &>/dev/null; then
+        SESSION_SECRET=$(openssl rand -base64 32 | head -c 43)
+        oc create secret generic supporting-services-proxy-session \
+            --from-literal=session_secret="$SESSION_SECRET" -n "$NAMESPACE"
+    fi
+fi
+
+# Substitute namespace placeholder in post-renderer patch
+POST_RENDERER_DIR="$PROJECT_ROOT/helm/langflow/post-renderer"
+PATCH_TEMPLATE="$POST_RENDERER_DIR/oauth-proxy-patch.yaml"
+PATCH_BACKUP=$(mktemp)
+trap "cp '$PATCH_BACKUP' '$PATCH_TEMPLATE'; rm -f '$PATCH_BACKUP' '$POST_RENDERER_DIR/helm-output.yaml'" EXIT
+
+# Save original and substitute namespace
+cp "$PATCH_TEMPLATE" "$PATCH_BACKUP"
+sed -i.bak "s/NAMESPACE_PLACEHOLDER/$NAMESPACE/g" "$PATCH_TEMPLATE"
+rm -f "${PATCH_TEMPLATE}.bak"
+
+# Render and apply LangFlow with Kustomize post-renderer for OAuth proxy sidecar
+# Pipeline: helm template → kustomize patch (adds OAuth proxy) → oc apply
+# See helm/langflow/post-renderer/ for the Kustomize-based patches.
 RELEASE_NAME="langflow"
-if helm status "$RELEASE_NAME" -n "$NAMESPACE" &>/dev/null; then
-    echo "Upgrading LangFlow..."
-    helm upgrade "$RELEASE_NAME" langflow/langflow-ide \
-        --namespace "$NAMESPACE" \
-        -f "$VALUES_FILE"
-else
-    echo "Installing LangFlow..."
-    helm install "$RELEASE_NAME" langflow/langflow-ide \
-        --namespace "$NAMESPACE" \
-        --create-namespace \
-        -f "$VALUES_FILE"
-fi
+echo "Rendering and applying LangFlow manifests..."
+helm template "$RELEASE_NAME" langflow/langflow-ide \
+    --namespace "$NAMESPACE" \
+    --version 0.1.1 \
+    -f "$VALUES_FILE" \
+    | "$POST_RENDERER_DIR/kustomize.sh" \
+    | oc apply -n "$NAMESPACE" -f -
 
-# Create OpenShift route (Helm chart creates langflow-service for frontend on 8080)
-echo "Creating LangFlow route..."
-oc create route edge langflow --service="${RELEASE_NAME}-service" --port=8080 -n "$NAMESPACE" 2>/dev/null || \
-    echo "Route already exists"
-
-# Create langflow-credentials secret for app consumption (if it doesn't exist)
-echo "Creating langflow-credentials secret for app..."
-if ! oc get secret langflow-credentials -n "$NAMESPACE" &> /dev/null; then
-    oc create secret generic langflow-credentials \
-        --from-literal=LANGFLOW_URL="http://${RELEASE_NAME}-service-backend:7860" \
-        -n "$NAMESPACE"
-    echo "Created langflow-credentials secret"
-else
-    echo "langflow-credentials secret already exists"
-fi
+# Apply updated Route and external Service (replaces the old oc create route command)
+echo "Applying Langflow Route and external Service..."
+oc apply -f "$PROJECT_ROOT/k8s/langflow/base/service.yaml" -n "$NAMESPACE"
+oc apply -f "$PROJECT_ROOT/k8s/langflow/base/route.yaml" -n "$NAMESPACE"
 
 # Wait for LangFlow to be ready (Helm chart creates a StatefulSet, not Deployment)
 echo "Waiting for LangFlow to be ready (this may take a few minutes)..."
@@ -116,13 +128,13 @@ echo "==================================="
 echo "LangFlow deployment complete!"
 echo "==================================="
 if [[ -n "$ROUTE_URL" ]]; then
-    echo "LangFlow URL: https://$ROUTE_URL"
+    echo "LangFlow URL (OAuth protected): https://$ROUTE_URL"
 fi
 echo ""
-echo "Login with admin credentials:"
-echo "  make get-admin-credentials"
+echo "Access requires OpenShift OAuth login with namespace edit permission."
+echo "Internal backend access via langflow-service-backend:7860 bypasses OAuth."
 echo ""
-echo "Check status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=langflow"
+echo "Check status: oc get pods -n $NAMESPACE -l app=langflow-service"
 echo ""
-echo "NOTE: Restart the app to pick up langflow-credentials:"
-echo "  oc rollout restart deployment/multi-agent-platform -n $NAMESPACE"
+echo "NOTE: Backend reads Langflow URL from backend-config secret."
+echo "  Ensure config/dev/.env.backend has LANGFLOW_URL set correctly."

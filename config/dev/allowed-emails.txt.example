@@ -1,0 +1,5 @@
+# Email allowlist for main app (Google OAuth)
+# One email per line. Only these users can log in to the platform.
+# Copy to allowed-emails.txt and add your users.
+user1@example.com
+user2@example.com

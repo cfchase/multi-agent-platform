@@ -1,16 +1,16 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: mlflow-route
+  name: mlflow
   labels:
     app: mlflow
 spec:
   to:
     kind: Service
-    name: mlflow
+    name: mlflow-external
     weight: 100
   port:
-    targetPort: http
+    targetPort: proxy
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect

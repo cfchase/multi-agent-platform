@@ -51,9 +51,33 @@ if [[ ! -f "$OAUTH_SECRET_FILE" ]]; then
     exit 1
 fi
 
+# Check if backend config source exists
+BACKEND_CONFIG_SOURCE="$PROJECT_ROOT/config/dev/.env.backend"
+if [[ ! -f "$BACKEND_CONFIG_SOURCE" ]]; then
+    echo "Error: Backend config not found at $BACKEND_CONFIG_SOURCE"
+    echo "Please copy config/dev/.env.backend.example to config/dev/.env.backend and configure it."
+    exit 1
+fi
+
+# Verify backend-config was generated (deploy.sh runs generate-config.sh k8s upfront)
+BACKEND_CONFIG_FILE="$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT/backend-config.env"
+if [[ ! -f "$BACKEND_CONFIG_FILE" ]]; then
+    echo "Error: Failed to generate backend config at $BACKEND_CONFIG_FILE"
+    echo "Please run: ./scripts/generate-config.sh k8s"
+    exit 1
+fi
+
 # Create namespace if it doesn't exist
 echo "Creating namespace if it doesn't exist..."
 oc create namespace "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
+
+# Auto-detect FRONTEND_HOST from Route if not already set in backend-config
+ROUTE_HOST=$(oc get route multi-agent-platform -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+if [[ -n "$ROUTE_HOST" ]] && ! grep -q "^FRONTEND_HOST=" "$BACKEND_CONFIG_FILE" 2>/dev/null; then
+    echo "Auto-detected Route: https://$ROUTE_HOST"
+    echo "FRONTEND_HOST=https://$ROUTE_HOST" >> "$BACKEND_CONFIG_FILE"
+    echo "BACKEND_CORS_ORIGINS=https://$ROUTE_HOST" >> "$BACKEND_CONFIG_FILE"
+fi
 
 # Apply app kustomize configuration
 echo "Applying Multi-Agent Platform App configuration..."
@@ -68,15 +92,10 @@ ROUTE_URL=$(oc get route multi-agent-platform -n "$NAMESPACE" -o jsonpath='{.spe
 
 echo ""
 echo "==================================="
-echo "Deep Research App deployment complete!"
+echo "Multi-Agent Platform App deployment complete!"
 echo "==================================="
 if [[ -n "$ROUTE_URL" ]]; then
     echo "App URL: https://$ROUTE_URL"
 fi
 echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app=multi-agent-platform"
-echo ""
-echo "Optional components (deploy to enable features):"
-echo "  - deploy-langflow.sh  (workflow builder)"
-echo "  - deploy-mlflow.sh    (experiment tracking)"
-echo "  - deploy-langfuse.sh  (LLM observability)"

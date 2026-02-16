@@ -139,13 +139,13 @@ class TestLangflowClient:
         assert "Authorization" not in client.headers
 
     def test_headers_with_api_key(self):
-        """Test that headers include authorization with API key."""
+        """Test that headers include x-api-key with API key."""
         client = LangflowClient(
             base_url="http://localhost",
             api_key="secret-key",
         )
 
-        assert client.headers["Authorization"] == "Bearer secret-key"
+        assert client.headers["x-api-key"] == "secret-key"
 
     def test_implements_protocol(self):
         """Test that LangflowClient implements the protocol."""

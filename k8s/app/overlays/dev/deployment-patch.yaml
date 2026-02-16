@@ -7,9 +7,6 @@ spec:
     spec:
       containers:
       - name: backend
-        env:
-        - name: ENVIRONMENT
-          value: "staging"
         resources:
           requests:
             memory: "64Mi"

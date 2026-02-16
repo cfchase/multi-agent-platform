@@ -33,22 +33,9 @@ service:
   port: 5000
   containerPort: 5000
 
-# Enable auth using shared admin-credentials secret
+# Disable built-in auth - OAuth proxy handles authentication
 auth:
-  enabled: true
-  existingAdminSecret:
-    name: "admin-credentials"
-    usernameKey: "email"
-    passwordKey: "password"
-  defaultPermission: READ
-  # Use PostgreSQL for auth storage (SQLite doesn't work in OpenShift)
-  postgres:
-    enabled: true
-    host: postgres
-    port: 5432
-    database: mlflow
-    driver: "psycopg2"
-    # Credentials injected via deploy script temp file
+  enabled: false
 
 # Disable ingress - we use OpenShift Route
 ingress:
@@ -74,3 +61,46 @@ securityContext:
   capabilities:
     drop:
       - ALL
+
+# Use shared ServiceAccount for OAuth proxy
+serviceAccount:
+  create: false
+  name: "supporting-services-proxy"
+
+# OAuth proxy sidecar for OpenShift authentication
+extraContainers:
+  - name: oauth-proxy
+    image: quay.io/openshift/origin-oauth-proxy:4.17
+    imagePullPolicy: IfNotPresent
+    ports:
+      - name: oauth-proxy
+        containerPort: 4180
+        protocol: TCP
+    args:
+      - -provider=openshift
+      - -http-address=:4180
+      - -https-address=
+      - -email-domain=*
+      - -upstream=http://localhost:5000
+      - -cookie-secure=false
+      - -cookie-secret-file=/etc/proxy/secrets/session_secret
+      - -openshift-service-account=supporting-services-proxy
+      - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      - -openshift-sar={"namespace":"NAMESPACE_PLACEHOLDER","resource":"pods","verb":"update"}
+    volumeMounts:
+      - name: proxy-session-secret
+        mountPath: /etc/proxy/secrets
+        readOnly: true
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "25m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+
+# Volume for OAuth proxy session secret
+extraVolumes:
+  - name: proxy-session-secret
+    secret:
+      secretName: supporting-services-proxy-session
