@@ -1116,6 +1116,22 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
     return total_success, total_failure
 
 
+def verify_flows() -> None:
+    """Print a verification summary listing all flows in Langflow."""
+    print()
+    log_info("Verification: listing all flows in Langflow...")
+    flows = list_all_flows()
+    if flows is not None:
+        log_info(f"  Total flows: {len(flows)}")
+        for flow in flows:
+            name = flow.get("name", "unnamed")
+            flow_id = flow.get("id", "")[:8]
+            access = flow.get("access_type", "PRIVATE")
+            log_info(f"  - {name} (ID: {flow_id}..., {access})")
+    else:
+        log_warn("Could not verify flows after import")
+
+
 def main() -> None:
     print("=" * 40)
     print("LangFlow Flow Importer")
@@ -1132,6 +1148,7 @@ def main() -> None:
     if simple_path:
         log_info(f"Simple mode: importing from {simple_path}")
         import_from_directory(Path(simple_path), "local")
+        verify_flows()
         return
 
     # Check for config file argument or default
@@ -1143,6 +1160,7 @@ def main() -> None:
         print("=" * 40)
         print(f"Import complete! ({success} succeeded, {failure} failed)")
         print("=" * 40)
+        verify_flows()
         if failure > 0:
             sys.exit(1)
     else:
@@ -1154,6 +1172,7 @@ def main() -> None:
         print("=" * 40)
         print("Import complete!")
         print("=" * 40)
+        verify_flows()
 
 
 if __name__ == "__main__":
