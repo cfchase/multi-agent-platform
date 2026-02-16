@@ -1,6 +1,6 @@
 # Service Management Targets (LangFlow, Langfuse, MLFlow, OAuth)
 
-.PHONY: langflow-start langflow-stop langflow-restart langflow-status langflow-logs langflow-import langflow-reset
+.PHONY: langflow-start langflow-stop langflow-restart langflow-status langflow-logs langflow-import langflow-import-cluster langflow-reset
 .PHONY: langfuse-start langfuse-stop langfuse-status langfuse-logs langfuse-reset
 .PHONY: mlflow-start mlflow-stop mlflow-status mlflow-logs mlflow-reset
 .PHONY: oauth-start oauth-stop oauth-status oauth-logs
@@ -22,6 +22,9 @@ langflow-logs: ## Show LangFlow logs
 
 langflow-import: ## Import flows from configured sources into LangFlow
 	@uv run --with requests --with pyyaml python scripts/import_flows.py
+
+langflow-import-cluster: ## Import flows into cluster LangFlow (via port-forward)
+	@./scripts/langflow-import-cluster.sh $(or $(ENV),dev)
 
 langflow-reset: ## Reset LangFlow (removes all data, use FORCE=1 to skip prompt)
 	@./scripts/dev-langflow.sh reset $(if $(filter 1 y yes true,$(FORCE)),-y,)
