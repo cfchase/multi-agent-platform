@@ -84,7 +84,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["local", "development", "staging", "production"] = "local"
 
     # Frontend Configuration
-    FRONTEND_HOST: str = "http://localhost:8080"
+    # Set to the frontend URL to ensure OAuth redirects go to the frontend.
+    # In local dev: http://localhost:4180 (via OAuth proxy). In cluster: auto-detected from route.
+    FRONTEND_HOST: str | None = None
 
     # CORS Configuration
     BACKEND_CORS_ORIGINS: Annotated[
@@ -95,9 +97,10 @@ class Settings(BaseSettings):
     @property
     def all_cors_origins(self) -> list[str]:
         """Get all CORS origins including frontend host"""
-        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            self.FRONTEND_HOST
-        ]
+        origins = [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
+        if self.FRONTEND_HOST:
+            origins.append(self.FRONTEND_HOST)
+        return origins
 
     # Database Configuration (PostgreSQL)
     # All fields have defaults for zero-config local development

@@ -398,10 +398,12 @@ async def delete_user(id: int, admin: CurrentAdminUser, session: SessionDep):
 
 ### Local Development Mode
 
-When `ENVIRONMENT=local` in `.env`:
+Default is `ENVIRONMENT=development` which uses OAuth (mock or real) via OAuth proxy on port 4180.
+
+Set `ENVIRONMENT=local` in `.env` to bypass OAuth entirely:
 - No OAuth headers required
 - Default "dev-user" is used
-- Allows testing without OAuth2 Proxy
+- Access app directly at `http://localhost:8080`
 
 ```python
 # In deps.py

@@ -236,7 +236,12 @@ def _build_settings_redirect(
     error_message: str | None = None,
 ) -> RedirectResponse:
     """Build redirect URL to frontend settings page with status."""
-    base_url = str(request.base_url).rstrip("/")
+    from app.core.config import settings
+
+    if settings.FRONTEND_HOST:
+        base_url = settings.FRONTEND_HOST.rstrip("/")
+    else:
+        base_url = str(request.base_url).rstrip("/")
     redirect_url = f"{base_url}/settings/integrations"
 
     # Add query params for status feedback

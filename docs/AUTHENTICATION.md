@@ -102,6 +102,7 @@ For quick UI development without OAuth overhead:
 ```bash
 # Edit config/local/.env.backend (or backend/.env after make env-setup)
 ENVIRONMENT=local
+FRONTEND_HOST=http://localhost:8080
 
 # Start the app (without services-start)
 make db-start && make db-init
@@ -444,7 +445,7 @@ curl -H "X-Forwarded-User: test" -H "X-Forwarded-Email: test@example.com" \
 
 ### 401 errors in development
 
-Ensure `ENVIRONMENT=local` is set in your `config/local/.env.backend` file (or `backend/.env`).
+Ensure OAuth proxy is running (`make services-start`) when using `ENVIRONMENT=development`, or set `ENVIRONMENT=local` to bypass OAuth entirely.
 
 ### Cookie issues
 

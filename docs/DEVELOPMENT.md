@@ -22,7 +22,7 @@ make setup
 
 # 3. Configure environment (copies from config/local/)
 make env-setup
-# Edit config/local/.env.backend: set ENVIRONMENT=local to bypass OAuth
+# Edit config/local/.env.backend if needed (default: ENVIRONMENT=development with OAuth)
 
 # 4. Start PostgreSQL database
 make db-start
@@ -130,34 +130,28 @@ make env-setup   # Copies config/local/.env.*.example to service directories
 
 ### Authentication Modes
 
-**Local Mode (recommended for development):**
+**OAuth Mode (default):**
+```bash
+# In config/local/.env.backend (or backend/.env after env-setup)
+ENVIRONMENT=development
+```
+- Uses OAuth proxy on port 4180 (mock OAuth if no credentials configured)
+- Access the app at `http://localhost:4180`
+- For real OAuth, configure `config/local/.env.oauth-proxy` — see [AUTHENTICATION.md](AUTHENTICATION.md)
+
+**No-Auth Mode (quick UI-only work):**
 ```bash
 # In config/local/.env.backend (or backend/.env after env-setup)
 ENVIRONMENT=local
 ```
-- No OAuth required
-- Uses a default "dev-user" for all requests
-- Simplest setup for local development
-
-**OAuth Mode (production-like):**
-```bash
-# In config/local/.env.backend (or backend/.env after env-setup)
-ENVIRONMENT=development
-
-# In config/local/.env.oauth-proxy
-OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
-OAUTH_CLIENT_SECRET=your-client-secret
-OAUTH_COOKIE_SECRET=generate-a-random-key
-```
-- Requires Google OAuth credentials
-- Run `make dev` to start with OAuth proxy on port 4180
-- See [AUTHENTICATION.md](AUTHENTICATION.md) for setup
+- No OAuth required, uses a default "dev-user" for all requests
+- Access the app directly at `http://localhost:8080`
 
 ### Key Variables
 
 **Backend (`config/local/.env.backend`):**
 ```bash
-ENVIRONMENT=local              # local (no auth) or development (OAuth)
+ENVIRONMENT=development        # development (OAuth, default) or local (no auth)
 POSTGRES_SERVER=localhost
 POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis

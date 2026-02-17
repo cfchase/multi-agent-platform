@@ -67,14 +67,14 @@ make dev
 
 Access locally:
 
-- **App**: <http://localhost:8080>
+- **App**: <http://localhost:4180> (via OAuth proxy)
 - **LangFlow**: <http://localhost:7860>
 - **MLFlow**: <http://localhost:5000>
 - **Langfuse**: <http://localhost:3000>
 
 ### Authentication
 
-OAuth is always enabled. Access app at <http://localhost:4180>.
+OAuth is enabled by default. Access app at <http://localhost:4180>.
 
 - **No OAuth credentials**: Uses mock OAuth server (any username/password works)
 - **With OAuth credentials**: Uses configured provider (Google, GitHub, Keycloak)

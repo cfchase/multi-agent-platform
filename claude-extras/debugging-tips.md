@@ -98,7 +98,7 @@ owner: Optional["User"] = Relationship(back_populates="items")
    - In local mode, dev-user is used automatically
 
 **Common fixes**:
-- Set `ENVIRONMENT=local` in `.env`
+- Ensure OAuth proxy is running (`make services-start`) or set `ENVIRONMENT=local` in `.env` to bypass
 - Check deps.py `get_current_user` function
 
 ## Frontend Issues

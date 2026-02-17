@@ -273,8 +273,9 @@ query Items($skip: Int, $limit: Int, $search: String) {
 This application uses **OAuth2 Proxy** for authentication. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for full setup guide.
 
 **Local Development:**
-- Set `ENVIRONMENT=local` in `config/local/.env.backend` for development without OAuth
-- A default "dev-user" is used for all requests in local mode
+- Default: `ENVIRONMENT=development` uses OAuth (mock or real provider via `make services-start`)
+- Access the app at `http://localhost:4180` (OAuth proxy port)
+- Set `ENVIRONMENT=local` to bypass OAuth entirely (uses dev-user, access at `http://localhost:8080`)
 
 **Production:**
 - OAuth2 Proxy runs as a sidecar container
