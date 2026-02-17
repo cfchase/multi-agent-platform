@@ -21,7 +21,7 @@ langflow-logs: ## Show LangFlow logs
 	@./scripts/dev-langflow.sh logs
 
 langflow-import: ## Import flows from configured sources into LangFlow
-	@uv run --with requests --with pyyaml python scripts/import_flows.py
+	@uv run --with requests --with pyyaml python scripts/import_flows.py config/local/flow-sources.yaml
 
 langflow-import-cluster: ## Import flows into cluster LangFlow (via port-forward)
 	@./scripts/langflow-import-cluster.sh $(or $(ENV),dev)

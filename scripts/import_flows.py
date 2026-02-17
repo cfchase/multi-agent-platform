@@ -35,7 +35,7 @@ import yaml
 
 # Configuration
 PROJECT_ROOT = Path(__file__).parent.parent
-DEFAULT_CONFIG = PROJECT_ROOT / "config" / "flow-sources.yaml"
+DEFAULT_CONFIG = PROJECT_ROOT / "config" / "local" / "flow-sources.yaml"
 LANGFLOW_URL = os.environ.get("LANGFLOW_URL", "http://localhost:7860")
 LANGFLOW_USER = os.environ.get("LANGFLOW_USER", "dev@localhost.local")
 LANGFLOW_PASSWORD = os.environ.get("LANGFLOW_PASSWORD", "devpassword123")
@@ -1154,25 +1154,18 @@ def main() -> None:
     # Check for config file argument or default
     config_file = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_CONFIG
 
-    if config_file.exists():
-        success, failure = import_from_config(config_file)
-        print()
-        print("=" * 40)
-        print(f"Import complete! ({success} succeeded, {failure} failed)")
-        print("=" * 40)
-        verify_flows()
-        if failure > 0:
-            sys.exit(1)
-    else:
-        # Default: import from built-in examples
-        log_info("No config found, importing built-in examples...")
-        examples_dir = PROJECT_ROOT / "langflow-flows" / "examples"
-        import_from_directory(examples_dir, "examples")
-        print()
-        print("=" * 40)
-        print("Import complete!")
-        print("=" * 40)
-        verify_flows()
+    if not config_file.exists():
+        log_error(f"Config file not found: {config_file}")
+        sys.exit(1)
+
+    success, failure = import_from_config(config_file)
+    print()
+    print("=" * 40)
+    print(f"Import complete! ({success} succeeded, {failure} failed)")
+    print("=" * 40)
+    verify_flows()
+    if failure > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
