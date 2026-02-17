@@ -2,83 +2,9 @@
 # Chart: langflow-ai/langflow-ide
 # Uses our existing PostgreSQL, shared admin-credentials
 
-replicaCount: 1
-
-image:
-  repository: langflowai/langflow
-  pullPolicy: Always
-  tag: "latest"
-
-service:
-  type: ClusterIP
-  port: 7860
-
-# Use external PostgreSQL (our shared postgres)
-externalDatabase:
-  enabled: true
-  driver: "postgresql"
-  host: "postgres"
-  port: 5432
-  user: "app"
-  database: "langflow"
-  # Password from existing postgres-secret
-  existingSecret: "postgres-secret"
-  existingSecretPasswordKey: "POSTGRES_PASSWORD"
-
-# Disable built-in PostgreSQL
+# Disable built-in PostgreSQL (we use our shared postgres)
 postgresql:
   enabled: false
-
-# Disable built-in SQLite
-sqlite:
-  enabled: false
-
-# Authentication - use shared admin-credentials secret
-# These are set via additionalEnvFrom
-env:
-  - name: LANGFLOW_AUTO_LOGIN
-    value: "true"
-  - name: LANGFLOW_SKIP_AUTH_AUTO_LOGIN
-    value: "true"
-  - name: LANGFLOW_CONFIG_DIR
-    value: "/app/langflow"
-  - name: LANGFLOW_ALEMBIC_LOG_FILE
-    value: "/app/db/alembic.log"
-  - name: LANGFLOW_LOG_LEVEL
-    value: "INFO"
-  - name: LANGFLOW_UPDATE_STARTER_PROJECTS
-    value: "false"
-  - name: LANGFLOW_SUPERUSER
-    valueFrom:
-      secretKeyRef:
-        name: admin-credentials
-        key: email
-  - name: LANGFLOW_SUPERUSER_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: admin-credentials
-        key: password
-  - name: OPENAI_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: langflow-credentials
-        key: OPENAI_API_KEY
-        optional: true
-
-# Resources
-resources:
-  requests:
-    memory: "1Gi"
-    cpu: "500m"
-  limits:
-    memory: "2Gi"
-    cpu: "1000m"
-
-# Persistent storage for data
-persistence:
-  enabled: true
-  size: 5Gi
-  # Uses default storage class
 
 # OpenShift compatibility - let SCC assign UIDs
 podSecurityContext: {}
@@ -90,25 +16,76 @@ securityContext:
     drop:
       - ALL
 
-# Health probes
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 7860
-  initialDelaySeconds: 120
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 5
-
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 7860
-  initialDelaySeconds: 60
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 10
-
 # Ingress disabled - we use OpenShift Route
 ingress:
   enabled: false
+
+langflow:
+  backend:
+    replicaCount: 1
+    image:
+      repository: langflowai/langflow
+      imagePullPolicy: Always
+      tag: "latest"
+    service:
+      type: ClusterIP
+      port: 7860
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    probe:
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 10
+
+    # Use external PostgreSQL (our shared postgres)
+    externalDatabase:
+      enabled: true
+      driver:
+        value: "postgresql"
+      host:
+        value: "postgres"
+      port:
+        value: "5432"
+      user:
+        value: "app"
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: postgres-secret
+            key: POSTGRES_PASSWORD
+      database:
+        value: "langflow"
+
+    # Disable built-in SQLite
+    sqlite:
+      enabled: false
+
+    env:
+      - name: LANGFLOW_AUTO_LOGIN
+        value: "true"
+      - name: LANGFLOW_SKIP_AUTH_AUTO_LOGIN
+        value: "true"
+      - name: LANGFLOW_CONFIG_DIR
+        value: "/tmp/langflow"
+      - name: LANGFLOW_ALEMBIC_LOG_FILE
+        value: "/tmp/alembic.log"
+      - name: LANGFLOW_LOG_LEVEL
+        value: "INFO"
+      - name: LANGFLOW_UPDATE_STARTER_PROJECTS
+        value: "false"
+      - name: LANGFLOW_SUPERUSER
+        valueFrom:
+          secretKeyRef:
+            name: admin-credentials
+            key: email
+      - name: LANGFLOW_SUPERUSER_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: admin-credentials
+            key: password

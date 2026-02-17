@@ -18,3 +18,8 @@ patches:
     target:
       kind: StatefulSet
       name: langflow-service
+  # Strategic merge patch: load all langflow-credentials env vars into Langflow container
+  - path: langflow-credentials-patch.yaml
+    target:
+      kind: StatefulSet
+      name: langflow-service

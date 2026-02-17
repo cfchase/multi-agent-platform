@@ -61,6 +61,37 @@ if [[ ! -f "$VALUES_FILE" ]]; then
     exit 1
 fi
 
+# Create langflow-credentials secret from config/dev/.env.langflow
+# Contains LLM API keys and tracing config — loaded via envFrom in the post-renderer patch
+LANGFLOW_ENV_FILE="$PROJECT_ROOT/config/$ENVIRONMENT/.env.langflow"
+if [[ -f "$LANGFLOW_ENV_FILE" ]]; then
+    # Filter to non-empty, non-comment key=value lines
+    LANGFLOW_CREDS=$(grep -v '^\s*#' "$LANGFLOW_ENV_FILE" | grep -v '^\s*$' | grep '=.' || true)
+    if [[ -n "$LANGFLOW_CREDS" ]]; then
+        # Build --from-literal args for each non-empty key
+        LITERAL_ARGS=()
+        while IFS= read -r line; do
+            key="${line%%=*}"
+            value="${line#*=}"
+            [[ -z "$key" || -z "$value" ]] && continue
+            LITERAL_ARGS+=("--from-literal=${key}=${value}")
+        done <<< "$LANGFLOW_CREDS"
+
+        if [[ ${#LITERAL_ARGS[@]} -gt 0 ]]; then
+            if oc get secret langflow-credentials -n "$NAMESPACE" &>/dev/null; then
+                oc delete secret langflow-credentials -n "$NAMESPACE"
+            fi
+            oc create secret generic langflow-credentials \
+                "${LITERAL_ARGS[@]}" -n "$NAMESPACE"
+            echo "Created langflow-credentials secret (${#LITERAL_ARGS[@]} keys)"
+        fi
+    else
+        echo "No non-empty values in $LANGFLOW_ENV_FILE — skipping langflow-credentials secret"
+    fi
+else
+    echo "Warning: $LANGFLOW_ENV_FILE not found — langflow-credentials secret not created"
+fi
+
 # Add Helm repo
 echo "Adding LangFlow Helm repository..."
 helm repo add langflow https://langflow-ai.github.io/langflow-helm-charts 2>/dev/null || true
