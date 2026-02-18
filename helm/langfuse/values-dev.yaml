@@ -65,9 +65,13 @@ s3:
   region: "auto"
   forcePathStyle: true
   accessKeyId:
-    value: ""  # Set via secrets-dev.yaml
+    secretKeyRef:
+      name: "langfuse-s3"
+      key: "root-user"
   secretAccessKey:
-    value: ""  # Set via secrets-dev.yaml
+    secretKeyRef:
+      name: "langfuse-s3"
+      key: "root-password"
   mode: standalone
   persistence:
     enabled: true
@@ -110,29 +114,9 @@ langfuse:
     telemetryEnabled: false
     signUpDisabled: true  # Only pre-created users can log in
 
-  # Additional environment variables for initial user setup
-  # Uses shared admin-credentials secret (same as LangFlow)
-  additionalEnv:
-    - name: LANGFUSE_INIT_ORG_ID
-      value: "multi-agent-platform"
-    - name: LANGFUSE_INIT_ORG_NAME
-      value: "Multi-Agent Platform"
-    - name: LANGFUSE_INIT_PROJECT_ID
-      value: "default"
-    - name: LANGFUSE_INIT_PROJECT_NAME
-      value: "Default Project"
-    - name: LANGFUSE_INIT_USER_EMAIL
-      valueFrom:
-        secretKeyRef:
-          name: admin-credentials
-          key: email
-    - name: LANGFUSE_INIT_USER_NAME
-      value: "Admin"
-    - name: LANGFUSE_INIT_USER_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: admin-credentials
-          key: password
+  # additionalEnv consolidated into secrets-dev.yaml.template
+  # to avoid Helm array-replace when using multiple -f values files.
+  # See: helm/langfuse/secrets-dev.yaml.template
 
   # Web deployment
   web:

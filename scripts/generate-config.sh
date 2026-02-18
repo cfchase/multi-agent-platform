@@ -202,6 +202,54 @@ cmd_dev() {
         done
 
         log_info "Generated Langfuse secrets"
+
+        # Generate Langfuse API keys (pk-/sk- prefixed) if still placeholders
+        if grep -q "LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-your-public-key" "$CONFIG_DEV/.env.langfuse"; then
+            local pk_suffix
+            pk_suffix=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))" 2>/dev/null || openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')
+            sed -i.bak "s|LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-your-public-key|LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-${pk_suffix}|" "$CONFIG_DEV/.env.langfuse"
+            rm -f "$CONFIG_DEV/.env.langfuse.bak"
+            log_info "Generated LANGFUSE_INIT_PROJECT_PUBLIC_KEY"
+        fi
+        if grep -q "LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-your-secret-key" "$CONFIG_DEV/.env.langfuse"; then
+            local sk_suffix
+            sk_suffix=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))" 2>/dev/null || openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')
+            sed -i.bak "s|LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-your-secret-key|LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-${sk_suffix}|" "$CONFIG_DEV/.env.langfuse"
+            rm -f "$CONFIG_DEV/.env.langfuse.bak"
+            log_info "Generated LANGFUSE_INIT_PROJECT_SECRET_KEY"
+        fi
+    fi
+
+    # Sync Langfuse API keys from .env.langfuse into .env.langflow
+    if [ -f "$CONFIG_DEV/.env.langfuse" ] && [ -f "$CONFIG_DEV/.env.langflow" ]; then
+        local lf_pk lf_sk
+        lf_pk=$(grep "^LANGFUSE_INIT_PROJECT_PUBLIC_KEY=" "$CONFIG_DEV/.env.langfuse" | cut -d= -f2-)
+        lf_sk=$(grep "^LANGFUSE_INIT_PROJECT_SECRET_KEY=" "$CONFIG_DEV/.env.langfuse" | cut -d= -f2-)
+
+        local synced=0
+        if [ -n "$lf_pk" ] && [ "$lf_pk" != "pk-your-public-key" ]; then
+            sed -i.bak "s|^LANGFUSE_PUBLIC_KEY=.*|LANGFUSE_PUBLIC_KEY=${lf_pk}|" "$CONFIG_DEV/.env.langflow"
+            rm -f "$CONFIG_DEV/.env.langflow.bak"
+            synced=1
+        fi
+        if [ -n "$lf_sk" ] && [ "$lf_sk" != "sk-your-secret-key" ]; then
+            sed -i.bak "s|^LANGFUSE_SECRET_KEY=.*|LANGFUSE_SECRET_KEY=${lf_sk}|" "$CONFIG_DEV/.env.langflow"
+            rm -f "$CONFIG_DEV/.env.langflow.bak"
+            synced=1
+        fi
+
+        # Ensure LANGFUSE_HOST is uncommented and set
+        if grep -q "^# LANGFUSE_HOST=" "$CONFIG_DEV/.env.langflow"; then
+            sed -i.bak "s|^# LANGFUSE_HOST=.*|LANGFUSE_HOST=http://langfuse-web:3000|" "$CONFIG_DEV/.env.langflow"
+            rm -f "$CONFIG_DEV/.env.langflow.bak"
+            synced=1
+        fi
+
+        if [ "$synced" -eq 1 ]; then
+            log_info "Synced Langfuse keys to .env.langflow"
+        else
+            log_warn "Langfuse keys not yet generated - skipping sync to .env.langflow"
+        fi
     fi
 
     # OAUTH_COOKIE_SECRET in .env.oauth-proxy
@@ -412,7 +460,7 @@ cmd_helm_langfuse() {
     load_env "$CONFIG_DEV/.env.langfuse"
 
     # Use selective envsubst to avoid replacing stray $ in YAML
-    local var_list='$REDIS_PASSWORD $CLICKHOUSE_PASSWORD $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD $SALT $ENCRYPTION_KEY $LANGFUSE_NEXTAUTH_URL $NEXTAUTH_SECRET'
+    local var_list='$REDIS_PASSWORD $CLICKHOUSE_PASSWORD $SALT $ENCRYPTION_KEY $LANGFUSE_NEXTAUTH_URL $NEXTAUTH_SECRET $LANGFUSE_INIT_PROJECT_PUBLIC_KEY $LANGFUSE_INIT_PROJECT_SECRET_KEY $LANGFUSE_INIT_USER_EMAIL $LANGFUSE_INIT_USER_NAME $LANGFUSE_INIT_USER_PASSWORD $LANGFUSE_INIT_ORG_ID $LANGFUSE_INIT_ORG_NAME $LANGFUSE_INIT_PROJECT_ID $LANGFUSE_INIT_PROJECT_NAME'
 
     envsubst_or_fallback "$template" "$output" "$var_list"
 
