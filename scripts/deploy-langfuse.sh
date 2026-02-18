@@ -55,6 +55,45 @@ if ! oc get secret admin-credentials -n "$NAMESPACE" &> /dev/null; then
     exit 1
 fi
 
+# Auto-calculate LANGFUSE_NEXTAUTH_URL from OpenShift apps domain
+APPS_DOMAIN_ERR=$(mktemp)
+APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>"$APPS_DOMAIN_ERR" || echo "")
+if [[ -n "$APPS_DOMAIN" ]]; then
+    LANGFUSE_NEXTAUTH_URL="https://langfuse-${NAMESPACE}.${APPS_DOMAIN}"
+    LANGFUSE_ENV_FILE="$PROJECT_ROOT/config/${ENVIRONMENT}/.env.langfuse"
+    if [[ -f "$LANGFUSE_ENV_FILE" ]]; then
+        if grep -q "^LANGFUSE_NEXTAUTH_URL=" "$LANGFUSE_ENV_FILE"; then
+            sed -i.bak "s|^LANGFUSE_NEXTAUTH_URL=.*|LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}|" "$LANGFUSE_ENV_FILE"
+            rm -f "${LANGFUSE_ENV_FILE}.bak"
+        else
+            echo "LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}" >> "$LANGFUSE_ENV_FILE"
+        fi
+        # Verify the write succeeded
+        actual_url=$(grep "^LANGFUSE_NEXTAUTH_URL=" "$LANGFUSE_ENV_FILE" | cut -d= -f2-)
+        if [ "$actual_url" != "$LANGFUSE_NEXTAUTH_URL" ]; then
+            echo "Error: Failed to update LANGFUSE_NEXTAUTH_URL in $LANGFUSE_ENV_FILE"
+            rm -f "$APPS_DOMAIN_ERR"
+            exit 1
+        fi
+        echo "Set LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}"
+    fi
+else
+    echo "Warning: Could not detect OpenShift apps domain."
+    if [[ -s "$APPS_DOMAIN_ERR" ]]; then
+        echo "  Reason: $(cat "$APPS_DOMAIN_ERR")"
+    fi
+    # Fail if LANGFUSE_NEXTAUTH_URL is still a placeholder
+    if grep -q "^LANGFUSE_NEXTAUTH_URL=auto-calculated-by-deploy-script" "$PROJECT_ROOT/config/${ENVIRONMENT}/.env.langfuse" 2>/dev/null; then
+        echo "Error: LANGFUSE_NEXTAUTH_URL is still a placeholder and cannot be auto-calculated."
+        echo "Please set it manually in config/${ENVIRONMENT}/.env.langfuse"
+        echo "Example: LANGFUSE_NEXTAUTH_URL=https://langfuse-${NAMESPACE}.apps.your-cluster.example.com"
+        rm -f "$APPS_DOMAIN_ERR"
+        exit 1
+    fi
+    echo "Using existing LANGFUSE_NEXTAUTH_URL value."
+fi
+rm -f "$APPS_DOMAIN_ERR"
+
 # Always regenerate secrets from source of truth (config/dev/.env.langfuse)
 SECRETS_FILE="$PROJECT_ROOT/helm/langfuse/secrets-${ENVIRONMENT}.yaml"
 echo "Generating Langfuse secrets..."
