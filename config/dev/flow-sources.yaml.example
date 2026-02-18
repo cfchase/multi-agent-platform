@@ -20,11 +20,10 @@
 # Components can load from a local path or a git repo.
 # For git: specify 'git' (URL) and 'branch', with 'path' as subdirectory.
 #
-# CLUSTER NOTE: Components are automatically skipped during cluster import
-# (make langflow-import-cluster). Component installation requires direct
-# filesystem access to the Langflow pod, which is not available via
-# port-forward. Components must be pre-installed in the container image
-# or installed manually on the pod if needed.
+# CLUSTER NOTE: Components are installed on the cluster pod via `oc cp` and
+# `oc exec` when running `make langflow-import-cluster`. The script stages
+# files locally, copies them to the pod, installs pip deps, and restarts the
+# pod so LangFlow discovers them.
 components:
 
   # Platform components (UserSettings, AppSettings, GoogleDriveValidator)
@@ -57,9 +56,9 @@ components:
 
 # --- MCP Servers: MCP server configurations to register ---
 #
-# CLUSTER NOTE: MCP servers are automatically skipped during cluster import
-# (make langflow-import-cluster). MCP server registration requires local
-# package installation which is not available on the cluster pod.
+# CLUSTER NOTE: MCP servers are registered on the cluster pod via `oc exec`
+# when running `make langflow-import-cluster`. Pip dependencies are installed
+# on the pod and server configs are merged into LangFlow project files.
 mcp_servers:
 
   - name: server-fetch

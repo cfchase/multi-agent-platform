@@ -4,6 +4,7 @@ Import flows from configured sources into LangFlow.
 
 Usage:
     python scripts/import_flows.py [config-file]
+    python scripts/import_flows.py --stage <staging-dir> <config-file> [--pod-packages-dir PATH]
 
 Environment variables:
     LANGFLOW_URL      - LangFlow API URL (default: http://localhost:7860)
@@ -233,7 +234,7 @@ def generate_init_py(category_dir: Path) -> int:
 
 
 
-def _build_mcp_entry(server_config: dict) -> dict | None:
+def _build_mcp_entry(server_config: dict, packages_dir: str = "/app/langflow/packages") -> dict | None:
     """Build MCP server entry for LangFlow config JSON.
 
     Returns the entry dict or None on validation failure.
@@ -250,7 +251,7 @@ def _build_mcp_entry(server_config: dict) -> dict | None:
             entry["args"] = server_config["args"]
         # Always include PYTHONPATH so packages on the PVC are importable
         env = server_config.get("env", {})
-        env.setdefault("PYTHONPATH", "/app/langflow/packages")
+        env.setdefault("PYTHONPATH", packages_dir)
         entry["env"] = env
         return entry
     elif server_type == "http":
@@ -918,11 +919,160 @@ def sync_git_repo(url: str, branch: str, name: str, token: str | None = None) ->
     return repo_dir
 
 
-def import_from_config(config_file: Path) -> tuple[int, int]:
-    """Parse YAML config and import flows. Returns (success_count, failure_count)."""
+def stage_for_cluster(
+    staging_dir: Path,
+    config_file: Path,
+    pod_packages_dir: str = "/tmp/langflow/packages",
+) -> bool:
+    """Stage components and MCP server configs for cluster deployment.
+
+    Creates:
+        staging_dir/components/{category}/*.py + __init__.py
+        staging_dir/manifest.json
+
+    Does NOT: call LangFlow API, pip install, require connectivity.
+    """
+    parsed = parse_config(config_file)
+    if parsed is None:
+        return False
+
+    component_sources = parsed["component_sources"]
+    mcp_server_configs = parsed["mcp_server_configs"]
+
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    components_staged = False
+    all_pip_deps: list[str] = []
+    mcp_entries: dict[str, dict] = {}
+    categories: list[str] = []
+
+    # Stage components
+    if component_sources:
+        log_info("=== Staging Components ===")
+        components_dir = staging_dir / "components"
+        components_dir.mkdir(parents=True, exist_ok=True)
+
+        for source in component_sources:
+            name = source.get("name", "unnamed")
+            enabled = source.get("enabled", True)
+            if not enabled:
+                log_info(f"Skipping disabled component source: {name}")
+                continue
+
+            path_str = source.get("path", "")
+            category = source.get("category", "custom")
+            dependencies = source.get("dependencies", [])
+
+            # Resolve source path (git or local)
+            git_url = source.get("git")
+            if git_url:
+                branch = source.get("branch", "main")
+                repo_dir = sync_git_repo(git_url, branch, f"components-{name}")
+                if repo_dir is None:
+                    log_error(f"Failed to clone repo for '{name}'")
+                    continue
+                source_path = repo_dir / path_str if path_str else repo_dir
+            else:
+                source_path = validate_path(PROJECT_ROOT, path_str)
+                if source_path is None:
+                    continue
+
+            if not source_path.is_dir():
+                log_error(f"Component source path not found: {source_path}")
+                continue
+
+            # Copy .py files to staging category dir
+            category_dir = components_dir / category
+            category_dir.mkdir(parents=True, exist_ok=True)
+
+            py_files = list(source_path.glob("*.py"))
+            copied = 0
+            for py_file in py_files:
+                if py_file.name == "__init__.py":
+                    continue
+                shutil.copy2(py_file, category_dir / py_file.name)
+                log_info(f"  Staged: {py_file.name} -> components/{category}/")
+                copied += 1
+
+            if copied > 0:
+                generate_init_py(category_dir)
+                components_staged = True
+                if category not in categories:
+                    categories.append(category)
+
+            if dependencies:
+                all_pip_deps.extend(dependencies)
+
+            log_info(f"Staged {copied} file(s) for '{name}'")
+
+    # Build MCP entries
+    if mcp_server_configs:
+        log_info("=== Building MCP Server Entries ===")
+        for server_config in mcp_server_configs:
+            name = server_config.get("name")
+            if not name:
+                log_error("MCP server config missing 'name' field")
+                continue
+
+            entry = _build_mcp_entry(server_config, packages_dir=pod_packages_dir)
+            if entry is not None:
+                mcp_entries[name] = entry
+                log_info(f"  Built MCP entry: {name}")
+
+            dependencies = server_config.get("dependencies", [])
+            if dependencies:
+                all_pip_deps.extend(dependencies)
+
+    if not components_staged and not mcp_entries:
+        log_info("Nothing to stage (no enabled components or MCP servers)")
+        # Still write an empty manifest so the shell script can detect this
+        manifest = {
+            "components": {"categories": []},
+            "pip_dependencies": [],
+            "mcp_servers": {},
+            "langflow_provided_packages": sorted(_LANGFLOW_PROVIDED),
+        }
+        manifest_path = staging_dir / "manifest.json"
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+        return True
+
+    # Deduplicate pip deps
+    seen: set[str] = set()
+    unique_deps: list[str] = []
+    for dep in all_pip_deps:
+        dep_name = dep.split(">=")[0].split("==")[0].split("<")[0].split(">")[0].strip()
+        if dep_name not in seen:
+            seen.add(dep_name)
+            unique_deps.append(dep)
+
+    # Write manifest
+    manifest = {
+        "components": {"categories": categories},
+        "pip_dependencies": unique_deps,
+        "mcp_servers": mcp_entries,
+        "langflow_provided_packages": sorted(_LANGFLOW_PROVIDED),
+    }
+    manifest_path = staging_dir / "manifest.json"
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+    log_info(f"Wrote manifest: {manifest_path}")
+
+    log_info(
+        f"Staging complete: {len(categories)} component category(ies), "
+        f"{len(unique_deps)} pip dep(s), {len(mcp_entries)} MCP server(s)"
+    )
+    return True
+
+
+def parse_config(config_file: Path) -> dict | None:
+    """Parse config YAML into component, MCP, and flow source lists.
+
+    Returns {"component_sources": [...], "mcp_server_configs": [...], "flow_sources": [...]}
+    or None on error.
+    """
     if not config_file.exists():
         log_warn(f"Config file not found: {config_file}")
-        return 0, 0
+        return None
 
     log_info(f"Reading config: {config_file}")
 
@@ -931,18 +1081,18 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
             config = yaml.safe_load(f)
     except yaml.YAMLError as e:
         log_error(f"Invalid YAML in {config_file}: {e}")
-        return 0, 0
+        return None
     except OSError as e:
         log_error(f"Failed to read {config_file}: {e}")
-        return 0, 0
+        return None
 
     if config is None:
         log_warn("Empty config file")
-        return 0, 0
+        return None
 
     if not isinstance(config, dict):
         log_error("Config must be a YAML mapping")
-        return 0, 0
+        return None
 
     # Support both new structured format (components/mcp_servers/flows keys)
     # and legacy single-list format (flow_sources key)
@@ -956,7 +1106,7 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
         sources = config.get("flow_sources", [])
         if not sources:
             log_warn("No flow sources configured")
-            return 0, 0
+            return None
         component_sources = []
         mcp_server_configs = []
         flow_sources = []
@@ -970,7 +1120,24 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
                 flow_sources.append(source)
     else:
         log_warn("No flow sources configured")
+        return None
+
+    return {
+        "component_sources": component_sources,
+        "mcp_server_configs": mcp_server_configs,
+        "flow_sources": flow_sources,
+    }
+
+
+def import_from_config(config_file: Path) -> tuple[int, int]:
+    """Parse YAML config and import flows. Returns (success_count, failure_count)."""
+    parsed = parse_config(config_file)
+    if parsed is None:
         return 0, 0
+
+    component_sources = parsed["component_sources"]
+    mcp_server_configs = parsed["mcp_server_configs"]
+    flow_sources = parsed["flow_sources"]
 
     # Cluster mode: skip components and MCP servers (local filesystem only)
     cluster_mode = os.environ.get("LANGFLOW_CLUSTER_MODE") == "1"
@@ -1155,6 +1322,25 @@ def verify_flows() -> None:
 
 
 def main() -> None:
+    # Handle --stage mode (no LangFlow connectivity needed)
+    if len(sys.argv) >= 2 and sys.argv[1] == "--stage":
+        if len(sys.argv) < 4:
+            log_error("Usage: import_flows.py --stage <staging-dir> <config-file> [--pod-packages-dir PATH]")
+            sys.exit(1)
+        staging_dir = Path(sys.argv[2])
+        config_file = Path(sys.argv[3])
+        pod_packages_dir = "/tmp/langflow/packages"
+        if "--pod-packages-dir" in sys.argv:
+            idx = sys.argv.index("--pod-packages-dir")
+            if idx + 1 < len(sys.argv):
+                pod_packages_dir = sys.argv[idx + 1]
+        print("=" * 40)
+        print("LangFlow Cluster Staging")
+        print("=" * 40)
+        print()
+        success = stage_for_cluster(staging_dir, config_file, pod_packages_dir)
+        sys.exit(0 if success else 1)
+
     print("=" * 40)
     print("LangFlow Flow Importer")
     print("=" * 40)

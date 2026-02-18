@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langflow-service
+spec:
+  # Add PVC so components, packages, and MCP configs persist across restarts
+  volumeClaimTemplates:
+    - metadata:
+        name: langflow-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+  template:
+    spec:
+      containers:
+        - name: langflow-ide
+          volumeMounts:
+            - name: langflow-data
+              mountPath: /tmp/langflow

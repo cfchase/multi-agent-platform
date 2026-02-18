@@ -23,3 +23,8 @@ patches:
     target:
       kind: StatefulSet
       name: langflow-service
+  # Strategic merge patch: add PVC for /tmp/langflow (components, packages, MCP configs)
+  - path: langflow-data-pvc-patch.yaml
+    target:
+      kind: StatefulSet
+      name: langflow-service

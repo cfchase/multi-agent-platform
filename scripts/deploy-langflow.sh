@@ -109,7 +109,7 @@ oc exec -n "$NAMESPACE" deploy/postgres -- psql -U app -d postgres -tc \
 if ! oc get sa supporting-services-proxy -n "$NAMESPACE" &>/dev/null; then
     echo "Warning: supporting-services-proxy SA not found. Run deploy.sh for full setup."
     echo "Creating basic OAuth resources for standalone deployment..."
-    oc create sa supporting-services-proxy -n "$NAMESPACE"
+    oc create sa supporting-services-proxy -n "$NAMESPACE" 2>/dev/null || true
     oc annotate sa supporting-services-proxy -n "$NAMESPACE" --overwrite \
         "serviceaccounts.openshift.io/oauth-redirectreference.langflow={\"kind\":\"OAuthRedirectReference\",\"apiVersion\":\"v1\",\"reference\":{\"kind\":\"Route\",\"name\":\"langflow\"}}"
     if ! oc get secret supporting-services-proxy-session -n "$NAMESPACE" &>/dev/null; then

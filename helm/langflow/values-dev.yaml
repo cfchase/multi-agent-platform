@@ -73,6 +73,8 @@ langflow:
         value: "true"
       - name: LANGFLOW_CONFIG_DIR
         value: "/tmp/langflow"
+      - name: LANGFLOW_COMPONENTS_PATH
+        value: "/tmp/langflow/components"
       - name: LANGFLOW_ALEMBIC_LOG_FILE
         value: "/tmp/alembic.log"
       - name: LANGFLOW_LOG_LEVEL
