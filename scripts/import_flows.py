@@ -78,6 +78,9 @@ INSTALLED_COMPONENTS: set[str] = set()
 # Track created MCP servers to avoid duplicate creation attempts
 CREATED_MCP_SERVERS: set[str] = set()
 
+# Track flow names imported in this run for filtered verification
+IMPORTED_FLOWS: set[str] = set()
+
 
 def log_info(msg: str) -> None:
     print(f"\033[0;32m[INFO]\033[0m {msg}")
@@ -781,6 +784,7 @@ def import_flow_data(
 
     if resp.ok and "id" in resp.text:
         log_info(f"  Imported: {flow_name}")
+        IMPORTED_FLOWS.add(flow_name)
         return True
     elif resp.status_code == 409:
         # Should not happen with replace-on-import, but handle gracefully
@@ -968,6 +972,13 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
         log_warn("No flow sources configured")
         return 0, 0
 
+    # Cluster mode: skip components and MCP servers (local filesystem only)
+    cluster_mode = os.environ.get("LANGFLOW_CLUSTER_MODE") == "1"
+    if cluster_mode and (component_sources or mcp_server_configs):
+        log_warn("Cluster mode: skipping components and MCP servers (local filesystem only)")
+        component_sources = []
+        mcp_server_configs = []
+
     total_items = len(component_sources) + len(mcp_server_configs) + len(flow_sources)
     if total_items == 0:
         log_warn("No flow sources configured")
@@ -1117,17 +1128,28 @@ def import_from_config(config_file: Path) -> tuple[int, int]:
 
 
 def verify_flows() -> None:
-    """Print a verification summary listing all flows in Langflow."""
+    """Print a verification summary listing flows imported in this run."""
     print()
-    log_info("Verification: listing all flows in Langflow...")
+    if not IMPORTED_FLOWS:
+        log_info("Verification: no flows were imported in this run")
+        return
+
+    log_info(f"Verification: {len(IMPORTED_FLOWS)} flow(s) imported in this run")
     flows = list_all_flows()
     if flows is not None:
-        log_info(f"  Total flows: {len(flows)}")
-        for flow in flows:
+        imported = [f for f in flows if f.get("name", "") in IMPORTED_FLOWS]
+        for flow in imported:
             name = flow.get("name", "unnamed")
             flow_id = flow.get("id", "")[:8]
             access = flow.get("access_type", "PRIVATE")
             log_info(f"  - {name} (ID: {flow_id}..., {access})")
+        # Report any that were imported but not found (edge case)
+        found_names = {f.get("name", "") for f in imported}
+        missing = IMPORTED_FLOWS - found_names
+        if missing:
+            log_warn(f"  {len(missing)} flow(s) imported but not found in verification:")
+            for name in sorted(missing):
+                log_warn(f"    - {name}")
     else:
         log_warn("Could not verify flows after import")
 

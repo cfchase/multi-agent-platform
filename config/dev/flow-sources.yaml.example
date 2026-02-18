@@ -16,56 +16,60 @@
 #   - pattern: Glob pattern for finding flow files (default: **/*.json)
 #   - public: Set to true to make flows visible to all users (default: false)
 
-# CLUSTER NOTE: Components and MCP servers are not supported on cluster import.
-# Component installation requires direct filesystem access to the Langflow pod's
-# PVC, which is not available via port-forward. Only the 'flows' section below
-# is used during cluster import. Components must be pre-installed in the
-# container image or via init containers if needed.
-
 # --- Components: custom LangFlow components to install ---
 # Components can load from a local path or a git repo.
 # For git: specify 'git' (URL) and 'branch', with 'path' as subdirectory.
-# components:
 #
-#   # Platform components (UserSettings, AppSettings, GoogleDriveValidator)
-#   # Required for any flow that receives user context (OAuth tokens,
-#   # preferences) or app context (feature flags) from the platform.
-#   - name: platform-components
-#     git: https://github.com/cfchase/langflow-examples
-#     branch: main
-#     path: components/platform
-#     category: platform
-#     dependencies: []
-#     enabled: true
-#
-#   # Example components (HelloWorldEcho, HelloWorldDep)
-#   - name: example-components
-#     git: https://github.com/cfchase/langflow-examples
-#     branch: main
-#     path: components/examples
-#     category: examples
-#     dependencies:
-#       - humanize>=4.0.0
-#     enabled: true
-#
-#   # Example: Local path instead of git
-#   # - name: my-components
-#   #   path: /path/to/my/components
-#   #   category: custom
-#   #   dependencies: []
-#   #   enabled: true
+# CLUSTER NOTE: Components are automatically skipped during cluster import
+# (make langflow-import-cluster). Component installation requires direct
+# filesystem access to the Langflow pod, which is not available via
+# port-forward. Components must be pre-installed in the container image
+# or installed manually on the pod if needed.
+components:
+
+  # Platform components (UserSettings, AppSettings, GoogleDriveValidator)
+  # Required for any flow that receives user context (OAuth tokens,
+  # preferences) or app context (feature flags) from the platform.
+  - name: platform-components
+    git: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: components/platform
+    category: platform
+    dependencies: []
+    enabled: true
+
+  # Example components (HelloWorldEcho, HelloWorldDep)
+  - name: example-components
+    git: https://github.com/cfchase/langflow-examples
+    branch: main
+    path: components/examples
+    category: examples
+    dependencies:
+      - humanize>=4.0.0
+    enabled: true
+
+  # Example: Local path instead of git
+  # - name: my-components
+  #   path: /path/to/my/components
+  #   category: custom
+  #   dependencies: []
+  #   enabled: true
 
 # --- MCP Servers: MCP server configurations to register ---
-# mcp_servers:
 #
-#   - name: server-fetch
-#     type: stdio
-#     command: python
-#     args:
-#       - "-m"
-#       - "mcp_server_fetch"
-#     dependencies:
-#       - mcp-server-fetch
+# CLUSTER NOTE: MCP servers are automatically skipped during cluster import
+# (make langflow-import-cluster). MCP server registration requires local
+# package installation which is not available on the cluster pod.
+mcp_servers:
+
+  - name: server-fetch
+    type: stdio
+    command: python
+    args:
+      - "-m"
+      - "mcp_server_fetch"
+    dependencies:
+      - mcp-server-fetch
 
 # --- Flows: flow definitions to import into LangFlow ---
 flows:

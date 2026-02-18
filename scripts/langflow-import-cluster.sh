@@ -70,9 +70,11 @@ for i in $(seq 1 10); do
 done
 
 # Run import
+log_info "Cluster mode: components and MCP servers will be skipped (local filesystem only)"
 log_info "Importing flows from $CONFIG_FILE..."
 echo ""
 
+LANGFLOW_CLUSTER_MODE=1 \
 LANGFLOW_URL="http://localhost:$LOCAL_PORT" \
     uv run --with requests --with pyyaml \
     python "$PROJECT_ROOT/scripts/import_flows.py" "$CONFIG_FILE"
