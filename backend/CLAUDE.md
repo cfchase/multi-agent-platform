@@ -571,7 +571,7 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-**IMPORTANT**: Never commit `.env` files with secrets! Config source of truth is in `config/local/.env.backend.example`. Copy to `config/local/.env.backend` and then to `backend/.env` via `make env-setup`. Templates are in `config/local/.env.*.example`.
+**IMPORTANT**: Never commit `.env` files with secrets! Config source of truth is `config/local/.env.example`. Run `make config-setup` to copy it to `config/local/.env` and `backend/.env`.
 
 ## Additional Resources
 

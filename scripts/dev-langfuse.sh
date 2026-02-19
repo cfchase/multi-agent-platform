@@ -17,14 +17,10 @@ init_container_tool || exit 1
 # Configuration
 PROJECT_ROOT="${SCRIPT_DIR}/.."
 
-# Load config from centralized config directory
-LANGFUSE_CONFIG="$PROJECT_ROOT/config/local/.env.langfuse"
-if [ -f "$LANGFUSE_CONFIG" ]; then
-    set -a; source "$LANGFUSE_CONFIG"; set +a
-fi
-POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
-if [ -f "$POSTGRES_CONFIG" ]; then
-    set -a; source "$POSTGRES_CONFIG"; set +a
+# Load consolidated config
+CONFIG_FILE="$PROJECT_ROOT/config/local/.env"
+if [ -f "$CONFIG_FILE" ]; then
+    set -a; source "$CONFIG_FILE"; set +a
 fi
 
 LANGFUSE_VERSION="${LANGFUSE_VERSION:-3}"

@@ -28,18 +28,18 @@ check_deploy_prerequisites() {
     check_openshift_login
 
     # Config files
-    local required_configs=(".env.backend" ".env.oauth-proxy" ".env.postgres")
+    local required_configs=(".env")
     for cfg in "${required_configs[@]}"; do
         if [ ! -f "$config_dir/$cfg" ]; then
             log_error "Missing config: $config_dir/$cfg"
-            log_error "Run: ./scripts/generate-config.sh $environment"
+            log_error "Run: cp $config_dir/.env.example $config_dir/.env"
             exit 1
         fi
     done
 
     # Check OAuth credentials are not placeholder
-    if grep -q "OAUTH_CLIENT_ID=your-client-id" "$config_dir/.env.oauth-proxy" 2>/dev/null; then
-        log_error "OAuth credentials not configured in $config_dir/.env.oauth-proxy"
+    if grep -q "OAUTH_CLIENT_ID=your-client-id" "$config_dir/.env" 2>/dev/null; then
+        log_error "OAuth credentials not configured in $config_dir/.env"
         echo ""
         echo "  To set up Google OAuth:"
         echo "    1. Go to https://console.cloud.google.com/apis/credentials"
@@ -59,8 +59,7 @@ check_deploy_prerequisites() {
             echo "    Authorized redirect URI:       https://<app-route>/oauth2/callback"
         fi
         echo ""
-        echo "    3. Copy the Client ID and Secret into $config_dir/.env.oauth-proxy"
-        echo "       and $config_dir/.env.backend"
+        echo "    3. Copy the Client ID and Secret into $config_dir/.env"
         echo ""
         echo "  See docs/AUTHENTICATION.md for detailed walkthrough"
         exit 1
@@ -110,23 +109,51 @@ echo "Environment: $ENVIRONMENT"
 echo "Namespace: $NAMESPACE"
 echo ""
 
-# Generate all k8s secrets from config/dev/ before any component deploys
-echo "Generating secrets from config/${ENVIRONMENT}/..."
+# Deploy in dependency order:
+# 1. Namespace + secrets/credentials/OAuth (prerequisites)
+# 2. PostgreSQL (database — needed by all services)
+# 3. Langfuse (tracing — generates API keys needed by Langflow)
+# 4. MLflow (experiment tracking — independent)
+# 5. Langflow (workflow engine — depends on Langfuse keys)
+# 6. App (frontend/backend — depends on all service credentials)
+
+# Step 1: Ensure namespace exists, generate secrets, set up cluster prerequisites
+echo "Ensuring namespace $NAMESPACE exists..."
+oc create namespace "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
+echo ""
+
+echo "Generating k8s secrets from config/${ENVIRONMENT}/..."
 "$SCRIPT_DIR/generate-config.sh" k8s --force
 echo ""
 
-# Deploy components in order
-# Note: App deploys LAST so it picks up all credential secrets from AI tools
-
-echo "Step 1/5: Deploying PostgreSQL..."
-"$SCRIPT_DIR/deploy-db.sh" "$ENVIRONMENT" "$NAMESPACE"
-echo ""
-
-# Generate admin credentials (required by LangFlow and Langfuse)
+# Admin credentials (shared by LangFlow and Langfuse)
+# Uses LANGFUSE_INIT_USER_PASSWORD from user's .env or auto-generates
 echo "Generating admin credentials if needed..."
 if ! oc get secret admin-credentials -n "$NAMESPACE" &> /dev/null; then
-    ADMIN_EMAIL="admin@localhost.local"
-    ADMIN_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))")
+    CONFIG_ENV="$PROJECT_ROOT/config/$ENVIRONMENT/.env"
+
+    # Resolve admin password: user .env > auto-generate
+    ADMIN_PASS=""
+    if [ -f "$CONFIG_ENV" ]; then
+        ADMIN_PASS=$(grep -E "^LANGFUSE_INIT_USER_PASSWORD=" "$CONFIG_ENV" 2>/dev/null | cut -d= -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+    fi
+    if [ -z "$ADMIN_PASS" ]; then
+        echo "No LANGFUSE_INIT_USER_PASSWORD found in .env — auto-generating admin password"
+        ADMIN_PASS=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))" 2>/dev/null || openssl rand -base64 16 2>/dev/null || "")
+        if [ -z "$ADMIN_PASS" ]; then
+            echo "Error: Cannot auto-generate admin password (need python3 or openssl)"
+            echo "  Set LANGFUSE_INIT_USER_PASSWORD in config/$ENVIRONMENT/.env instead"
+            exit 1
+        fi
+    fi
+
+    # Resolve admin email from user .env or default
+    ADMIN_EMAIL=""
+    if [ -f "$CONFIG_ENV" ]; then
+        ADMIN_EMAIL=$(grep -E "^LANGFUSE_INIT_USER_EMAIL=" "$CONFIG_ENV" 2>/dev/null | cut -d= -f2- | sed 's/^["'"'"']//;s/["'"'"']$//')
+    fi
+    ADMIN_EMAIL="${ADMIN_EMAIL:-admin@localhost.local}"
+
     oc create secret generic admin-credentials \
         --from-literal=email="$ADMIN_EMAIL" \
         --from-literal=password="$ADMIN_PASS" \
@@ -139,19 +166,16 @@ else
 fi
 echo ""
 
-# Setup namespace admin group from config (for Langflow/MLflow OAuth access)
+# Namespace admin group (for Langflow/MLflow OAuth access)
 ADMINS_FILE="$PROJECT_ROOT/config/$ENVIRONMENT/namespace-admins.txt"
 GROUP_NAME="${NAMESPACE}-admins"
 if [ -f "$ADMINS_FILE" ]; then
     echo "Setting up namespace admin group: $GROUP_NAME"
-    # Create group if it doesn't exist
     if ! oc get group "$GROUP_NAME" &> /dev/null 2>&1; then
         oc adm groups new "$GROUP_NAME"
         echo "Created group: $GROUP_NAME"
     fi
-    # Add users from config file
     while IFS= read -r user || [ -n "$user" ]; do
-        # Skip comments and empty lines
         [[ "$user" =~ ^#.*$ || -z "$user" ]] && continue
         user=$(echo "$user" | tr -d '[:space:]')
         if ! oc get group "$GROUP_NAME" -o jsonpath='{.users[*]}' 2>/dev/null | grep -qw "$user"; then
@@ -160,31 +184,43 @@ if [ -f "$ADMINS_FILE" ]; then
             echo "  Already in group: $user"
         fi
     done < "$ADMINS_FILE"
-    # Grant edit role on namespace
-    oc adm policy add-role-to-group edit "$GROUP_NAME" -n "$NAMESPACE" 2>/dev/null
-    echo "Granted edit role to $GROUP_NAME in $NAMESPACE"
+    if ! oc adm policy add-role-to-group edit "$GROUP_NAME" -n "$NAMESPACE" 2>&1; then
+        echo "Warning: Failed to grant edit role to $GROUP_NAME in $NAMESPACE"
+        echo "  You may need cluster-admin permissions to assign roles"
+    else
+        echo "Granted edit role to $GROUP_NAME in $NAMESPACE"
+    fi
 else
     echo "No namespace-admins.txt found at $ADMINS_FILE - skipping group setup"
 fi
 echo ""
 
-# Setup shared OAuth resources BEFORE individual service deploys
+# Shared OAuth resources (ServiceAccount, session secret)
 ensure_supporting_services_oauth "$NAMESPACE"
 echo ""
 
-echo "Step 2/5: Deploying LangFlow..."
-"$SCRIPT_DIR/deploy-langflow.sh" "$ENVIRONMENT" "$NAMESPACE"
+# Step 2: PostgreSQL (all services depend on this)
+echo "Step 2/6: Deploying PostgreSQL..."
+"$SCRIPT_DIR/deploy-db.sh" "$ENVIRONMENT" "$NAMESPACE"
 echo ""
 
-echo "Step 3/5: Deploying MLFlow..."
-"$SCRIPT_DIR/deploy-mlflow.sh" "$ENVIRONMENT" "$NAMESPACE"
-echo ""
-
-echo "Step 4/5: Deploying Langfuse..."
+# Step 3: Langfuse (generates secrets-dev.yaml with API keys needed by Langflow)
+echo "Step 3/6: Deploying Langfuse..."
 "$SCRIPT_DIR/deploy-langfuse.sh" "$ENVIRONMENT" "$NAMESPACE"
 echo ""
 
-echo "Step 5/5: Deploying Multi-Agent Platform App..."
+# Step 4: MLflow (independent)
+echo "Step 4/6: Deploying MLFlow..."
+"$SCRIPT_DIR/deploy-mlflow.sh" "$ENVIRONMENT" "$NAMESPACE"
+echo ""
+
+# Step 5: Langflow (reads Langfuse API keys from secrets-dev.yaml)
+echo "Step 5/6: Deploying LangFlow..."
+"$SCRIPT_DIR/deploy-langflow.sh" "$ENVIRONMENT" "$NAMESPACE"
+echo ""
+
+# Step 6: App (depends on all service credentials)
+echo "Step 6/6: Deploying Multi-Agent Platform App..."
 "$SCRIPT_DIR/deploy-app.sh" "$ENVIRONMENT" "$NAMESPACE"
 echo ""
 

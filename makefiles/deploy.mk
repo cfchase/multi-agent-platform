@@ -5,7 +5,7 @@
 .PHONY: deploy-db deploy-app deploy-langflow deploy-mlflow deploy-langfuse
 .PHONY: generate-k8s-secrets generate-k8s-secrets-dev generate-k8s-secrets-prod
 .PHONY: generate-langfuse-secrets-dev generate-admin-secret-dev get-admin-credentials
-.PHONY: config-setup config-reset
+.PHONY: config-setup-cluster config-reset-cluster config-generate
 
 # Generate K8s secrets from backend/.env (if they don't exist)
 generate-k8s-secrets-dev:
@@ -68,13 +68,15 @@ get-admin-credentials: ## Show admin credentials and URLs for LangFlow/Langfuse/
 generate-langfuse-secrets-dev:
 	@./scripts/generate-langfuse-secrets.sh
 
-# Config setup and reset
-config-setup: ## Generate cluster config from examples (skips existing files)
+# Cluster config setup, reset, and artifact generation
+config-setup-cluster: ## Setup cluster config from examples (skips existing files)
 	@./scripts/generate-config.sh dev
 
-config-reset: ## Delete and regenerate all cluster config (use when moving to a new cluster)
+config-reset-cluster: ## Delete all cluster config (run config-setup-cluster after editing .env)
 	@./scripts/generate-config.sh reset dev
-	@./scripts/generate-config.sh dev
+
+config-generate: ## Generate k8s/helm deployment artifacts from config/dev/.env
+	@./scripts/generate-config.sh all
 
 # Individual component deployment targets
 deploy-db: ## Deploy PostgreSQL database only

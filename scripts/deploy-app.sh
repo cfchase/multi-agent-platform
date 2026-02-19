@@ -52,10 +52,10 @@ if [[ ! -f "$OAUTH_SECRET_FILE" ]]; then
 fi
 
 # Check if backend config source exists
-BACKEND_CONFIG_SOURCE="$PROJECT_ROOT/config/dev/.env.backend"
+BACKEND_CONFIG_SOURCE="$PROJECT_ROOT/config/dev/.env"
 if [[ ! -f "$BACKEND_CONFIG_SOURCE" ]]; then
     echo "Error: Backend config not found at $BACKEND_CONFIG_SOURCE"
-    echo "Please copy config/dev/.env.backend.example to config/dev/.env.backend and configure it."
+    echo "Please copy config/dev/.env.example to config/dev/.env and configure it."
     exit 1
 fi
 

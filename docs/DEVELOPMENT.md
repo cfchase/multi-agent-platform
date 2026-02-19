@@ -20,9 +20,9 @@ cd multi-agent-platform
 # 2. Install all dependencies
 make setup
 
-# 3. Configure environment (copies from config/local/)
-make env-setup
-# Edit config/local/.env.backend if needed (default: ENVIRONMENT=development with OAuth)
+# 3. Configure environment (copies config/local/.env.example to config/local/.env)
+make config-setup
+# Edit config/local/.env if needed (default: ENVIRONMENT=development with OAuth)
 
 # 4. Start PostgreSQL database
 make db-start
@@ -111,37 +111,34 @@ git status
 
 ### Environment Files
 
-Configuration templates live in `config/local/` (source of truth):
+Configuration is consolidated into a single file per environment:
 
 ```
-config/local/.env.backend.example    # Backend configuration template
-config/local/.env.frontend.example   # Frontend configuration template
-config/local/.env.langflow.example   # Langflow configuration template
-config/local/.env.langfuse.example   # Langfuse configuration template
-config/local/.env.mlflow.example     # MLflow configuration template
-config/local/.env.oauth-proxy.example # OAuth proxy configuration template
-config/local/.env.postgres.example   # PostgreSQL configuration template
+config/local/.env.example    # Local development configuration template (all services)
+config/dev/.env.example      # Cluster deployment configuration template (all services)
 ```
 
-Copy from examples:
+Copy from example:
 ```bash
-make env-setup   # Copies config/local/.env.*.example to service directories
+make config-setup   # Copies config/local/.env.example to config/local/.env
 ```
+
+Edit `config/local/.env` to configure LLM API keys, OAuth credentials, database settings, Langflow options, and other service variables.
 
 ### Authentication Modes
 
 **OAuth Mode (default):**
 ```bash
-# In config/local/.env.backend (or backend/.env after env-setup)
+# In config/local/.env
 ENVIRONMENT=development
 ```
 - Uses OAuth proxy on port 4180 (mock OAuth if no credentials configured)
 - Access the app at `http://localhost:4180`
-- For real OAuth, configure `config/local/.env.oauth-proxy` — see [AUTHENTICATION.md](AUTHENTICATION.md)
+- For real OAuth, configure OAuth credentials in `config/local/.env` -- see [AUTHENTICATION.md](AUTHENTICATION.md)
 
 **No-Auth Mode (quick UI-only work):**
 ```bash
-# In config/local/.env.backend (or backend/.env after env-setup)
+# In config/local/.env
 ENVIRONMENT=local
 ```
 - No OAuth required, uses a default "dev-user" for all requests
@@ -149,7 +146,7 @@ ENVIRONMENT=local
 
 ### Key Variables
 
-**Backend (`config/local/.env.backend`):**
+All variables are in `config/local/.env`:
 ```bash
 ENVIRONMENT=development        # development (OAuth, default) or local (no auth)
 POSTGRES_SERVER=localhost
@@ -157,11 +154,6 @@ POSTGRES_USER=app
 POSTGRES_PASSWORD=changethis
 POSTGRES_DB=app
 POSTGRES_PORT=5432
-```
-
-**Frontend (`config/local/.env.frontend`):**
-```bash
-VITE_API_URL=/api  # Proxy handled by Vite
 ```
 
 ## Database Management
@@ -223,7 +215,7 @@ make mlflow-stop
 - Configure flows for the Chat feature via environment variables:
 
 ```bash
-# In config/local/.env.backend for mock mode (no Langflow required):
+# In config/local/.env for mock mode (no Langflow required):
 LANGFLOW_URL=mock
 
 # For local Langflow:
@@ -352,7 +344,7 @@ curl http://localhost:8000/api/v1/utils/health-check
 # (visible in terminal running `make dev-backend`)
 
 # Verify .env configuration
-cat config/local/.env.backend
+cat config/local/.env
 ```
 
 ### Frontend Issues

@@ -13,11 +13,13 @@ package-lock.json
 .env.production.local
 
 # Centralized config (keep .example files, ignore actual configs)
+config/local/.env
 config/local/.env.*
-!config/local/.env.*.example
+!config/local/.env.example
 config/local/flow-sources.yaml
+config/dev/.env
 config/dev/.env.*
-!config/dev/.env.*.example
+!config/dev/.env.example
 config/dev/flow-sources.yaml
 
 # IDE and Editors
@@ -72,12 +74,6 @@ config/dev/namespace-admins.txt
 # Helm secrets (keep .example files, ignore actual secrets)
 helm/*/secrets-*.yaml
 !helm/*/secrets-*.yaml.example
-
-# Flow sources config (keep .example, ignore actual config)
-config/flow-sources.yaml
-
-# LangFlow env vars (API keys for global variables — keep .example)
-config/langflow.env
 
 # Local development overrides
 .local/

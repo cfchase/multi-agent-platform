@@ -42,7 +42,7 @@ make setup && make services-start && make db-seed && make dev
 - Deploy to prod: `make deploy-prod`
 
 **Troubleshooting:**
-- API not working? Check `/api/v1/utils/health-check` → Verify `config/local/.env.*` files → Check CORS settings
+- API not working? Check `/api/v1/utils/health-check` → Verify `config/local/.env` → Check CORS settings
 - Database issues? `make db-status` → `make db-logs` → `make db-shell`
 
 ## Project Structure
@@ -63,8 +63,8 @@ make setup && make services-start && make db-seed && make dev
 │   ├── vite.config.ts  # Vite configuration with /api proxy
 │   └── Dockerfile      # Frontend container (nginx-based)
 ├── config/              # Centralized configuration (source of truth)
-│   ├── local/          # Local development configs (.env.*.example)
-│   └── dev/            # Cluster deployment configs (.env.*.example)
+│   ├── local/          # Local development config (.env.example)
+│   └── dev/            # Cluster deployment config (.env.example)
 ├── k8s/                # Kubernetes/OpenShift manifests
 │   ├── base/          # Base kustomize resources
 │   └── overlays/      # Environment-specific overlays (dev/prod)
@@ -113,7 +113,7 @@ make setup && make services-start && make db-seed && make dev
 ### Local Development
 ```bash
 make setup             # Install all dependencies
-make env-setup         # Copy config/local/.env.*.example to service dirs
+make config-setup      # Copy config/local/.env.example to config/local/.env
 make dev              # Run both frontend and backend
 make dev-frontend     # Run React dev server (port 8080)
 make dev-backend      # Run FastAPI server (port 8000)
@@ -302,7 +302,7 @@ This application uses **OAuth2 Proxy** for authentication. See [docs/AUTHENTICAT
 
 - ❌ Missing CORS configuration → Add origins to `backend/app/core/config.py`
 - ❌ Not using Pydantic models for validation → **ALWAYS** define request/response schemas
-- ❌ Hardcoding URLs or sensitive values → Use environment variables (`config/local/.env.*` files for local dev)
+- ❌ Hardcoding URLs or sensitive values → Use environment variables (`config/local/.env` for local dev)
 - ❌ Wrong HTTP status codes → 400 (bad input) vs 404 (not found) vs 409 (conflict)
 
 ### Frontend (React/PatternFly)
@@ -321,13 +321,13 @@ This application uses **OAuth2 Proxy** for authentication. See [docs/AUTHENTICAT
 ### Git/Commits
 
 - ❌ Not following Conventional Commits → Use `feat:`, `fix:`, `refactor:`, etc.
-- ❌ Committing `.env` files with secrets → Use `config/local/.env.*.example` templates
+- ❌ Committing `.env` files with secrets → Use `config/local/.env.example` template
 
 ## Development Workflow
 
 ### Initial Setup
 1. Install dependencies: `make setup`
-2. Configure environment: `make env-setup` (copies from `config/local/`)
+2. Configure environment: `make config-setup` (copies from `config/local/.env.example`)
 3. Start all services: `make services-start`
 4. Seed test data: `make db-seed`
 5. Start development servers: `make dev`

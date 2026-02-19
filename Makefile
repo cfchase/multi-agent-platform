@@ -17,7 +17,7 @@ include makefiles/helm.mk
 include makefiles/test.mk
 
 .PHONY: help setup setup-frontend setup-backend dev dev-frontend dev-backend dev-2 dev-frontend-2 dev-backend-2
-.PHONY: env-setup sync-version bump-version show-version health-backend health-frontend
+.PHONY: config-setup config-reset env-setup sync-version bump-version show-version health-backend health-frontend
 .PHONY: clean clean-all fresh-start quick-start
 
 # Default target
@@ -66,36 +66,14 @@ dev-frontend-2: ## Run second frontend instance (port 8081)
 dev-backend-2: ## Run second backend instance (port 8001)
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
-# Environment Setup
-env-setup: ## Copy config example files for local development
-	@echo "Setting up environment files from config/local/..."
-	@for example in config/local/.env.*.example; do \
-		actual=$${example%.example}; \
-		if [ ! -f "$$actual" ]; then \
-			cp "$$example" "$$actual"; \
-			echo "  Created $$(basename $$actual)"; \
-		fi; \
-	done
-	@if [ ! -f config/local/flow-sources.yaml ]; then \
-		cp config/local/flow-sources.yaml.example config/local/flow-sources.yaml; \
-		echo "  Created flow-sources.yaml"; \
-	fi
-	@echo ""
-	@echo "Copying component configs..."
-	@if [ ! -f backend/.env ]; then \
-		cp config/local/.env.backend backend/.env 2>/dev/null || true; \
-		echo "  Created backend/.env"; \
-	fi
-	@if [ ! -f frontend/.env ]; then \
-		cp config/local/.env.frontend frontend/.env 2>/dev/null || true; \
-		echo "  Created frontend/.env"; \
-	fi
-	@echo ""
-	@echo "Config files are in config/local/. Edit them to configure:"
-	@echo "  .env.backend   - Database, OAuth, Langflow settings"
-	@echo "  .env.postgres  - Database credentials"
-	@echo "  .env.langflow  - LLM API keys for Langflow"
-	@echo "  .env.langfuse  - Langfuse service credentials"
+# Config Setup (local by default, use config-setup-dev for cluster)
+config-setup: ## Setup local config from examples
+	@./scripts/generate-config.sh local
+
+config-reset: ## Delete all local config (run config-setup after editing .env)
+	@./scripts/generate-config.sh reset local
+
+env-setup: config-setup ## Alias for config-setup
 
 # Version Management
 sync-version: ## Sync VERSION to pyproject.toml and package.json
@@ -128,7 +106,7 @@ clean: ## Clean build artifacts and dependencies
 clean-all: clean ## Clean everything
 
 # Development Workflow
-fresh-start: clean setup env-setup ## Clean setup for new development
+fresh-start: clean setup config-setup ## Clean setup for new development
 	@echo "Fresh development environment ready!"
 
-quick-start: setup env-setup dev ## Quick start for development
+quick-start: setup config-setup dev ## Quick start for development

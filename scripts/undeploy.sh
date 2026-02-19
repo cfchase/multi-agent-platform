@@ -44,22 +44,15 @@ if ! oc whoami &> /dev/null; then
     exit 1
 fi
 
-# Undeploy in reverse order
-# Services are deployed via helm template | oc apply, so delete by label
-echo "Step 1/5: Removing Langfuse..."
-oc delete route langfuse -n "$NAMESPACE" 2>/dev/null || true
-oc delete statefulset -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete all,configmap,secret,serviceaccount,role,rolebinding -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+# Undeploy in reverse dependency order (opposite of deploy.sh):
+# Deploy: namespace → postgres → langfuse → mlflow → langflow → app
+# Undeploy: app → langflow → mlflow → langfuse → shared resources → postgres
+echo "Step 1/5: Removing Multi-Agent Platform App..."
+oc delete -k "$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete secret backend-config -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
-echo "Step 2/5: Removing MLFlow..."
-oc delete route mlflow -n "$NAMESPACE" 2>/dev/null || true
-oc delete service mlflow-external -n "$NAMESPACE" 2>/dev/null || true
-oc delete all,configmap,secret,serviceaccount -l app.kubernetes.io/instance=mlflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete -k "$PROJECT_ROOT/k8s/mlflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-echo ""
-
-echo "Step 3/5: Removing LangFlow..."
+echo "Step 2/5: Removing LangFlow..."
 oc delete route langflow -n "$NAMESPACE" 2>/dev/null || true
 oc delete service langflow-external -n "$NAMESPACE" 2>/dev/null || true
 oc delete statefulset -l release=langflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
@@ -67,19 +60,27 @@ oc delete all,configmap,secret,serviceaccount -l release=langflow -n "$NAMESPACE
 oc delete -k "$PROJECT_ROOT/k8s/langflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 echo ""
 
-echo "Step 4/5: Removing Multi-Agent Platform App..."
-oc delete -k "$PROJECT_ROOT/k8s/app/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete secret backend-config -n "$NAMESPACE" 2>/dev/null || true
+echo "Step 3/5: Removing MLFlow..."
+oc delete route mlflow -n "$NAMESPACE" 2>/dev/null || true
+oc delete service mlflow-external -n "$NAMESPACE" 2>/dev/null || true
+oc delete all,configmap,secret,serviceaccount -l app.kubernetes.io/instance=mlflow -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete -k "$PROJECT_ROOT/k8s/mlflow/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
 echo ""
 
-echo "Removing shared OAuth resources..."
+echo "Step 4/5: Removing Langfuse..."
+oc delete route langfuse -n "$NAMESPACE" 2>/dev/null || true
+oc delete statefulset -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+oc delete all,configmap,secret,serviceaccount,role,rolebinding -l app.kubernetes.io/instance=langfuse -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
+echo ""
+
+echo "Removing shared OAuth resources and admin credentials..."
 oc delete sa supporting-services-proxy -n "$NAMESPACE" 2>/dev/null || true
 oc delete secret supporting-services-proxy-session -n "$NAMESPACE" 2>/dev/null || true
+oc delete secret admin-credentials -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
 echo "Step 5/5: Removing PostgreSQL..."
 oc delete -k "$PROJECT_ROOT/k8s/postgres/overlays/$ENVIRONMENT" -n "$NAMESPACE" --ignore-not-found=true 2>/dev/null || true
-oc delete secret admin-credentials -n "$NAMESPACE" 2>/dev/null || true
 echo ""
 
 echo "==================================="

@@ -20,14 +20,10 @@ MLFLOW_PORT="${MLFLOW_PORT:-5000}"
 PROJECT_ROOT="${SCRIPT_DIR}/.."
 DATA_DIR="${PROJECT_ROOT}/.local/mlflow"
 
-# Load config from centralized config directory
-MLFLOW_CONFIG="$PROJECT_ROOT/config/local/.env.mlflow"
-if [ -f "$MLFLOW_CONFIG" ]; then
-    set -a; source "$MLFLOW_CONFIG"; set +a
-fi
-POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
-if [ -f "$POSTGRES_CONFIG" ]; then
-    set -a; source "$POSTGRES_CONFIG"; set +a
+# Load consolidated config
+CONFIG_FILE="$PROJECT_ROOT/config/local/.env"
+if [ -f "$CONFIG_FILE" ]; then
+    set -a; source "$CONFIG_FILE"; set +a
 fi
 
 # Database connection (connects to shared PostgreSQL)
