@@ -46,13 +46,13 @@ class TestTokenEncryption:
         with pytest.raises(InvalidToken):
             encryption.decrypt(b"invalid-encrypted-data")
 
-    def test_encryption_without_key_raises_error(self):
-        """Missing TOKEN_ENCRYPTION_KEY raises ValueError."""
+    def test_encryption_with_invalid_key_raises_error(self):
+        """Invalid encryption key raises ValueError."""
         from app.core.encryption import TokenEncryption
 
-        # Explicitly pass empty key to test error handling
-        with pytest.raises(ValueError, match="TOKEN_ENCRYPTION_KEY"):
-            TokenEncryption(key="")
+        # Explicitly pass invalid key to test error handling
+        with pytest.raises(ValueError):
+            TokenEncryption(key="not-a-valid-fernet-key")
 
 
 class TestUserIntegrationModel:

@@ -36,19 +36,11 @@ class TokenEncryption:
 
         Args:
             key: Base64-encoded 32-byte key. If not provided,
-                 reads from TOKEN_ENCRYPTION_KEY setting.
-
-        Raises:
-            ValueError: If no key is provided or found in settings.
+                 reads from TOKEN_ENCRYPTION_KEY setting (which auto-generates
+                 a default for local/dev environments).
         """
         if key is None:
             key = settings.TOKEN_ENCRYPTION_KEY
-
-        if not key:
-            raise ValueError(
-                "TOKEN_ENCRYPTION_KEY environment variable is required. "
-                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-            )
 
         self.fernet = Fernet(key.encode() if isinstance(key, str) else key)
 

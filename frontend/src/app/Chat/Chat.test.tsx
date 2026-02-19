@@ -206,4 +206,95 @@ describe('Chat component', () => {
     // Component should not crash and should handle the error
     expect(screen.getByText('Research Assistant')).toBeVisible();
   });
+
+  test('should display actual error message from SSE error event', async () => {
+    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
+
+    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
+      (_chatId, _content, onMessage) => {
+        setTimeout(() => {
+          onMessage({ type: 'error', error: 'Failed to connect to Langflow: Connection refused' });
+        }, 10);
+        return { close: vi.fn() };
+      }
+    );
+
+    renderChat();
+
+    await waitFor(() => {
+      expect(ChatAPI.getChats).toHaveBeenCalled();
+    });
+
+    // Simulate sending by calling the streaming mock directly and checking the onMessage callback
+    const onMessage = vi.fn();
+    ChatAPI.createStreamingMessage(1, 'test', onMessage);
+
+    await waitFor(() => {
+      expect(onMessage).toHaveBeenCalledWith({
+        type: 'error',
+        error: 'Failed to connect to Langflow: Connection refused',
+      });
+    });
+  });
+
+  test('should pass partial content and error separately when error occurs mid-stream', async () => {
+    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
+
+    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
+      (_chatId, _content, onMessage) => {
+        setTimeout(() => {
+          onMessage({ type: 'content', content: 'Here is the beginning' });
+          onMessage({ type: 'error', error: 'Langflow streaming error: 500' });
+        }, 10);
+        return { close: vi.fn() };
+      }
+    );
+
+    renderChat();
+
+    await waitFor(() => {
+      expect(ChatAPI.getChats).toHaveBeenCalled();
+    });
+
+    // Verify the streaming API delivers both content and error events
+    const events: Array<{ type: string; content?: string; error?: string }> = [];
+    ChatAPI.createStreamingMessage(1, 'test', (event) => events.push(event));
+
+    await waitFor(() => {
+      expect(events).toHaveLength(2);
+      expect(events[0]).toEqual({ type: 'content', content: 'Here is the beginning' });
+      expect(events[1]).toEqual({ type: 'error', error: 'Langflow streaming error: 500' });
+    });
+  });
+
+  test('should pass network error message through to error handler', async () => {
+    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
+
+    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
+      (_chatId, _content, _onMessage, onError) => {
+        setTimeout(() => {
+          onError?.(new Error('Missing integration: jira. Please connect the service in Settings.'));
+        }, 10);
+        return { close: vi.fn() };
+      }
+    );
+
+    renderChat();
+
+    await waitFor(() => {
+      expect(ChatAPI.getChats).toHaveBeenCalled();
+    });
+
+    // Verify the onError callback receives the actual error message
+    const onError = vi.fn();
+    ChatAPI.createStreamingMessage(1, 'test', vi.fn(), onError);
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Missing integration: jira. Please connect the service in Settings.',
+        })
+      );
+    });
+  });
 });

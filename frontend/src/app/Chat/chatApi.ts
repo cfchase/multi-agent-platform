@@ -140,9 +140,18 @@ export const ChatAPI = {
       body: JSON.stringify(body),
       signal: controller.signal,
     })
-      .then((response) => {
+      .then(async (response) => {
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          let detail = `HTTP error! status: ${response.status}`;
+          try {
+            const body = await response.json();
+            if (body?.detail) {
+              detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+            }
+          } catch {
+            // Response body wasn't JSON — use default status message
+          }
+          throw new Error(detail);
         }
 
         const reader = response.body?.getReader();
