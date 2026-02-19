@@ -8,6 +8,7 @@ and validation following FastAPI best practices.
 import os
 import secrets
 import tomllib
+from base64 import urlsafe_b64encode
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -125,8 +126,10 @@ class Settings(BaseSettings):
 
     # OAuth Integration Configuration
     # Token encryption key for secure storage of OAuth tokens
-    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    TOKEN_ENCRYPTION_KEY: str | None = None
+    # Auto-generated for local/dev (tokens won't survive key changes across restarts).
+    # For production, set explicitly and persist:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    TOKEN_ENCRYPTION_KEY: str = urlsafe_b64encode(secrets.token_bytes(32)).decode()
 
     # LLM API Keys
     # Used by the backend to inject application-level API keys into flows via tweaks.

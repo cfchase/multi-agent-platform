@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Alert,
   AlertActionCloseButton,
+  AlertActionLink,
   Button,
   Dropdown,
   DropdownItem,
@@ -28,7 +29,7 @@ import {
   MessageProps,
   Conversation,
 } from '@patternfly/chatbot';
-import { ArrowDownIcon, RedoIcon, TrashIcon } from '@patternfly/react-icons';
+import { ArrowDownIcon, TrashIcon } from '@patternfly/react-icons';
 
 import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
 import userAvatar from '@app/images/user-avatar.svg';
@@ -37,7 +38,6 @@ import aiLogo from '@app/images/ai-logo-transparent.svg';
 import '@patternfly/chatbot/dist/css/main.css';
 import './Chat.css';
 
-const ERROR_MESSAGE = 'Sorry, an error occurred. Click retry to try again.';
 const DISPLAY_MODE = ChatbotDisplayMode.embedded;
 
 function convertMessageToProps(msg: ChatMessage): MessageProps {
@@ -69,7 +69,13 @@ function Chat(): React.ReactElement {
   const [messages, setMessages] = React.useState<MessageProps[]>([]);
   const [isSending, setIsSending] = React.useState(false);
   const [announcement, setAnnouncement] = React.useState<string>();
-  const [lastError, setLastError] = React.useState<{ message: string; chatId: number } | null>(null);
+  const [lastError, setLastError] = React.useState<{
+    message: string;
+    chatId: number;
+    botMessageId: string;
+    errorText: string;
+  } | null>(null);
+  const [errorMessages, setErrorMessages] = React.useState<Map<string, string>>(new Map());
 
   // Operation error state (for displaying errors to user)
   const [operationError, setOperationError] = React.useState<string | null>(null);
@@ -136,6 +142,8 @@ function Chat(): React.ReactElement {
 
   // Load messages and restore flow when chat changes
   React.useEffect(() => {
+    setLastError(null);
+    setErrorMessages(new Map());
     if (selectedChatId) {
       const chat = chats.find((c) => c.id === selectedChatId);
       if (chat?.flow_name) {
@@ -265,8 +273,9 @@ function Chat(): React.ReactElement {
     };
 
     // Add loading bot message
+    const botMessageId = `bot-${Date.now()}`;
     const loadingBotMessage: MessageProps = {
-      id: `bot-${Date.now()}`,
+      id: botMessageId,
       role: 'bot',
       content: '',
       name: 'Assistant',
@@ -277,8 +286,16 @@ function Chat(): React.ReactElement {
 
     if (isRetry) {
       // Remove the error message and add new loading message
+      const errorBotId = lastError?.botMessageId;
+      if (errorBotId) {
+        setErrorMessages((prev) => {
+          const next = new Map(prev);
+          next.delete(errorBotId);
+          return next;
+        });
+      }
       setMessages((prev) => {
-        const withoutError = prev.filter((msg) => !msg.content?.includes('error occurred'));
+        const withoutError = prev.filter((msg) => msg.id !== errorBotId);
         return [...withoutError, loadingBotMessage];
       });
     } else {
@@ -298,7 +315,7 @@ function Chat(): React.ReactElement {
           // Update the bot message with accumulated content
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === loadingBotMessage.id
+              msg.id === botMessageId
                 ? { ...msg, content: accumulatedContent, isLoading: false }
                 : msg
             )
@@ -322,29 +339,43 @@ function Chat(): React.ReactElement {
             );
           }
         } else if (event.type === 'error') {
+          const errorText = event.error || 'An unknown error occurred.';
           streamControllerRef.current = null;
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === loadingBotMessage.id
-                ? { ...msg, content: ERROR_MESSAGE, isLoading: false }
+              msg.id === botMessageId
+                ? { ...msg, content: accumulatedContent || '', isLoading: false }
                 : msg
             )
           );
-          setLastError({ message: messageText, chatId: chatId });
+          setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
+          setLastError({
+            message: messageText,
+            chatId: chatId,
+            botMessageId,
+            errorText,
+          });
           setIsSending(false);
         }
       },
       (err) => {
         console.error('Streaming error:', err);
+        const errorText = err.message || 'An unknown error occurred.';
         streamControllerRef.current = null;
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === loadingBotMessage.id
-              ? { ...msg, content: ERROR_MESSAGE, isLoading: false }
+            msg.id === botMessageId
+              ? { ...msg, content: accumulatedContent || '', isLoading: false }
               : msg
           )
         );
-        setLastError({ message: messageText, chatId: chatId });
+        setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
+        setLastError({
+          message: messageText,
+          chatId: chatId,
+          botMessageId,
+          errorText,
+        });
         setIsSending(false);
       },
       () => {
@@ -495,9 +526,17 @@ function Chat(): React.ReactElement {
                   onScroll={handleScroll}
                 >
                   {messages.map((message) => {
-                    const hasError = message.content?.includes('error occurred');
+                    const errorText = errorMessages.get(message.id || '');
+                    const hasError = !!errorText;
+                    const hasPartialContent = hasError && !!message.content;
                     const canRetry = hasError && lastError && lastError.chatId === selectedChatId;
                     const showCopyAction = message.role === 'bot' && !message.isLoading && !hasError;
+
+                    const retryLink = canRetry ? (
+                      <AlertActionLink onClick={handleRetry} isDisabled={isSending}>
+                        Retry
+                      </AlertActionLink>
+                    ) : undefined;
 
                     return (
                       <Message
@@ -512,18 +551,31 @@ function Chat(): React.ReactElement {
                               }
                             : undefined
                         }
-                      >
-                        {canRetry && (
-                          <Button
-                            variant="link"
-                            icon={<RedoIcon />}
-                            onClick={handleRetry}
-                            isDisabled={isSending}
-                          >
-                            Retry
-                          </Button>
-                        )}
-                      </Message>
+                        {...(hasError && !hasPartialContent
+                          ? {
+                              error: {
+                                title: errorText,
+                                variant: 'danger',
+                                actionLinks: retryLink,
+                              },
+                            }
+                          : {})}
+                        {...(hasError && hasPartialContent
+                          ? {
+                              extraContent: {
+                                afterMainContent: (
+                                  <Alert
+                                    variant="danger"
+                                    title={errorText}
+                                    isInline
+                                    isPlain
+                                    actionLinks={retryLink}
+                                  />
+                                ),
+                              },
+                            }
+                          : {})}
+                      />
                     );
                   })}
                 </MessageBox>
