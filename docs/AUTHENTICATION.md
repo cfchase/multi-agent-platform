@@ -100,7 +100,7 @@ OAuth running - access app at: http://localhost:4180
 For quick UI development without OAuth overhead:
 
 ```bash
-# Edit config/local/.env.backend (or backend/.env after make env-setup)
+# Edit config/local/.env
 ENVIRONMENT=local
 FRONTEND_HOST=http://localhost:8080
 
@@ -119,7 +119,7 @@ In local mode:
 
 ## Real OAuth Providers
 
-For testing with actual OAuth providers (Google, GitHub, Keycloak), configure credentials in `config/local/.env.oauth-proxy` (local) or `config/dev/.env.oauth-proxy` (cluster).
+For testing with actual OAuth providers (Google, GitHub, Keycloak), configure credentials in `config/local/.env` (local) or `config/dev/.env` (cluster).
 
 ### Environment Variables
 
@@ -202,16 +202,12 @@ Authorized redirect URIs:
 
 ```bash
 # Set up environment from config/local/ templates
-make env-setup
+make config-setup
 ```
 
-Add these values to `config/local/.env.backend`:
+Add these values to `config/local/.env`:
 ```bash
 ENVIRONMENT=development
-```
-
-Add these values to `config/local/.env.oauth-proxy`:
-```bash
 OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 OAUTH_CLIENT_SECRET=your-client-secret
 # OAUTH_COOKIE_SECRET is auto-generated if not set
@@ -255,21 +251,18 @@ Authorized redirect URIs:
 
 ```bash
 # Generate config files from templates
-make config-setup
+make config-setup-cluster
 
 # Or manually copy:
-cp config/dev/.env.oauth-proxy.example config/dev/.env.oauth-proxy
+cp config/dev/.env.example config/dev/.env
 # Edit with your credentials
 ```
 
-Contents of `config/dev/.env.oauth-proxy`:
+Set OAuth values in `config/dev/.env`:
 ```bash
-# Generate cookie secret: python -c "import secrets; print(secrets.token_urlsafe(32))"
-cookie-secret=your-generated-cookie-secret
-
-# From Google Cloud Console
-client-id=your-client-id.apps.googleusercontent.com
-client-secret=your-client-secret
+OAUTH_COOKIE_SECRET=your-generated-cookie-secret
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
 ```
 
 **Deploy:**

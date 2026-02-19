@@ -61,35 +61,69 @@ if [[ ! -f "$VALUES_FILE" ]]; then
     exit 1
 fi
 
-# Create langflow-credentials secret from config/dev/.env.langflow
+# Create langflow-credentials secret from consolidated .env
 # Contains LLM API keys and tracing config — loaded via envFrom in the post-renderer patch
-LANGFLOW_ENV_FILE="$PROJECT_ROOT/config/$ENVIRONMENT/.env.langflow"
+# Only extract Langflow-relevant keys (LLM API keys, search APIs)
+LANGFLOW_ENV_FILE="$PROJECT_ROOT/config/$ENVIRONMENT/.env"
+LANGFLOW_KEYS="OPENAI_API_KEY|GEMINI_API_KEY|ANTHROPIC_API_KEY|OLLAMA_BASE_URL|TAVILY_API_KEY|GOOGLE_API_KEY|GOOGLE_CSE_ID|LANGFLOW_VARIABLES_TO_GET_FROM_ENVIRONMENT"
+
+LITERAL_ARGS=()
 if [[ -f "$LANGFLOW_ENV_FILE" ]]; then
-    # Filter to non-empty, non-comment key=value lines
-    LANGFLOW_CREDS=$(grep -v '^\s*#' "$LANGFLOW_ENV_FILE" | grep -v '^\s*$' | grep '=.' || true)
+    # Filter to Langflow-relevant, non-empty, non-comment key=value lines
+    LANGFLOW_CREDS=$(grep -v '^\s*#' "$LANGFLOW_ENV_FILE" | grep -v '^\s*$' | grep -E "^(${LANGFLOW_KEYS})=." || true)
     if [[ -n "$LANGFLOW_CREDS" ]]; then
-        # Build --from-literal args for each non-empty key
-        LITERAL_ARGS=()
         while IFS= read -r line; do
             key="${line%%=*}"
             value="${line#*=}"
             [[ -z "$key" || -z "$value" ]] && continue
             LITERAL_ARGS+=("--from-literal=${key}=${value}")
         done <<< "$LANGFLOW_CREDS"
-
-        if [[ ${#LITERAL_ARGS[@]} -gt 0 ]]; then
-            if oc get secret langflow-credentials -n "$NAMESPACE" &>/dev/null; then
-                oc delete secret langflow-credentials -n "$NAMESPACE"
-            fi
-            oc create secret generic langflow-credentials \
-                "${LITERAL_ARGS[@]}" -n "$NAMESPACE"
-            echo "Created langflow-credentials secret (${#LITERAL_ARGS[@]} keys)"
-        fi
-    else
-        echo "No non-empty values in $LANGFLOW_ENV_FILE — skipping langflow-credentials secret"
     fi
 else
-    echo "Warning: $LANGFLOW_ENV_FILE not found — langflow-credentials secret not created"
+    echo "Warning: $LANGFLOW_ENV_FILE not found"
+fi
+
+# Inject Langfuse tracing keys from generated secrets-dev.yaml
+# These are auto-generated API keys, not user-settable, so read from the artifact
+LANGFUSE_SECRETS="$PROJECT_ROOT/helm/langfuse/secrets-${ENVIRONMENT}.yaml"
+if [[ -f "$LANGFUSE_SECRETS" ]]; then
+    # Extract additionalEnv value by name from YAML (e.g., "- name: KEY\n  value: VAL")
+    _yaml_env_val() { awk "/name: ${1}\$/{getline; gsub(/.*value: *\"?/,\"\"); gsub(/\"? *$/,\"\"); print; exit}" "$2" 2>/dev/null; }
+    LF_PK=$(_yaml_env_val "LANGFUSE_INIT_PROJECT_PUBLIC_KEY" "$LANGFUSE_SECRETS")
+    LF_SK=$(_yaml_env_val "LANGFUSE_INIT_PROJECT_SECRET_KEY" "$LANGFUSE_SECRETS")
+    if [[ -n "$LF_PK" ]]; then
+        LITERAL_ARGS+=("--from-literal=LANGFUSE_PUBLIC_KEY=${LF_PK}")
+    fi
+    if [[ -n "$LF_SK" ]]; then
+        LITERAL_ARGS+=("--from-literal=LANGFUSE_SECRET_KEY=${LF_SK}")
+    fi
+    if [[ -z "$LF_PK" || -z "$LF_SK" ]]; then
+        echo "Warning: Could not extract Langfuse API keys from $LANGFUSE_SECRETS"
+        echo "  LANGFUSE_PUBLIC_KEY: ${LF_PK:-(empty)}"
+        echo "  LANGFUSE_SECRET_KEY: ${LF_SK:-(empty)}"
+        echo "  Langflow tracing may not work. Verify secrets-${ENVIRONMENT}.yaml format."
+    else
+        echo "Added Langfuse tracing keys from secrets-${ENVIRONMENT}.yaml"
+    fi
+    # Langfuse internal service URL (Helm release "langfuse", service "langfuse-web" on port 3000)
+    LITERAL_ARGS+=("--from-literal=LANGFUSE_HOST=http://langfuse-web:3000")
+else
+    echo "Warning: $LANGFUSE_SECRETS not found — Langfuse tracing not configured"
+fi
+
+if [[ ${#LITERAL_ARGS[@]} -gt 0 ]]; then
+    if oc get secret langflow-credentials -n "$NAMESPACE" &>/dev/null; then
+        if ! oc delete secret langflow-credentials -n "$NAMESPACE"; then
+            echo "Error: Failed to delete existing langflow-credentials secret."
+            echo "  Check RBAC permissions: oc auth can-i delete secrets -n $NAMESPACE"
+            exit 1
+        fi
+    fi
+    oc create secret generic langflow-credentials \
+        "${LITERAL_ARGS[@]}" -n "$NAMESPACE"
+    echo "Created langflow-credentials secret (${#LITERAL_ARGS[@]} keys)"
+else
+    echo "No credentials to configure — skipping langflow-credentials secret"
 fi
 
 # Add Helm repo
@@ -149,7 +183,13 @@ oc apply -f "$PROJECT_ROOT/k8s/langflow/base/route.yaml" -n "$NAMESPACE"
 
 # Wait for LangFlow to be ready (Helm chart creates a StatefulSet, not Deployment)
 echo "Waiting for LangFlow to be ready (this may take a few minutes)..."
-oc rollout status statefulset/${RELEASE_NAME}-service -n "$NAMESPACE" --timeout=300s || true
+if ! oc rollout status statefulset/${RELEASE_NAME}-service -n "$NAMESPACE" --timeout=300s; then
+    echo ""
+    echo "Warning: LangFlow did not become ready within 300s"
+    echo "  Check pod status: oc get pods -n $NAMESPACE -l app=langflow-service"
+    echo "  Check logs: oc logs -n $NAMESPACE -l app=langflow-service --tail=50"
+    echo "  Continuing with remaining deployments..."
+fi
 
 # Get route URL
 ROUTE_URL=$(oc get route langflow -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
@@ -167,5 +207,4 @@ echo "Internal backend access via langflow-service-backend:7860 bypasses OAuth."
 echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app=langflow-service"
 echo ""
-echo "NOTE: Backend reads Langflow URL from backend-config secret."
-echo "  Ensure config/dev/.env.backend has LANGFLOW_URL set correctly."
+echo "Backend connects to Langflow via internal service URL (langflow-service-backend:7860, auto-configured)."

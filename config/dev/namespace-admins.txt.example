@@ -1,7 +1,19 @@
-# OpenShift users with admin access to the namespace.
-# One username per line. These users get edit access to the namespace
-# and can access Langflow/MLflow via OpenShift OAuth proxy.
-# Copy to namespace-admins.txt and add your users.
-# Username is the OpenShift username (e.g., from 'oc whoami').
+# ========================================
+# OpenShift Namespace Admins
+# ========================================
+# One OpenShift username per line.
+# These users get edit access to the namespace and can access
+# Langflow and MLflow via OpenShift OAuth proxy.
+# Lines starting with # are comments (ignored).
+# Blank lines are ignored.
+#
+# Find your username with: oc whoami
+# Copy this file to namespace-admins.txt and replace with real usernames.
+# WARNING: Empty file will prevent all admin access to Langflow/MLflow.
+# No wildcard patterns — list each user explicitly.
+#
+# Example:
+#   jdoe
+#   admin-user
 user1
 user2

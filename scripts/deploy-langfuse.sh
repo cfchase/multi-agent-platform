@@ -56,45 +56,34 @@ if ! oc get secret admin-credentials -n "$NAMESPACE" &> /dev/null; then
 fi
 
 # Auto-calculate LANGFUSE_NEXTAUTH_URL from OpenShift apps domain
+# Exported as env var for generate-config.sh envsubst pipeline (never written to user config files)
 APPS_DOMAIN_ERR=$(mktemp)
 APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>"$APPS_DOMAIN_ERR" || echo "")
 if [[ -n "$APPS_DOMAIN" ]]; then
-    LANGFUSE_NEXTAUTH_URL="https://langfuse-${NAMESPACE}.${APPS_DOMAIN}"
-    LANGFUSE_ENV_FILE="$PROJECT_ROOT/config/${ENVIRONMENT}/.env.langfuse"
-    if [[ -f "$LANGFUSE_ENV_FILE" ]]; then
-        if grep -q "^LANGFUSE_NEXTAUTH_URL=" "$LANGFUSE_ENV_FILE"; then
-            sed -i.bak "s|^LANGFUSE_NEXTAUTH_URL=.*|LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}|" "$LANGFUSE_ENV_FILE"
-            rm -f "${LANGFUSE_ENV_FILE}.bak"
-        else
-            echo "LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}" >> "$LANGFUSE_ENV_FILE"
-        fi
-        # Verify the write succeeded
-        actual_url=$(grep "^LANGFUSE_NEXTAUTH_URL=" "$LANGFUSE_ENV_FILE" | cut -d= -f2-)
-        if [ "$actual_url" != "$LANGFUSE_NEXTAUTH_URL" ]; then
-            echo "Error: Failed to update LANGFUSE_NEXTAUTH_URL in $LANGFUSE_ENV_FILE"
-            rm -f "$APPS_DOMAIN_ERR"
-            exit 1
-        fi
-        echo "Set LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}"
-    fi
+    export LANGFUSE_NEXTAUTH_URL="https://langfuse-${NAMESPACE}.${APPS_DOMAIN}"
+    echo "Auto-calculated LANGFUSE_NEXTAUTH_URL=${LANGFUSE_NEXTAUTH_URL}"
 else
     echo "Warning: Could not detect OpenShift apps domain."
     if [[ -s "$APPS_DOMAIN_ERR" ]]; then
         echo "  Reason: $(cat "$APPS_DOMAIN_ERR")"
     fi
-    # Fail if LANGFUSE_NEXTAUTH_URL is still a placeholder
-    if grep -q "^LANGFUSE_NEXTAUTH_URL=auto-calculated-by-deploy-script" "$PROJECT_ROOT/config/${ENVIRONMENT}/.env.langfuse" 2>/dev/null; then
-        echo "Error: LANGFUSE_NEXTAUTH_URL is still a placeholder and cannot be auto-calculated."
-        echo "Please set it manually in config/${ENVIRONMENT}/.env.langfuse"
+    # Check if LANGFUSE_NEXTAUTH_URL is set from consolidated .env
+    LANGFUSE_ENV_FILE="$PROJECT_ROOT/config/${ENVIRONMENT}/.env"
+    if [[ -f "$LANGFUSE_ENV_FILE" ]]; then
+        set -a; source "$LANGFUSE_ENV_FILE"; set +a
+    fi
+    if [[ -z "$LANGFUSE_NEXTAUTH_URL" || "$LANGFUSE_NEXTAUTH_URL" == "auto-calculated-by-deploy-script" ]]; then
+        echo "Error: LANGFUSE_NEXTAUTH_URL cannot be auto-calculated and is not set in config/${ENVIRONMENT}/.env"
+        echo "Please set it manually in config/${ENVIRONMENT}/.env"
         echo "Example: LANGFUSE_NEXTAUTH_URL=https://langfuse-${NAMESPACE}.apps.your-cluster.example.com"
         rm -f "$APPS_DOMAIN_ERR"
         exit 1
     fi
-    echo "Using existing LANGFUSE_NEXTAUTH_URL value."
+    echo "Using LANGFUSE_NEXTAUTH_URL from config/${ENVIRONMENT}/.env"
 fi
 rm -f "$APPS_DOMAIN_ERR"
 
-# Always regenerate secrets from source of truth (config/dev/.env.langfuse)
+# Always regenerate secrets from source of truth (config/dev/.env)
 SECRETS_FILE="$PROJECT_ROOT/helm/langfuse/secrets-${ENVIRONMENT}.yaml"
 echo "Generating Langfuse secrets..."
 "$SCRIPT_DIR/generate-config.sh" helm-langfuse --force
@@ -140,7 +129,13 @@ oc create route edge langfuse --service="${RELEASE_NAME}-web" --port=3000 -n "$N
 
 # Wait for Langfuse to be ready
 echo "Waiting for Langfuse to be ready..."
-oc rollout status deployment/${RELEASE_NAME}-web -n "$NAMESPACE" --timeout=300s || true
+if ! oc rollout status deployment/${RELEASE_NAME}-web -n "$NAMESPACE" --timeout=300s; then
+    echo ""
+    echo "Warning: Langfuse did not become ready within 300s"
+    echo "  Check pod status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=langfuse"
+    echo "  Check logs: oc logs -n $NAMESPACE -l app.kubernetes.io/name=langfuse-web --tail=50"
+    echo "  Continuing with remaining deployments..."
+fi
 
 # Get route URL
 ROUTE_URL=$(oc get route langfuse -n "$NAMESPACE" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
@@ -158,5 +153,4 @@ echo "  make get-admin-credentials"
 echo ""
 echo "Check status: oc get pods -n $NAMESPACE -l app.kubernetes.io/instance=langfuse"
 echo ""
-echo "NOTE: Backend reads Langfuse URL from backend-config secret."
-echo "  Ensure config/dev/.env.backend has LANGFUSE_HOST set correctly."
+echo "Backend connects to Langfuse via internal service URL (langfuse-web:3000, auto-configured)."

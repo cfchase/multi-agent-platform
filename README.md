@@ -59,7 +59,7 @@ A platform for hosting and orchestrating multiple LangFlow workflows, built on R
 git clone https://github.com/cfchase/multi-agent-platform
 cd multi-agent-platform
 make setup
-make env-setup              # Copy config from config/local/
+make config-setup           # Copy config from config/local/
 make services-start
 make db-seed  # optional: load sample data
 make dev
@@ -79,7 +79,7 @@ OAuth is enabled by default. Access app at <http://localhost:4180>.
 - **No OAuth credentials**: Uses mock OAuth server (any username/password works)
 - **With OAuth credentials**: Uses configured provider (Google, GitHub, Keycloak)
 
-Configure OAuth in `config/local/.env.oauth-proxy` (local) or `config/dev/.env.oauth-proxy` (cluster):
+Configure OAuth in `config/local/.env` (local) or `config/dev/.env` (cluster):
 
 ```bash
 OAUTH_CLIENT_ID=your-client-id
@@ -98,16 +98,16 @@ For setup details, see [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
 # 1. Login to your cluster
 oc login --server=https://your-cluster
 
-# 2. Set up deployment config (creates config/dev/ files, auto-generates secrets)
-make config-setup
+# 2. Set up deployment config (creates config/dev/ files)
+make config-setup-cluster
 
-# 3. Configure OAuth credentials (required)
-#    Edit config/dev/.env.oauth-proxy with your Google OAuth Client ID and Secret
-#    Edit config/dev/.env.backend with the same OAuth credentials
+# 3. Configure credentials (required)
+#    Edit config/dev/.env with OAuth, LLM keys, etc.
 #    Edit config/dev/allowed-emails.txt with authorized email addresses
 #    Edit config/dev/namespace-admins.txt with OpenShift usernames for admin access
 
-# 4. Deploy everything
+# 4. Generate deployment artifacts and deploy
+make config-generate
 make deploy
 
 # 5. Verify deployment

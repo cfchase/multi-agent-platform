@@ -1,5 +1,15 @@
-# Email allowlist for main app (Google OAuth)
+# ========================================
+# Email Allowlist for Main App (Google OAuth)
+# ========================================
 # One email per line. Only these users can log in to the platform.
-# Copy to allowed-emails.txt and add your users.
+# Lines starting with # are comments (ignored).
+# Blank lines are ignored.
+#
+# Copy this file to allowed-emails.txt and replace with real emails.
+# WARNING: Empty file or placeholder emails will prevent all logins.
+#
+# Example:
+#   user@company.com
+#   team-lead@company.com
 user1@example.com
 user2@example.com

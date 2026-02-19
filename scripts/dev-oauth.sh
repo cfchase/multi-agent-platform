@@ -4,7 +4,7 @@
 # Runs oauth2-proxy locally for testing OAuth authentication flow
 # Supports Google OAuth (default) or OIDC providers (Keycloak, Okta, etc.)
 #
-# Requires OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET in config/local/.env.oauth-proxy
+# Requires OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET in config/local/.env
 
 set -e
 
@@ -20,10 +20,10 @@ OAUTH_PROXY_CONTAINER="app-oauth-proxy-dev"
 OAUTH_PORT="${OAUTH_PORT:-4180}"
 OAUTH_PROXY_IMAGE="quay.io/oauth2-proxy/oauth2-proxy:v7.6.0"
 
-# Load OAuth config from centralized config directory
-OAUTH_CONFIG="${SCRIPT_DIR}/../config/local/.env.oauth-proxy"
-if [ -f "$OAUTH_CONFIG" ]; then
-    set -a; source "$OAUTH_CONFIG"; set +a
+# Load consolidated config
+CONFIG_FILE="${SCRIPT_DIR}/../config/local/.env"
+if [ -f "$CONFIG_FILE" ]; then
+    set -a; source "$CONFIG_FILE"; set +a
 fi
 
 # Ensure cookie secret exists
@@ -56,7 +56,7 @@ is_oauth_configured() {
 start_oauth() {
     if ! is_oauth_configured; then
         log_warn "OAuth not configured - skipping OAuth2 Proxy"
-        log_info "To enable OAuth, set OAUTH_CLIENT_ID/SECRET in config/local/.env.oauth-proxy"
+        log_info "To enable OAuth, set OAUTH_CLIENT_ID/SECRET in config/local/.env"
         log_info "Using ENVIRONMENT=local with dev-user for local development"
         return 0
     fi
@@ -138,13 +138,13 @@ show_help() {
     echo "Usage: $0 {start|stop|status|logs|help}"
     echo ""
     echo "Commands:"
-    echo "  start   Start OAuth2 Proxy (requires credentials in config/local/.env.oauth-proxy)"
+    echo "  start   Start OAuth2 Proxy (requires credentials in config/local/.env)"
     echo "  stop    Stop OAuth2 Proxy"
     echo "  status  Check OAuth2 Proxy status"
     echo "  logs    Follow OAuth2 Proxy logs"
     echo "  help    Show this help message"
     echo ""
-    echo "Required environment variables in config/local/.env.oauth-proxy:"
+    echo "Required environment variables in config/local/.env:"
     echo "  OAUTH_CLIENT_ID      OAuth Client ID"
     echo "  OAUTH_CLIENT_SECRET  OAuth Client Secret"
     echo ""

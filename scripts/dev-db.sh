@@ -16,10 +16,10 @@ init_container_tool || exit 1
 # Configuration
 PROJECT_ROOT="${SCRIPT_DIR}/.."
 
-# Load config from centralized config directory
-POSTGRES_CONFIG="$PROJECT_ROOT/config/local/.env.postgres"
-if [ -f "$POSTGRES_CONFIG" ]; then
-    set -a; source "$POSTGRES_CONFIG"; set +a
+# Load consolidated config
+CONFIG_FILE="$PROJECT_ROOT/config/local/.env"
+if [ -f "$CONFIG_FILE" ]; then
+    set -a; source "$CONFIG_FILE"; set +a
 fi
 
 POSTGRES_VERSION="${POSTGRES_VERSION:-15-alpine}"

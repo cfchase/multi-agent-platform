@@ -96,9 +96,9 @@ make push-prod  # Uses TAG=prod
 ```
 config/
 ├── local/                          # Local development configs
-│   └── .env.*.example             # Per-service config templates
+│   └── .env.example               # Consolidated config template
 ├── dev/                            # Cluster deployment configs
-│   └── .env.*.example             # Per-service config templates
+│   └── .env.example               # Consolidated config template
 │
 k8s/
 ├── app/                            # Deep Research app (Kustomize)
@@ -134,7 +134,7 @@ helm/
     └── values-dev.yaml
 │
 scripts/                               # Called via make targets (not directly)
-├── generate-config.sh              # make config-setup
+├── generate-config.sh              # make config-setup-cluster / config-generate
 ├── verify-deployment.sh            # make verify-deploy
 ├── deploy.sh                       # make deploy
 ├── deploy-db.sh                    # make deploy-db
@@ -213,31 +213,29 @@ The application uses a **consolidated pod deployment** with multiple containers:
 
 ### OAuth2 Proxy Secret Setup
 
-**CRITICAL**: Before deploying, you must create the OAuth2 proxy secret file.
+**CRITICAL**: Before deploying, you must configure OAuth credentials.
 
-1. **Generate config files from templates:**
+1. **Set up configuration:**
    ```bash
-   # For development (generates all config/dev/ files)
-   make config-setup
+   # Generate config from template
+   make config-setup-cluster
 
-   # Or manually copy the OAuth proxy config:
-   cp config/dev/.env.oauth-proxy.example config/dev/.env.oauth-proxy
+   # Or manually copy the consolidated config:
+   cp config/dev/.env.example config/dev/.env
    ```
 
-2. **Generate a cookie secret:**
+2. **Edit `config/dev/.env` with your OAuth provider credentials:**
    ```bash
-   openssl rand -base64 32 | tr -- '+/' '-_'
+   OAUTH_CLIENT_ID=your-oauth-client-id
+   OAUTH_CLIENT_SECRET=your-oauth-client-secret
    ```
 
-3. **Edit the config file with your OAuth provider credentials:**
+3. **Generate deployment artifacts** (secrets are auto-generated):
    ```bash
-   # config/dev/.env.oauth-proxy
-   client-id=your-oauth-client-id
-   client-secret=your-oauth-client-secret
-   cookie-secret=<generated-cookie-secret>
+   make config-generate
    ```
 
-4. **The config file is gitignored** - never commit OAuth secrets!
+4. **The `.env` file is gitignored** - never commit OAuth secrets!
 
 See [AUTHENTICATION.md](AUTHENTICATION.md) for OAuth provider configuration details.
 
