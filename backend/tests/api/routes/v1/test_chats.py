@@ -473,6 +473,46 @@ class TestMessageStreaming:
         ).all()
         assert len(assistant_messages) == 0
 
+    def test_stream_message_empty_response_returns_error(
+        self, client: TestClient, session: Session, test_chat: Chat, monkeypatch
+    ):
+        """Test that empty Langflow response yields SSE error event, not done."""
+        from app.services.langflow.mock_client import MockLangflowClient
+        from app.api.routes.v1 import chat_messages
+
+        # Create a mock client that returns empty content (simulates rejected query)
+        empty_client = MockLangflowClient(responses=[""], stream_delay=0)
+        monkeypatch.setattr(chat_messages, "get_langflow_client", lambda: empty_client)
+
+        response = client.post(
+            f"/api/v1/chats/{test_chat.id}/messages/stream",
+            json={"content": "UNSAFE_TEST"},
+        )
+
+        assert response.status_code == 200
+
+        # Parse SSE events
+        events = []
+        for line in response.text.split("\n\n"):
+            if line.startswith("data: "):
+                events.append(json.loads(line[6:]))
+
+        # Should get an error event, not a done event
+        error_events = [e for e in events if e.get("type") == "error"]
+        assert len(error_events) == 1
+        assert "No response received" in error_events[0]["error"]
+
+        # No done event should be present
+        done_events = [e for e in events if e.get("type") == "done"]
+        assert len(done_events) == 0
+
+        # No assistant message should be saved
+        assistant_msgs = session.query(ChatMessage).filter(
+            ChatMessage.chat_id == test_chat.id,
+            ChatMessage.role == "assistant"
+        ).all()
+        assert len(assistant_msgs) == 0
+
 
 @pytest.fixture
 def other_user(session: Session) -> User:
