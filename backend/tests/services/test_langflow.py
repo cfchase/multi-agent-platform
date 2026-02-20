@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+from app.services.langflow.client import extract_chunk_from_sse_data, extract_error_from_sse_data
 from app.services.langflow import (
     LangflowClient,
     LangflowError,
@@ -211,3 +212,81 @@ class TestLangflowFactory:
             mock_settings.LANGFLOW_URL = None
 
             assert is_langflow_configured() is False
+
+
+class TestExtractErrorFromSseData:
+    """Tests for extract_error_from_sse_data."""
+
+    def test_returns_none_for_token_event(self):
+        data = {"event": "token", "data": {"chunk": "hello"}}
+        assert extract_error_from_sse_data(data) is None
+
+    def test_returns_none_for_add_message_event(self):
+        data = {"event": "add_message", "data": {"text": "hi", "sender": "Machine"}}
+        assert extract_error_from_sse_data(data) is None
+
+    def test_returns_none_for_no_event(self):
+        data = {"chunk": "hello"}
+        assert extract_error_from_sse_data(data) is None
+
+    def test_extracts_error_field(self):
+        data = {"event": "error", "data": {"error": "Query rejected"}}
+        assert extract_error_from_sse_data(data) == "Query rejected"
+
+    def test_extracts_message_field(self):
+        data = {"event": "error", "data": {"message": "Not allowed"}}
+        assert extract_error_from_sse_data(data) == "Not allowed"
+
+    def test_extracts_text_field(self):
+        data = {"event": "error", "data": {"text": "Invalid input"}}
+        assert extract_error_from_sse_data(data) == "Invalid input"
+
+    def test_handles_string_data(self):
+        data = {"event": "error", "data": "Something went wrong"}
+        assert extract_error_from_sse_data(data) == "Something went wrong"
+
+    def test_falls_back_to_str_representation(self):
+        data = {"event": "error", "data": {"unexpected_key": "value"}}
+        result = extract_error_from_sse_data(data)
+        assert "unexpected_key" in result
+
+    def test_handles_none_data(self):
+        data = {"event": "error", "data": None}
+        assert extract_error_from_sse_data(data) == "Unknown error"
+
+    def test_handles_missing_data_key(self):
+        data = {"event": "error"}
+        result = extract_error_from_sse_data(data)
+        assert result == "{}"
+
+    def test_handles_integer_data(self):
+        data = {"event": "error", "data": 42}
+        assert extract_error_from_sse_data(data) == "42"
+
+
+class TestExtractChunkFromSseData:
+    """Tests for extract_chunk_from_sse_data."""
+
+    def test_token_event(self):
+        data = {"event": "token", "data": {"chunk": "hello"}}
+        assert extract_chunk_from_sse_data(data) == "hello"
+
+    def test_add_message_from_machine(self):
+        data = {"event": "add_message", "data": {"text": "response", "sender": "Machine"}}
+        assert extract_chunk_from_sse_data(data) == "response"
+
+    def test_add_message_from_ai(self):
+        data = {"event": "add_message", "data": {"text": "response", "sender": "AI"}}
+        assert extract_chunk_from_sse_data(data) == "response"
+
+    def test_add_message_from_user_ignored(self):
+        data = {"event": "add_message", "data": {"text": "input", "sender": "User"}}
+        assert extract_chunk_from_sse_data(data) is None
+
+    def test_direct_chunk(self):
+        data = {"chunk": "hello"}
+        assert extract_chunk_from_sse_data(data) == "hello"
+
+    def test_unknown_event_returns_none(self):
+        data = {"event": "unknown", "data": {"something": "else"}}
+        assert extract_chunk_from_sse_data(data) is None

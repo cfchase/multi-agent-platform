@@ -269,7 +269,11 @@ async def stream_message(
                 yield format_sse_event({"type": "done", "message_id": assistant_message.id})
             else:
                 logger.warning(f"No content received from Langflow for chat {chat_id}")
-                yield format_sse_event({"type": "done"})
+                yield format_sse_event({
+                    "type": "error",
+                    "error": "No response received from the AI service. "
+                             "The query may have been rejected by the flow.",
+                })
 
         except LangflowError as e:
             logger.error(f"Langflow error in chat {chat_id}: {e.message}")

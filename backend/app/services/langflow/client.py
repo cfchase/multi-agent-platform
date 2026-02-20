@@ -25,6 +25,39 @@ SSE_DATA_PREFIX = "data: "
 SSE_DONE_MARKER = "[DONE]"
 
 
+def extract_error_from_sse_data(data: dict) -> str | None:
+    """
+    Extract an error message from an SSE data payload, if present.
+
+    Handles Langflow error event formats where the top-level "event" is "error":
+    - {"event": "error", "data": {"error": "..."}}
+    - {"event": "error", "data": {"message": "..."}}
+    - {"event": "error", "data": {"text": "..."}}
+    - {"event": "error", "data": "plain string error"}
+
+    Falls back to str(data) if none of the known keys are found.
+
+    Returns the error message string, or None if not an error event.
+    """
+    event_type = data.get("event")
+    if event_type != "error":
+        return None
+
+    event_data = data.get("data", {})
+    if isinstance(event_data, str):
+        return event_data
+
+    if not isinstance(event_data, dict):
+        return str(event_data) if event_data is not None else "Unknown error"
+
+    return (
+        event_data.get("error")
+        or event_data.get("message")
+        or event_data.get("text")
+        or str(event_data)
+    )
+
+
 def extract_chunk_from_sse_data(data: dict) -> str | None:
     """
     Extract the text chunk from an SSE data payload.
@@ -404,6 +437,12 @@ class LangflowClient:
 
                         try:
                             data = json.loads(data_str)
+
+                            # Check for error events from Langflow (e.g. rejected queries)
+                            error_msg = extract_error_from_sse_data(data)
+                            if error_msg:
+                                raise LangflowError(error_msg)
+
                             chunk = extract_chunk_from_sse_data(data)
                             if chunk:
                                 yield chunk
