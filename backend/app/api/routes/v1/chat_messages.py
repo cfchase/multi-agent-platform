@@ -34,8 +34,6 @@ from app.services.flow_token_injection import (
     build_app_settings_data,
     build_generic_tweaks,
     build_user_settings_data,
-    get_required_services_for_flow,
-    MissingTokenError,
 )
 from app.services.langflow import LangflowError, get_langflow_client
 
@@ -215,22 +213,11 @@ async def stream_message(
     session.commit()
     session.refresh(user_message)
 
-    # Get required OAuth services for this flow
-    required_services = get_required_services_for_flow(flow_name) if flow_name else []
-
-    # Build user data with OAuth tokens
-    try:
-        user_data = await build_user_settings_data(
-            session=session,
-            user_id=current_user.id,
-            services=required_services,
-        )
-    except MissingTokenError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing integration: {e.service_name}. "
-                   "Please connect the service in Settings.",
-        )
+    # Build user data with all available OAuth tokens
+    user_data = await build_user_settings_data(
+        session=session,
+        user_id=current_user.id,
+    )
 
     # Build app data (feature flags, config)
     app_data = build_app_settings_data()

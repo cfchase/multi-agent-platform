@@ -15,6 +15,7 @@ Includes protection against:
 
 import logging
 from datetime import datetime, timedelta, timezone
+from cryptography.fernet import InvalidToken
 from sqlmodel import Session
 
 from app.crud.integration import (
@@ -139,7 +140,15 @@ async def get_valid_token(
         )
 
     # Return the decrypted access token
-    tokens = get_decrypted_tokens(integration)
+    try:
+        tokens = get_decrypted_tokens(integration)
+    except InvalidToken:
+        logger.error(
+            "Failed to decrypt token for %s user %s (encryption key mismatch)",
+            service_name,
+            user_id,
+        )
+        return None
     return tokens["access_token"]
 
 

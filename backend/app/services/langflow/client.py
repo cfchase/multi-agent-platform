@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 # HTTP timeout constants (seconds)
 LIST_FLOWS_TIMEOUT = 30.0
-CHAT_TIMEOUT = 120.0
+# Granular chat timeout: short connect/write/pool, long read for streaming.
+# LangFlow flows can run 5-30+ minutes for deep research tasks.
+# TODO: rearchitect for long-running tasks (async job queue + polling)
+CHAT_TIMEOUT = httpx.Timeout(connect=30.0, read=1800.0, write=30.0, pool=30.0)
 
 # SSE constants
 SSE_DATA_PREFIX = "data: "

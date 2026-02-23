@@ -158,17 +158,12 @@ tweaks = await build_flow_tweaks(
 await client.chat(message, tweaks=tweaks)
 ```
 
-### Handling Missing Tokens
+### Missing Tokens
 
-```python
-from app.services.flow_token_injection import build_flow_tweaks, MissingTokenError
-
-try:
-    tweaks = await build_flow_tweaks(...)
-except MissingTokenError as e:
-    # User needs to connect the service
-    return {"error": f"Please connect {e.service_name} first"}
-```
+The platform injects all available tokens automatically. If a user hasn't
+connected a service, its token is simply omitted from `UserSettings.data`.
+Flows should handle missing tokens gracefully (e.g., skip document search
+if no `google_drive_token` is present).
 
 ## Frontend Integration
 

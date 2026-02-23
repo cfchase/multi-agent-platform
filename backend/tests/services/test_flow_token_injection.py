@@ -5,7 +5,6 @@ Tests the generic settings injection pattern:
 - build_user_settings_data: OAuth tokens via UserSettings component
 - build_app_settings_data: App context via AppSettings component
 - build_generic_tweaks: Tweak dict assembly for Langflow
-- get_required_services_for_flow: Flow-to-services mapping
 """
 
 import pytest
@@ -17,8 +16,6 @@ from app.services.flow_token_injection import (
     build_app_settings_data,
     build_generic_tweaks,
     build_user_settings_data,
-    get_required_services_for_flow,
-    MissingTokenError,
 )
 
 
@@ -26,8 +23,8 @@ class TestBuildUserSettingsData:
     """Tests for building user settings with OAuth tokens."""
 
     @pytest.mark.asyncio
-    async def test_with_valid_token_single_service(self, session: Session):
-        """Builds user data with token for a single service."""
+    async def test_with_single_integration(self, session: Session):
+        """Injects token for a single connected service."""
         from app.crud.integration import create_or_update_integration
 
         user = User(email="test@example.com", username="testuser")
@@ -47,15 +44,14 @@ class TestBuildUserSettingsData:
         user_data = await build_user_settings_data(
             session=session,
             user_id=user.id,
-            services=["google_drive"],
         )
 
         assert user_data["user_id"] == user.id
         assert user_data["google_drive_token"] == "google-access-token"
 
     @pytest.mark.asyncio
-    async def test_with_multiple_services(self, session: Session):
-        """Builds user data with tokens for multiple services."""
+    async def test_with_multiple_integrations(self, session: Session):
+        """Injects tokens for all connected services."""
         from app.crud.integration import create_or_update_integration
 
         user = User(email="test@example.com", username="testuser")
@@ -81,7 +77,6 @@ class TestBuildUserSettingsData:
         user_data = await build_user_settings_data(
             session=session,
             user_id=user.id,
-            services=["google_drive", "dataverse"],
         )
 
         assert user_data["user_id"] == user.id
@@ -89,55 +84,51 @@ class TestBuildUserSettingsData:
         assert user_data["dataverse_token"] == "dataverse-token"
 
     @pytest.mark.asyncio
-    async def test_with_no_services_defaults_to_all(self, session: Session):
-        """When services is None, defaults to checking all known services."""
+    async def test_with_no_integrations(self, session: Session):
+        """Returns only user_id when no services are connected."""
         user = User(email="test@example.com", username="testuser")
         session.add(user)
         session.commit()
         session.refresh(user)
 
-        # No integrations created — get_valid_token returns None for each
         user_data = await build_user_settings_data(
             session=session,
             user_id=user.id,
-            services=None,
         )
 
-        # Should still have user_id, but no tokens (none connected)
         assert user_data["user_id"] == user.id
         assert "google_drive_token" not in user_data
         assert "dataverse_token" not in user_data
 
     @pytest.mark.asyncio
-    async def test_with_empty_services_list(self, session: Session):
-        """Empty list means no services needed — returns only user_id."""
+    async def test_expired_token_omitted(self, session: Session):
+        """Expired tokens are omitted (get_valid_token returns None)."""
+        from app.crud.integration import create_or_update_integration
+
         user = User(email="test@example.com", username="testuser")
         session.add(user)
         session.commit()
         session.refresh(user)
 
-        user_data = await build_user_settings_data(
+        # Create an expired integration (expires_in=0 makes it already expired)
+        create_or_update_integration(
             session=session,
             user_id=user.id,
-            services=[],
+            service_name="google_drive",
+            access_token="expired-token",
+            expires_in=0,
         )
 
-        assert user_data == {"user_id": user.id}
-
-    @pytest.mark.asyncio
-    async def test_missing_integration_skips_gracefully(self, session: Session):
-        """When a service has no integration, its token is omitted (not error)."""
-        user = User(email="test@example.com", username="testuser")
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-        # No google_drive integration created
-        user_data = await build_user_settings_data(
-            session=session,
-            user_id=user.id,
-            services=["google_drive"],
-        )
+        # Mock get_valid_token to return None (simulating expired + refresh failure)
+        with patch(
+            "app.services.flow_token_injection.get_valid_token",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            user_data = await build_user_settings_data(
+                session=session,
+                user_id=user.id,
+            )
 
         assert user_data["user_id"] == user.id
         assert "google_drive_token" not in user_data
@@ -145,10 +136,20 @@ class TestBuildUserSettingsData:
     @pytest.mark.asyncio
     async def test_with_refreshed_token(self, session: Session):
         """Uses refreshed token value when get_valid_token refreshes."""
+        from app.crud.integration import create_or_update_integration
+
         user = User(email="test@example.com", username="testuser")
         session.add(user)
         session.commit()
         session.refresh(user)
+
+        create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="old-token",
+            expires_in=3600,
+        )
 
         with patch(
             "app.services.flow_token_injection.get_valid_token",
@@ -158,7 +159,6 @@ class TestBuildUserSettingsData:
             user_data = await build_user_settings_data(
                 session=session,
                 user_id=user.id,
-                services=["google_drive"],
             )
 
         assert user_data["google_drive_token"] == "refreshed-token"
@@ -224,30 +224,3 @@ class TestBuildGenericTweaks:
         """Empty dicts are falsy — no tweaks generated."""
         tweaks = build_generic_tweaks(user_data={}, app_data={})
         assert tweaks == {}
-
-
-class TestGetRequiredServicesForFlow:
-    """Tests for flow-to-services mapping."""
-
-    def test_known_flow_returns_services(self):
-        """Known flow returns its required OAuth services."""
-        services = get_required_services_for_flow("enterprise-agent")
-        assert services == ["google_drive"]
-
-    def test_unknown_flow_returns_empty(self):
-        """Unknown flow returns empty list (no OAuth needed)."""
-        services = get_required_services_for_flow("unknown-flow-name")
-        assert services == []
-
-    def test_return_type_is_list(self):
-        """Return type is always list[str]."""
-        services = get_required_services_for_flow("enterprise-agent")
-        assert isinstance(services, list)
-        for s in services:
-            assert isinstance(s, str)
-
-    def test_multi_service_flow(self):
-        """Flow requiring multiple services returns all of them."""
-        services = get_required_services_for_flow("multi-source-rag")
-        assert "google_drive" in services
-        assert "dataverse" in services

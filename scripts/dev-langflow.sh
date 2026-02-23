@@ -15,6 +15,7 @@ init_container_tool || exit 1
 
 # Configuration
 LANGFLOW_VERSION="${LANGFLOW_VERSION:-latest}"
+LANGFLOW_IMAGE="${LANGFLOW_IMAGE:-docker.io/langflowai/langflow:${LANGFLOW_VERSION}}"
 CONTAINER_NAME="app-langflow-dev"
 LANGFLOW_PORT="${LANGFLOW_PORT:-7860}"
 PROJECT_ROOT="${SCRIPT_DIR}/.."
@@ -76,34 +77,91 @@ case "$1" in
             # Generate a secret key to avoid file permission issues
             SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32)
 
-            $CONTAINER_TOOL run -d \
-                --name $CONTAINER_NAME \
-                -e LANGFLOW_DATABASE_URL="$DATABASE_URL" \
-                -e LANGFLOW_CONFIG_DIR=/app/langflow \
-                -e LANGFLOW_SECRET_KEY="$SECRET_KEY" \
-                -e LANGFLOW_AUTO_LOGIN=true \
-                -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true \
-                -e LANGFLOW_LOG_LEVEL=info \
-                -e LANGFLOW_PORT=7860 \
-                -e LANGFLOW_COMPONENTS_PATH=/app/langflow/components \
-                -e PYTHONPATH=/app/langflow/packages \
-                -e LANGFLOW_VARIABLES_TO_GET_FROM_ENVIRONMENT="OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,OLLAMA_BASE_URL" \
-                -e LANGFLOW_FALLBACK_TO_ENV_VAR=true \
-                -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
-                -e GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
-                -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
-                -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.containers.internal:11434}" \
-                -e LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-sk-dev-secret-key}" \
-                -e LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-pk-dev-public-key}" \
-                -e LANGFUSE_HOST="${LANGFUSE_HOST:-http://${DB_HOST}:${LANGFUSE_WEB_PORT:-3000}}" \
-                -e TZ="${TZ:-UTC}" \
-                -p $LANGFLOW_PORT:7860 \
-                -v "${DATA_DIR}:/app/langflow" \
-                -v "${DATA_DIR}/components:/app/langflow/components:z" \
-                -v "${DATA_DIR}/packages:/app/langflow/packages:z" \
-                --add-host=host.docker.internal:host-gateway \
-                --add-host=host.containers.internal:host-gateway \
-                docker.io/langflowai/langflow:$LANGFLOW_VERSION
+            # Build env var and volume args (shared between stock and custom images)
+            COMMON_ENV_ARGS=(
+                -e LANGFLOW_SECRET_KEY="$SECRET_KEY"
+                -e LANGFLOW_AUTO_LOGIN=true
+                -e LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true
+                -e LANGFLOW_LOG_LEVEL=info
+                -e LANGFLOW_PORT=7860
+                -e LANGFLOW_VARIABLES_TO_GET_FROM_ENVIRONMENT="OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,OLLAMA_BASE_URL"
+                -e LANGFLOW_FALLBACK_TO_ENV_VAR=true
+                -e OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+                -e GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+                -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+                -e OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://host.containers.internal:11434}"
+                -e LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-sk-dev-secret-key}"
+                -e LANGFUSE_PUBLIC_KEY="${LANGFUSE_PUBLIC_KEY:-pk-dev-public-key}"
+                -e LANGFUSE_HOST="${LANGFUSE_HOST:-http://${DB_HOST}:${LANGFUSE_WEB_PORT:-3000}}"
+                -e TZ="${TZ:-UTC}"
+                -e LANGFLOW_LAZY_LOAD_COMPONENTS=false
+            )
+
+            # Detect host DNS servers (needed for VPN-resolved internal hostnames)
+            DNS_ARGS=()
+            for dns in $(scutil --dns 2>/dev/null | awk '/nameserver\[0\]/{print $3}' | head -3); do
+                DNS_ARGS+=(--dns "$dns")
+            done
+
+            COMMON_RUN_ARGS=(
+                -p $LANGFLOW_PORT:7860
+                --add-host=host.docker.internal:host-gateway
+                --add-host=host.containers.internal:host-gateway
+                "${DNS_ARGS[@]}"
+            )
+
+            # Determine if using custom image (not stock langflowai)
+            if [[ "$LANGFLOW_IMAGE" != docker.io/langflowai/* ]]; then
+                # Custom image (e.g., agents-python custom build)
+                # NOTE: Custom images use /app/langflow for LangFlow source code
+                # (editable install), so we must NOT mount data there. The image
+                # handles its own data directory and LANGFLOW_COMPONENTS_PATH.
+                log_info "Using custom LangFlow image: $LANGFLOW_IMAGE"
+
+                CUSTOM_ENV_ARGS=(
+                    -e GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-}"
+                    -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+                    -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
+                    -e GRANITE_GUARDIAN_ENDPOINT="${GRANITE_GUARDIAN_ENDPOINT:-}"
+                    -e GRANITE_GUARDIAN_API_KEY="${GRANITE_GUARDIAN_API_KEY:-}"
+                    -e GRANITE_CA_BUNDLE="${GRANITE_CA_BUNDLE:-}"
+                )
+
+                CUSTOM_VOL_ARGS=()
+
+                # Mount platform components (UserSettings, AppSettings, etc.)
+                # These are installed by `make langflow-import` into .local/langflow/components/
+                if [ -d "${DATA_DIR}/components/platform" ]; then
+                    CUSTOM_VOL_ARGS+=(-v "${DATA_DIR}/components/platform:/app/components/platform:ro")
+                fi
+
+                # Mount gcloud credentials for Vertex AI auth (harmless if dir doesn't exist)
+                if [ -d "${HOME}/.config/gcloud" ]; then
+                    CUSTOM_VOL_ARGS+=(-v "${HOME}/.config/gcloud:/root/.config/gcloud:ro")
+                fi
+
+                $CONTAINER_TOOL run -d \
+                    --name $CONTAINER_NAME \
+                    "${COMMON_ENV_ARGS[@]}" \
+                    "${CUSTOM_ENV_ARGS[@]}" \
+                    "${COMMON_RUN_ARGS[@]}" \
+                    "${CUSTOM_VOL_ARGS[@]}" \
+                    "$LANGFLOW_IMAGE"
+            else
+                # Stock LangFlow image (uses PostgreSQL for shared state)
+                $CONTAINER_TOOL run -d \
+                    --name $CONTAINER_NAME \
+                    "${COMMON_ENV_ARGS[@]}" \
+                    -e LANGFLOW_DATABASE_URL="$DATABASE_URL" \
+                    -e LANGFLOW_CONFIG_DIR=/app/langflow \
+                    -e LANGFLOW_COMPONENTS_PATH=/app/langflow/components \
+                    -e PYTHONPATH=/app/langflow/packages \
+                    "${COMMON_RUN_ARGS[@]}" \
+                    -v "${DATA_DIR}:/app/langflow" \
+                    -v "${DATA_DIR}/components:/app/langflow/components:z" \
+                    -v "${DATA_DIR}/packages:/app/langflow/packages:z" \
+                    "$LANGFLOW_IMAGE"
+            fi
         fi
 
         log_info "Waiting for LangFlow to be ready..."
@@ -207,10 +265,18 @@ case "$1" in
         echo ""
         echo "Environment variables:"
         echo "  LANGFLOW_VERSION  - LangFlow version (default: latest)"
+        echo "  LANGFLOW_IMAGE    - Custom LangFlow image (overrides LANGFLOW_VERSION)"
+        echo "                      Example: LANGFLOW_IMAGE=langflow-langflow:latest"
         echo "  LANGFLOW_PORT     - LangFlow port (default: 7860)"
         echo "  POSTGRES_USER     - Database user (default: app)"
         echo "  POSTGRES_PASSWORD - Database password (default: changethis)"
         echo "  LANGFLOW_DB       - Database name (default: langflow)"
+        echo ""
+        echo "Custom image env vars (forwarded when LANGFLOW_IMAGE is set):"
+        echo "  GOOGLE_CLOUD_PROJECT       - GCP project for Vertex AI"
+        echo "  GRANITE_GUARDIAN_ENDPOINT   - Granite Guardian API endpoint"
+        echo "  GRANITE_GUARDIAN_API_KEY    - Granite Guardian API key"
+        echo "  GRANITE_CA_BUNDLE          - Custom CA bundle path"
         echo ""
         echo "Prerequisites:"
         echo "  PostgreSQL must be running: make db-start"
