@@ -114,11 +114,14 @@ case "$1" in
             if [[ "$LANGFLOW_IMAGE" != docker.io/langflowai/* ]]; then
                 # Custom image (e.g., agents-python custom build)
                 # NOTE: Custom images use /app/langflow for LangFlow source code
-                # (editable install), so we must NOT mount data there. The image
-                # handles its own data directory and LANGFLOW_COMPONENTS_PATH.
+                # (editable install), so data is mounted at /data/langflow instead.
+                # Uses same PostgreSQL and DATA_DIR conventions as stock image.
                 log_info "Using custom LangFlow image: $LANGFLOW_IMAGE"
 
                 CUSTOM_ENV_ARGS=(
+                    -e LANGFLOW_DATABASE_URL="$DATABASE_URL"
+                    -e LANGFLOW_CONFIG_DIR=/data/langflow
+                    -e PYTHONPATH=/data/langflow/packages
                     -e GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-}"
                     -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
                     -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
@@ -127,10 +130,13 @@ case "$1" in
                     -e GRANITE_CA_BUNDLE="${GRANITE_CA_BUNDLE:-}"
                 )
 
-                CUSTOM_VOL_ARGS=()
+                CUSTOM_VOL_ARGS=(
+                    -v "${DATA_DIR}:/data/langflow"
+                    -v "${DATA_DIR}/components:/data/langflow/components:z"
+                    -v "${DATA_DIR}/packages:/data/langflow/packages:z"
+                )
 
-                # Mount platform components (UserSettings, AppSettings, etc.)
-                # These are installed by `make langflow-import` into .local/langflow/components/
+                # Mount platform components into image's component path
                 if [ -d "${DATA_DIR}/components/platform" ]; then
                     CUSTOM_VOL_ARGS+=(-v "${DATA_DIR}/components/platform:/app/components/platform:ro")
                 fi

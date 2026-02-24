@@ -86,3 +86,4 @@ helm/*/secrets-*.yaml
 # Playwright MCP
 .playwright-mcp/
 .planning/
+app.db
