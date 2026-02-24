@@ -96,6 +96,7 @@ start_oauth() {
         -e OAUTH2_PROXY_PASS_USER_HEADERS="true" \
         -e OAUTH2_PROXY_SET_XAUTHREQUEST="true" \
         -e OAUTH2_PROXY_SKIP_PROVIDER_BUTTON="true" \
+        -e OAUTH2_PROXY_UPSTREAM_TIMEOUT="1860s" \
         -e OAUTH2_PROXY_REDIRECT_URL="http://localhost:${OAUTH_PORT}/oauth2/callback" \
         $OAUTH_PROXY_IMAGE
 

@@ -137,6 +137,38 @@ class TestGetValidToken:
             mock_refresh.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_get_valid_token_returns_none_on_decrypt_failure(self, session: Session):
+        """Returns None when stored token cannot be decrypted (key mismatch)."""
+        from cryptography.fernet import InvalidToken
+        from app.crud.integration import create_or_update_integration
+        from app.services.token_refresh import get_valid_token
+
+        user = User(email="test@example.com", username="testuser")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        create_or_update_integration(
+            session=session,
+            user_id=user.id,
+            service_name="google_drive",
+            access_token="valid-token",
+            expires_in=3600,
+        )
+
+        with patch(
+            "app.services.token_refresh.get_decrypted_tokens",
+            side_effect=InvalidToken,
+        ):
+            token = await get_valid_token(
+                session=session,
+                user_id=user.id,
+                service_name="google_drive",
+            )
+
+        assert token is None
+
+    @pytest.mark.asyncio
     async def test_get_valid_token_returns_none_for_missing(self, session: Session):
         """Returns None when integration doesn't exist."""
         from app.services.token_refresh import get_valid_token

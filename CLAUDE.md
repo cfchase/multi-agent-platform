@@ -362,6 +362,91 @@ For extended autonomous work with verification checkpoints:
 
 **📖 See**: [claude-extras/autonomous-workflow.md](claude-extras/autonomous-workflow.md) for detailed process.
 
+## LangFlow Integration
+
+### Flow Management
+
+Flows, components, and MCP servers are managed via `flow-sources.yaml` (gitignored — local config with machine-specific paths). See `config/dev/flow-sources.yaml` for the cluster variant.
+
+**Import pipeline:**
+1. `scripts/import_flows.py` reads `flow-sources.yaml` entries
+2. Components staged to temp dir, copied to LangFlow container
+3. MCP servers registered via PVC JSON config files
+4. Flows imported via LangFlow REST API with replace-on-import (find by name, delete, recreate)
+
+**Key scripts:**
+| Script | Purpose |
+|--------|---------|
+| `scripts/dev-langflow.sh` | Start LangFlow container (stock or custom image mode) |
+| `scripts/import_flows.py` | Import components, MCP servers, and flows |
+| `scripts/langflow-import-cluster.sh` | Cluster-mode import (staging + pod copy + API import) |
+| `scripts/deploy-langflow.sh` | Deploy LangFlow to K8s/OpenShift via Helm |
+
+**Custom image mode** (`dev-langflow.sh`):
+- Uses custom-built image with `redhat_agents` pre-installed
+- Connects to shared PostgreSQL (same as stock mode)
+- Mounts data at `/data/langflow` instead of `/app/langflow` (avoids overwriting the editable install)
+- Forwards additional env vars not needed by stock image: GCP credentials, Google OAuth client, and Granite Guardian settings
+- Set `LANGFLOW_LAZY_LOAD_COMPONENTS=false` for custom components to appear fully loaded
+
+### User Settings / Tweaks Injection
+
+Platform injects per-user credentials and app settings to LangFlow components via tweaks:
+
+```python
+tweaks = {
+    "User Settings": {"settings_data": {"google_drive_token": "...", "dataverse_token": "..."}},
+    "App Settings": {"settings_data": {"features": {...}}},
+}
+```
+
+**CRITICAL:** Tweaks match by `display_name` (e.g., `"User Settings"` with space), NOT component `name` attribute (`"UserSettings"`). Components MUST declare inputs — `inputs = []` causes tweaks to be silently dropped.
+
+**Backend injection:**
+- `build_app_settings_data()` returns non-secret app context (feature flags, app name). API keys reach LangFlow via environment variables, not tweaks.
+- `build_user_settings_data()` injects per-user OAuth tokens (from OAuth proxy headers → backend → LangFlow API)
+- `build_generic_tweaks()` assembles both into the tweaks dict sent to LangFlow
+
+### Helm Charts & Deployment
+
+```
+helm/
+├── langflow/
+│   ├── values-dev.yaml              # Custom image, env vars, resources
+│   └── post-renderer/
+│       ├── kustomization.yaml       # Kustomize patch references
+│       ├── oauth-proxy-patch.yaml   # OAuth2 Proxy sidecar for authentication
+│       ├── dept-toolserver-sidecar-patch.yaml  # dept-toolserver sidecar container
+│       ├── langflow-credentials-patch.yaml     # Secret env injection
+│       ├── langflow-data-pvc-patch.yaml        # Persistent volume for data
+│       └── security-context-patch.yaml         # Pod security context
+├── langfuse/                        # Observability (Langfuse + ClickHouse + Redis)
+└── mlflow/                          # ML experiment tracking
+```
+
+**dept-toolserver sidecar:**
+- MCP server for department tree navigation (port 8086)
+- Added to langflow StatefulSet via strategic merge patch
+- Uses `tcpSocket` probes (MCP protocol uses POST; GET returns 406)
+- Image from OpenShift internal registry
+
+### Environment Variables
+
+LangFlow env vars configured in `config/local/.env` and forwarded by `dev-langflow.sh`:
+- `LANGFLOW_FALLBACK_TO_ENV_VAR=true` — enables env vars as global variable values
+- `LANGFLOW_LAZY_LOAD_COMPONENTS=false` — required for custom components
+- GCP credentials: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- Granite Guardian: `GRANITE_GUARDIAN_ENDPOINT`, `GRANITE_GUARDIAN_API_KEY`, `GRANITE_CA_BUNDLE`
+- Langfuse: `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_HOST`
+
+### Related Repos
+
+| Repo | Purpose | Branch |
+|------|---------|--------|
+| agents-python | Enterprise agent components and `redhat_agents` library | `feature/platform-multi-user` |
+| langflow-examples | Shared example flows, platform components (UserSettings, AppSettings) | `feature/enterprise-agent-migration` |
+| analyze-flow | Historical — enterprise agent stubs and planning docs | `feature/enterprise-agent-migration` |
+
 ## Additional Resources
 
 **Claude Agent Workflows (`claude-extras/`):**

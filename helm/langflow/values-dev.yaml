@@ -24,7 +24,9 @@ langflow:
   backend:
     replicaCount: 1
     image:
-      repository: langflowai/langflow
+      # Custom image with redhat_agents baked in (built via OpenShift BuildConfig)
+      # Override with quay.io/cfchase/langflow-redhat when using external registry
+      repository: image-registry.openshift-image-registry.svc:5000/multi-agent-platform-dev/langflow-redhat
       imagePullPolicy: Always
       tag: "latest"
     service:
@@ -32,16 +34,17 @@ langflow:
       port: 7860
     resources:
       requests:
-        memory: "1Gi"
-        cpu: "500m"
-      limits:
         memory: "2Gi"
         cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
     probe:
-      initialDelaySeconds: 60
-      periodSeconds: 10
-      timeoutSeconds: 5
-      failureThreshold: 10
+      # Custom image with redhat_agents takes longer to start
+      initialDelaySeconds: 120
+      periodSeconds: 15
+      timeoutSeconds: 10
+      failureThreshold: 20
 
     # Use external PostgreSQL (our shared postgres)
     externalDatabase:
@@ -74,13 +77,26 @@ langflow:
       - name: LANGFLOW_CONFIG_DIR
         value: "/tmp/langflow"
       - name: LANGFLOW_COMPONENTS_PATH
-        value: "/tmp/langflow/components"
+        value: "/app/components"
       - name: LANGFLOW_ALEMBIC_LOG_FILE
         value: "/tmp/alembic.log"
       - name: LANGFLOW_LOG_LEVEL
         value: "INFO"
       - name: LANGFLOW_UPDATE_STARTER_PROJECTS
         value: "false"
+      # Custom image settings for redhat_agents
+      - name: LANGFLOW_LAZY_LOAD_COMPONENTS
+        value: "false"
+      - name: GOOGLE_CLOUD_PROJECT
+        value: "redhat-ai-analysis"
+      - name: XDG_STATE_HOME
+        value: "/app"
+      - name: CONFIG_DIR
+        value: "/app/src/config"
+      - name: LFX_DEV
+        value: "1"
+      - name: DO_NOT_TRACK
+        value: "true"
       - name: LANGFLOW_SUPERUSER
         valueFrom:
           secretKeyRef:

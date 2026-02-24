@@ -133,7 +133,7 @@ class Settings(BaseSettings):
 
     # LLM API Keys
     # Used by the backend to inject application-level API keys into flows via tweaks.
-    # Also available as LangFlow global variables (via config/langflow.env) for direct UI testing.
+    # Also available as LangFlow global variables (via environment variables forwarded by dev-langflow.sh).
     OPENAI_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None

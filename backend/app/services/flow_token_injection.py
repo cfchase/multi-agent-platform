@@ -2,10 +2,11 @@
 Flow token injection service for Langflow integration.
 
 Injects user OAuth tokens into Langflow flow tweaks via the generic
-UserSettings component. This decouples the backend from flow internals.
+UserSettings component. The platform is flow-agnostic: it always injects
+all available tokens and lets flows take what they need.
 
 Architecture:
-- API keys (OPENAI_API_KEY, etc.) -> langflow.env global variables
+- API keys (OPENAI_API_KEY, etc.) -> environment variables (forwarded by dev-langflow.sh)
 - User tokens (OAuth) -> UserSettings.data via tweaks
 - App context (feature flags, etc.) -> AppSettings.data via tweaks
 """
@@ -13,66 +14,58 @@ Architecture:
 import logging
 from sqlmodel import Session
 
+from app.crud.integration import get_user_integrations
 from app.services.token_refresh import get_valid_token
 
 logger = logging.getLogger(__name__)
-
-
-class MissingTokenError(Exception):
-    """Error raised when a required service token is missing."""
-
-    def __init__(self, service_name: str, message: str | None = None):
-        self.service_name = service_name
-        default_msg = f"Missing or expired token for service: {service_name}"
-        super().__init__(message or default_msg)
 
 
 async def build_user_settings_data(
     *,
     session: Session,
     user_id: int,
-    services: list[str] | None = None,
 ) -> dict:
     """
-    Build user settings dict with OAuth tokens for specified services.
+    Build user settings dict with all available OAuth tokens.
+
+    Discovers the user's connected integrations and injects valid tokens
+    for each. Flows opt in by reading the tokens they need from
+    UserSettings.data — the platform does not need to know which flows
+    use which services.
 
     Args:
         session: Database session
         user_id: User ID
-        services: List of service names to include tokens for.
-                  If None, includes all available tokens.
 
     Returns:
         Dict suitable for UserSettings.data injection
 
-    Raises:
-        MissingTokenError: If a required service token is not available
-
     Example:
         user_data = await build_user_settings_data(
-            session=session,
-            user_id=user.id,
-            services=["google_drive"],
+            session=session, user_id=user.id,
         )
-        # Result: {"google_drive_token": "...", "user_id": 123}
+        # Result: {"google_drive_token": "...", "dataverse_token": "...", "user_id": 123}
     """
     user_data: dict = {"user_id": user_id}
 
-    # Default services to check if none specified
-    if services is None:
-        services = ["google_drive", "dataverse"]
+    integrations = get_user_integrations(session=session, user_id=user_id)
 
-    for service_name in services:
+    for integration in integrations:
         token = await get_valid_token(
             session=session,
             user_id=user_id,
-            service_name=service_name,
+            service_name=integration.service_name,
         )
 
         if token is not None:
-            # Use consistent key naming: {service_name}_token
-            user_data[f"{service_name}_token"] = token
-            logger.debug("Added token for %s to user settings", service_name)
+            user_data[f"{integration.service_name}_token"] = token
+            logger.debug("Added token for %s to user settings", integration.service_name)
+        else:
+            logger.warning(
+                "Omitted token for %s user %s (expired or unavailable)",
+                integration.service_name,
+                user_id,
+            )
 
     return user_data
 
@@ -86,7 +79,7 @@ def build_app_settings_data() -> dict:
     - Feature flags
     - Version info
 
-    API keys are NOT included - they go in langflow.env.
+    API keys are NOT included - they reach LangFlow via environment variables.
 
     Returns:
         Dict suitable for AppSettings.data injection
@@ -126,31 +119,3 @@ def build_generic_tweaks(
         tweaks["App Settings"] = {"settings_data": app_data}
 
     return tweaks
-
-
-def get_required_services_for_flow(flow_name: str) -> list[str]:
-    """
-    Get list of OAuth services required by a flow.
-
-    This is the minimal configuration - just which services need tokens.
-    The injection target is always UserSettings.data.
-
-    Args:
-        flow_name: Name of the Langflow flow
-
-    Returns:
-        List of service names (e.g., ["google_drive", "dataverse"])
-    """
-    # Map flow names to required OAuth services
-    # The injection target is always UserSettings.data
-    flow_services: dict[str, list[str]] = {
-        # Enterprise agent needs Google Drive
-        "enterprise-agent": ["google_drive"],
-        # Test flows for validation
-        "test-google-drive": ["google_drive"],
-        "test-dataverse": ["dataverse"],
-        # Flows that need both
-        "multi-source-rag": ["google_drive", "dataverse"],
-    }
-
-    return flow_services.get(flow_name, [])

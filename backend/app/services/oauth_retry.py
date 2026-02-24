@@ -9,6 +9,7 @@ import logging
 from typing import Any, Callable, Awaitable
 
 import httpx
+from cryptography.fernet import InvalidToken
 from sqlmodel import Session
 
 from app.crud.integration import get_decrypted_tokens, get_user_integration
@@ -68,7 +69,18 @@ async def with_oauth_retry(
     if integration is None:
         raise ValueError(f"No integration found for {service_name}")
 
-    tokens = get_decrypted_tokens(integration)
+    try:
+        tokens = get_decrypted_tokens(integration)
+    except InvalidToken:
+        logger.error(
+            "Failed to decrypt token for %s user %s (encryption key mismatch)",
+            service_name,
+            user_id,
+        )
+        raise ValueError(
+            f"Cannot decrypt token for {service_name}. "
+            "The encryption key may have changed — user should reconnect the service."
+        )
     access_token = tokens["access_token"]
 
     # Make the initial request
@@ -105,7 +117,15 @@ async def with_oauth_retry(
         user_id=user_id,
         service_name=service_name,
     )
-    tokens = get_decrypted_tokens(integration)
+    try:
+        tokens = get_decrypted_tokens(integration)
+    except InvalidToken:
+        logger.error(
+            "Failed to decrypt refreshed token for %s user %s",
+            service_name,
+            user_id,
+        )
+        return response
     new_access_token = tokens["access_token"]
 
     logger.info(

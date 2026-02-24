@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langflow-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: dept-toolserver
+          image: image-registry.openshift-image-registry.svc:5000/multi-agent-platform-dev/dept-toolserver:latest
+          imagePullPolicy: Always
+          ports:
+            - name: mcp
+              containerPort: 8086
+              protocol: TCP
+          env:
+            - name: DEPT_MCP_PORT
+              value: "8086"
+            - name: CONFIG_DIR
+              value: "/app/config"
+          envFrom:
+            - secretRef:
+                name: langflow-credentials
+                optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            tcpSocket:
+              port: 8086
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 8086
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3

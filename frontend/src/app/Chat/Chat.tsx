@@ -149,7 +149,11 @@ function Chat(): React.ReactElement {
       if (chat?.flow_name) {
         setSelectedFlowName(chat.flow_name);
       }
-      loadMessages(selectedChatId);
+      // Skip loading messages if we're currently sending — handleSend manages
+      // messages directly and loadMessages would overwrite the loading indicator.
+      if (!isSending) {
+        loadMessages(selectedChatId);
+      }
     } else {
       setMessages([]);
     }

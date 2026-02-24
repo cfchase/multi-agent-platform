@@ -28,3 +28,8 @@ patches:
     target:
       kind: StatefulSet
       name: langflow-service
+  # Strategic merge patch: add dept-toolserver MCP sidecar container
+  - path: dept-toolserver-sidecar-patch.yaml
+    target:
+      kind: StatefulSet
+      name: langflow-service

@@ -130,7 +130,7 @@ The refresh service includes safeguards for multi-replica deployments:
 
 - **Service-specific thresholds**: Different services have different refresh windows
   - Google Drive: 5 minutes before expiration
-  - Dataverse: 5 minutes before expiration
+  - Dataverse: 60 minutes before expiration (long-running agentic tasks)
 
 ## Flow Integration
 
@@ -139,36 +139,31 @@ The refresh service includes safeguards for multi-replica deployments:
 When executing a flow that requires external service access:
 
 ```python
-from app.services.flow_token_injection import build_flow_tweaks
-
-# Configuration maps services to Langflow component fields
-token_config = {
-    "google_drive": "GoogleDriveLoader.credentials",
-    "dataverse": "DataverseSearchTool.api_token",
-}
-
-# Build tweaks with user tokens (auto-refreshes if needed)
-tweaks = await build_flow_tweaks(
-    session=session,
-    user_id=user.id,
-    token_config=token_config,
+from app.services.flow_token_injection import (
+    build_user_settings_data,
+    build_app_settings_data,
+    build_generic_tweaks,
 )
+
+# Build user data (discovers all connected integrations, auto-refreshes tokens)
+user_data = await build_user_settings_data(session=session, user_id=user.id)
+
+# Build app context (feature flags, non-secret config)
+app_data = build_app_settings_data()
+
+# Assemble into Langflow tweaks
+tweaks = build_generic_tweaks(user_data=user_data, app_data=app_data)
 
 # Pass to Langflow
 await client.chat(message, tweaks=tweaks)
 ```
 
-### Handling Missing Tokens
+### Missing Tokens
 
-```python
-from app.services.flow_token_injection import build_flow_tweaks, MissingTokenError
-
-try:
-    tweaks = await build_flow_tweaks(...)
-except MissingTokenError as e:
-    # User needs to connect the service
-    return {"error": f"Please connect {e.service_name} first"}
-```
+The platform injects all available tokens automatically. If a user hasn't
+connected a service, its token is simply omitted from `UserSettings.data`.
+Flows should handle missing tokens gracefully (e.g., skip document search
+if no `google_drive_token` is present).
 
 ## Frontend Integration
 

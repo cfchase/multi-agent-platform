@@ -42,6 +42,7 @@ setup-backend: ## Install backend dependencies only
 
 # Development
 dev: ## Run frontend and backend (run services-start first)
+	@./scripts/generate-config.sh local
 	@if ./scripts/dev-oauth.sh status >/dev/null 2>&1; then \
 		echo "OAuth running - access app at: http://localhost:4180"; \
 	else \
