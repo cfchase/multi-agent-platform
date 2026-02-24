@@ -20,22 +20,23 @@
 # Components can load from a local path or a git repo.
 # For git: specify 'git' (URL) and 'branch', with 'path' as subdirectory.
 #
-# CLUSTER NOTE: Components are installed on the cluster pod via `oc cp` and
-# `oc exec` when running `make langflow-import-cluster`. The script stages
-# files locally, copies them to the pod, installs pip deps, and restarts the
-# pod so LangFlow discovers them.
+# CLUSTER NOTE: When using the custom agents-python-langflow image,
+# enterprise agent components are pre-installed in the image at /app/components.
+# Only enable component entries below for additional components not in the image.
+#
+# For stock LangFlow image, components are installed on the cluster pod via
+# `oc cp` and `oc exec` when running `make langflow-import-cluster`.
 components:
 
   # Platform components (UserSettings, AppSettings, GoogleDriveValidator)
-  # Required for any flow that receives user context (OAuth tokens,
-  # preferences) or app context (feature flags) from the platform.
+  # NOTE: Pre-installed in agents-python-langflow image. Only enable for stock LangFlow.
   - name: platform-components
     git: https://github.com/cfchase/langflow-examples
     branch: main
     path: components/platform
     category: platform
     dependencies: []
-    enabled: true
+    enabled: false
 
   # Example components (HelloWorldEcho, HelloWorldDep)
   - name: example-components
@@ -47,19 +48,17 @@ components:
       - humanize>=4.0.0
     enabled: true
 
-  # Example: Local path instead of git
-  # - name: my-components
-  #   path: /path/to/my/components
-  #   category: custom
-  #   dependencies: []
-  #   enabled: true
-
 # --- MCP Servers: MCP server configurations to register ---
 #
 # CLUSTER NOTE: MCP servers are registered on the cluster pod via `oc exec`
 # when running `make langflow-import-cluster`. Pip dependencies are installed
 # on the pod and server configs are merged into LangFlow project files.
 mcp_servers:
+
+  # dept-toolserver runs as a sidecar in the langflow pod (same pod, localhost)
+  - name: dept-toolserver
+    type: sse
+    url: http://localhost:8086/sse
 
   - name: server-fetch
     type: stdio
@@ -73,6 +72,16 @@ mcp_servers:
 # --- Flows: flow definitions to import into LangFlow ---
 flows:
 
+  # Enterprise agent flow from agents-python-langflow (GitLab)
+  - name: enterprise-agent-multiuser
+    type: git
+    url: https://gitlab.cee.redhat.com/cchase/agents-python-langflow
+    branch: main
+    pattern: "flows/redhat-enterprise-agent-multiuser.json"
+    project: "Enterprise Agent"
+    public: true
+    enabled: true
+
   # Import all flows from langflow-examples via git
   - name: langflow-examples
     type: git
@@ -82,37 +91,3 @@ flows:
     project: "Examples"
     public: true
     enabled: true
-
-  # Example: Single file from URL
-  # - name: my-flow
-  #   type: file
-  #   path: https://raw.githubusercontent.com/user/repo/main/flow.json
-  #   project: "Examples"
-  #   public: true
-  #   enabled: true
-
-  # Example: Local file
-  # - name: my-local-flow
-  #   type: file
-  #   path: ./langflow-flows/my-flow.json
-  #   project: "Development"
-  #   enabled: true
-
-  # Example: Local directory
-  # - name: local-dev
-  #   type: local
-  #   path: ./langflow-flows/dev
-  #   pattern: "**/*.json"
-  #   project: "Development"
-  #   enabled: true
-
-  # Example: Private git repository
-  # - name: enterprise
-  #   type: git
-  #   url: https://github.com/your-org/your-flows
-  #   branch: main
-  #   pattern: "**/flows/*.json"
-  #   project: "Enterprise"
-  #   auth:
-  #     env_var: GITHUB_FLOW_TOKEN
-  #   enabled: true

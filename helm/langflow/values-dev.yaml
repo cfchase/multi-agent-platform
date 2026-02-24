@@ -20,13 +20,16 @@ securityContext:
 ingress:
   enabled: false
 
+# Pull secret for private quay.io images
+imagePullSecrets:
+  - name: quay-pull-secret
+
 langflow:
   backend:
     replicaCount: 1
     image:
-      # Custom image with redhat_agents baked in (built via OpenShift BuildConfig)
-      # Override with quay.io/cfchase/langflow-redhat when using external registry
-      repository: image-registry.openshift-image-registry.svc:5000/multi-agent-platform-dev/langflow-redhat
+      # Custom image with redhat_agents baked in (built via GitLab CI)
+      repository: quay.io/cfchase/agents-python-langflow
       imagePullPolicy: Always
       tag: "latest"
     service:

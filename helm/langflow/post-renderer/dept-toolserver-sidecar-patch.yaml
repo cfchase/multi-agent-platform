@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: dept-toolserver
-          image: image-registry.openshift-image-registry.svc:5000/multi-agent-platform-dev/dept-toolserver:latest
+          image: quay.io/cfchase/dept-toolserver:latest
           imagePullPolicy: Always
           ports:
             - name: mcp
