@@ -152,7 +152,9 @@ case "$1" in
                     "${CUSTOM_ENV_ARGS[@]}" \
                     "${COMMON_RUN_ARGS[@]}" \
                     "${CUSTOM_VOL_ARGS[@]}" \
-                    "$LANGFLOW_IMAGE"
+                    --entrypoint bash \
+                    "$LANGFLOW_IMAGE" \
+                    -c "pip install --quiet psycopg[binary] && exec /app/entrypoint.sh"
             else
                 # Stock LangFlow image (uses PostgreSQL for shared state)
                 $CONTAINER_TOOL run -d \
