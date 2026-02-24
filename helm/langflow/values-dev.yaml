@@ -100,6 +100,8 @@ langflow:
         value: "1"
       - name: DO_NOT_TRACK
         value: "true"
+      - name: LOG_FILE
+        value: "/tmp/redhat_agents_logs/debug.log"
       - name: LANGFLOW_SUPERUSER
         valueFrom:
           secretKeyRef:
