@@ -6,7 +6,7 @@ This module sets up the FastAPI application with:
 - Request logging middleware
 - API routes (REST)
 - GraphQL endpoint
-- Admin panel (SQLAdmin)
+- Health check and root endpoints
 - Lifespan handler with configuration logging
 - Background task for OAuth state cleanup
 """
@@ -23,7 +23,6 @@ from sqlmodel import Session
 from strawberry.fastapi import GraphQLRouter
 import uvicorn
 
-from app.admin import setup_admin
 from app.api.router import router as api_router
 from app.api.deps import get_db, get_current_user
 from app.core.config import settings
@@ -140,11 +139,6 @@ app.include_router(api_router, prefix="/api")
 # Include GraphQL endpoint under /api for consistent proxy handling
 app.include_router(graphql_app, prefix="/api/graphql")
 
-# Setup Admin panel (available at /admin)
-# Note: In production, protect /admin with OAuth2 proxy or network policies
-setup_admin(app, engine)
-
-
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -154,7 +148,6 @@ async def root():
         "rest_api": "/api/v1/",
         "graphql_api": "/api/graphql",
         "graphql_playground": "/api/graphql (open in browser)",
-        "admin": "/admin",
         "docs": "/docs",
     }
 

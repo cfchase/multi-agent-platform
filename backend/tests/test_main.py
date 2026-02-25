@@ -18,7 +18,6 @@ def test_read_root(client: TestClient):
     assert "version" in data
     assert data["rest_api"] == "/api/v1/"
     assert data["graphql_api"] == "/api/graphql"
-    assert data["admin"] == "/admin"
     assert data["docs"] == "/docs"
 
 
@@ -33,10 +32,3 @@ def test_health_check(client: TestClient):
     assert "database" in data
     assert data["database"]["status"] == "healthy"
     assert "message" in data["database"]
-
-
-def test_admin_panel_accessible(client: TestClient):
-    """Test the admin panel is accessible."""
-    response = client.get("/admin/")
-    # Admin redirects to login or renders directly
-    assert response.status_code in [200, 302]
