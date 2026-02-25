@@ -254,10 +254,10 @@ def _build_mcp_entry(server_config: dict, packages_dir: str = "/app/langflow/pac
         env.setdefault("PYTHONPATH", packages_dir)
         entry["env"] = env
         return entry
-    elif server_type == "http":
+    elif server_type in ("http", "sse"):
         url = server_config.get("url")
         if not url:
-            log_error(f"MCP server missing 'url' for http type")
+            log_error(f"MCP server missing 'url' for {server_type} type")
             return None
         return {"url": url}
     else:
