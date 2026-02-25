@@ -33,7 +33,6 @@ dependencies = [
     "email-validator<3.0.0.0,>=2.1.0.post1",
     # GraphQL
     "strawberry-graphql[fastapi]>=0.245.0",
-    "sqladmin>=0.22.0",
     # HTTP client for Langflow integration
     "httpx>=0.28.1",
     "sse-starlette>=2.2.1",
