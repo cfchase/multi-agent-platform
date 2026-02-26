@@ -158,9 +158,7 @@ if ! oc get secret admin-credentials -n "$NAMESPACE" &> /dev/null; then
         --from-literal=email="$ADMIN_EMAIL" \
         --from-literal=password="$ADMIN_PASS" \
         -n "$NAMESPACE"
-    echo "Created admin-credentials secret"
-    echo "  Email: $ADMIN_EMAIL"
-    echo "  Password: $ADMIN_PASS"
+    echo "Created admin-credentials secret (use 'oc get secret admin-credentials -o yaml' to retrieve)"
 else
     echo "admin-credentials already exists"
 fi

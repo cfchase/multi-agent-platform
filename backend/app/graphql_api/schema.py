@@ -114,15 +114,11 @@ class Query:
         skip: int = 0,
         limit: int = 100,
     ) -> list[UserType]:
-        """Get a list of users with pagination.
+        """Get a list of users with pagination. Requires admin access."""
+        current_user = info.context.get("current_user")
+        if not current_user or not current_user.admin:
+            raise PermissionError("Admin access required")
 
-        Args:
-            skip: Number of users to skip
-            limit: Maximum number of users to return
-
-        Returns:
-            List of users
-        """
         session: Session = info.context["session"]
 
         statement = select(User).offset(skip).limit(limit)
@@ -131,14 +127,11 @@ class Query:
 
     @strawberry.field
     def user(self, info: Info, id: int) -> UserType | None:
-        """Get a single user by ID.
+        """Get a single user by ID. Requires admin access."""
+        current_user = info.context.get("current_user")
+        if not current_user or not current_user.admin:
+            raise PermissionError("Admin access required")
 
-        Args:
-            id: The user ID
-
-        Returns:
-            The user if found, None otherwise
-        """
         session: Session = info.context["session"]
         user = session.get(User, id)
         return UserType.from_orm(user) if user else None

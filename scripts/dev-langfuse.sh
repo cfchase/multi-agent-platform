@@ -142,7 +142,7 @@ start_minio() {
             -e MINIO_ROOT_USER=$MINIO_ROOT_USER \
             -e MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD \
             -v "${MINIO_DATA}:/data" \
-            -p 9090:9000 \
+            -p 127.0.0.1:9090:9000 \
             -p 127.0.0.1:9091:9001 \
             docker.io/minio/minio:latest \
             server /data --console-address ":9001"

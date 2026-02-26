@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter
 from sqlmodel import select
 
 from app.api.deps import SessionDep
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,8 +22,9 @@ async def health_check(session: SessionDep):
         db_status = "healthy"
         db_message = "Database connection successful"
     except Exception as e:
+        logger.error(f"Database health check failed: {e}")
         db_status = "unhealthy"
-        db_message = f"Database connection failed: {str(e)}"
+        db_message = "Database connection failed"
 
     # Overall status is healthy only if database is healthy
     overall_status = "healthy" if db_status == "healthy" else "unhealthy"

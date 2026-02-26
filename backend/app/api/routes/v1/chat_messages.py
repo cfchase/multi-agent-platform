@@ -8,6 +8,7 @@ This module provides operations for chat messages:
 - Delete message
 """
 
+import asyncio
 import json
 import logging
 import traceback
@@ -226,21 +227,66 @@ async def stream_message(
     tweaks = build_generic_tweaks(user_data=user_data, app_data=app_data)
 
     async def generate_stream() -> AsyncGenerator[str, None]:
-        """Generate SSE events from Langflow streaming response."""
+        """Generate SSE events from Langflow streaming response.
+
+        Sends periodic SSE heartbeat comments while waiting for LangFlow
+        to prevent proxies (nginx, OAuth proxy, OpenShift Route) from
+        closing the idle chunked connection.
+        """
         client = get_langflow_client()
         accumulated_content = ""
 
+        # Send initial heartbeat immediately to establish the chunked stream
+        # (SSE comment — ignored by EventSource clients but keeps proxies alive)
+        yield ": heartbeat\n\n"
+
         try:
-            # Stream from Langflow
-            async for chunk in client.chat_stream(
-                message=request.content,
-                session_id=str(chat_id),
-                flow_id=request.flow_id,
-                flow_name=request.flow_name,
-                tweaks=tweaks,
-            ):
-                accumulated_content += chunk
-                yield format_sse_event({"type": "content", "content": chunk})
+            # Use an async queue so we can interleave heartbeats with real data
+            chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+            async def langflow_producer():
+                """Read from LangFlow and put chunks on the queue."""
+                try:
+                    async for chunk in client.chat_stream(
+                        message=request.content,
+                        session_id=str(chat_id),
+                        flow_id=request.flow_id,
+                        flow_name=request.flow_name,
+                        tweaks=tweaks,
+                    ):
+                        await chunk_queue.put(chunk)
+                finally:
+                    await chunk_queue.put(None)  # sentinel
+
+            producer_task = asyncio.create_task(langflow_producer())
+
+            try:
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(
+                            chunk_queue.get(), timeout=15.0
+                        )
+                    except asyncio.TimeoutError:
+                        # No data from LangFlow yet — send heartbeat to keep alive
+                        yield ": heartbeat\n\n"
+                        continue
+
+                    if chunk is None:
+                        break  # stream finished
+                    accumulated_content += chunk
+                    yield format_sse_event({"type": "content", "content": chunk})
+            finally:
+                if not producer_task.done():
+                    producer_task.cancel()
+                    try:
+                        await producer_task
+                    except (asyncio.CancelledError, Exception):
+                        pass
+                # Re-raise any exception from the producer
+                if producer_task.done() and not producer_task.cancelled():
+                    exc = producer_task.exception()
+                    if exc:
+                        raise exc
 
             # Save assistant message with accumulated content (only if not empty)
             if accumulated_content.strip():
