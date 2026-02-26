@@ -93,7 +93,7 @@ langflow:
       - name: GOOGLE_CLOUD_PROJECT
         value: "redhat-ai-analysis"
       - name: XDG_STATE_HOME
-        value: "/app"
+        value: "/tmp/langflow"
       - name: CONFIG_DIR
         value: "/app/src/config"
       - name: LFX_DEV
