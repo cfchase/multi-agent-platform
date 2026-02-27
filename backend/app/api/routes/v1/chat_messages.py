@@ -28,6 +28,9 @@ from app.models import (
     ChatMessageCreate,
     ChatMessagePublic,
     ChatMessagesPublic,
+    Job,
+    JobPublic,
+    JobStatus,
     Message,
 )
 from app.core.config import settings
@@ -129,6 +132,116 @@ def create_message(
     session.commit()
     session.refresh(message)
     return message
+
+
+class JobMessageRequest(BaseModel):
+    """Request body for job-based message endpoint."""
+    content: str
+    flow_id: str | None = None
+    flow_name: str | None = None
+
+
+@router.post("/job", response_model=JobPublic)
+async def create_job_message(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    chat_id: int,
+    request: JobMessageRequest,
+) -> Any:
+    """
+    Send a message and create a background job for AI processing.
+
+    This endpoint:
+    1. Saves the user message to the database
+    2. Creates a placeholder assistant message (filled on job completion)
+    3. Creates a Job record (status=pending)
+    4. Submits to LangFlow V2 with background=true
+    5. Updates Job with langflow_job_id and status=in_progress
+    6. Returns JobPublic response (includes job id for frontend polling)
+    """
+    # Verify chat exists and user has access
+    chat = get_chat_with_permission(session, current_user, chat_id)
+    flow_name = request.flow_name or settings.LANGFLOW_DEFAULT_FLOW
+
+    # Save user message
+    user_message = ChatMessage(
+        chat_id=chat_id,
+        content=request.content,
+        role="user",
+    )
+    session.add(user_message)
+
+    # Create placeholder assistant message (content filled on job completion)
+    assistant_message = ChatMessage(
+        chat_id=chat_id,
+        content="",
+        role="assistant",
+    )
+    session.add(assistant_message)
+
+    # Update chat metadata
+    chat.updated_at = datetime.now(timezone.utc)
+    if not chat.flow_name and flow_name:
+        chat.flow_name = flow_name
+    session.add(chat)
+    session.commit()
+    session.refresh(user_message)
+    session.refresh(assistant_message)
+
+    # Resolve flow ID
+    client = get_langflow_client()
+    resolved_flow_id = await client.resolve_flow_id(
+        flow_id=request.flow_id, flow_name=flow_name
+    )
+    if not resolved_flow_id:
+        raise HTTPException(status_code=400, detail="No flow configured or found")
+
+    # Create job record
+    job = Job(
+        chat_message_id=assistant_message.id,
+        flow_id=resolved_flow_id,
+        status=JobStatus.PENDING.value,
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+
+    # Build tweaks and submit to LangFlow V2
+    user_data = await build_user_settings_data(
+        session=session, user_id=current_user.id
+    )
+    app_data = build_app_settings_data()
+    tweaks = build_generic_tweaks(user_data=user_data, app_data=app_data)
+
+    try:
+        v2_inputs = client.build_v2_inputs(
+            message=request.content,
+            session_id=str(chat_id),
+            tweaks=tweaks,
+        )
+        lf_response = await client.submit_workflow(
+            flow_id=resolved_flow_id,
+            inputs=v2_inputs,
+            session_id=str(chat_id),
+        )
+        now = datetime.now(timezone.utc)
+        job.langflow_job_id = lf_response.get("job_id")
+        job.status = JobStatus.IN_PROGRESS.value
+        job.started_at = now
+        job.updated_at = now
+    except Exception as e:
+        logger.error(f"Failed to submit workflow: {e}")
+        now = datetime.now(timezone.utc)
+        job.status = JobStatus.FAILED.value
+        job.error_message = str(e)
+        job.completed_at = now
+        job.updated_at = now
+
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
 
 
 @router.delete("/{message_id}")
