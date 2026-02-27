@@ -7,6 +7,7 @@ This module provides CRUD operations for chats:
 - Create new chat
 - Update chat
 - Delete chat
+- Get active job for a chat (page refresh recovery)
 """
 
 from datetime import datetime, timezone
@@ -19,10 +20,15 @@ from app.api.deps import CurrentUser, SessionDep
 from app.models import (
     Chat,
     ChatCreate,
+    ChatMessage,
     ChatPublic,
     ChatsPublic,
     ChatUpdate,
+    Job,
+    JobPublic,
+    JobStatus,
     Message,
+    TERMINAL_STATUSES,
 )
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -117,6 +123,37 @@ def update_chat(
     session.commit()
     session.refresh(chat)
     return chat
+
+
+@router.get("/{id}/active-job", response_model=JobPublic)
+def get_active_job(
+    session: SessionDep, current_user: CurrentUser, id: int
+) -> Any:
+    """
+    Get the active (non-terminal) job for a chat, if any.
+
+    Used for page refresh recovery -- checks if there's an in-flight job
+    that the frontend should resume polling for.
+
+    Returns 404 if no active job exists.
+    """
+    chat = get_chat_with_permission(session, current_user, id)
+
+    # Find the latest non-terminal job for any message in this chat
+    terminal_values = {s.value for s in TERMINAL_STATUSES}
+    statement = (
+        select(Job)
+        .join(ChatMessage, Job.chat_message_id == ChatMessage.id)
+        .where(ChatMessage.chat_id == chat.id)
+        .where(Job.status.notin_(terminal_values))
+        .order_by(Job.id.desc())
+        .limit(1)
+    )
+    job = session.exec(statement).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="No active job found")
+
+    return job
 
 
 @router.delete("/{id}")
