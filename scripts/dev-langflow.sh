@@ -128,6 +128,9 @@ case "$1" in
                     -e GRANITE_GUARDIAN_ENDPOINT="${GRANITE_GUARDIAN_ENDPOINT:-}"
                     -e GRANITE_GUARDIAN_API_KEY="${GRANITE_GUARDIAN_API_KEY:-}"
                     -e GRANITE_CA_BUNDLE="${GRANITE_CA_BUNDLE:-}"
+                    # V2 Workflow API (Phase 9: job model for long-running flows)
+                    -e LANGFLOW_DEVELOPER_API_ENABLED=${LANGFLOW_DEVELOPER_API_ENABLED:-true}
+                    ${LANGFLOW_API_KEY:+-e LANGFLOW_API_KEY=$LANGFLOW_API_KEY}
                 )
 
                 CUSTOM_VOL_ARGS=(
@@ -279,10 +282,12 @@ case "$1" in
         echo "  LANGFLOW_DB       - Database name (default: langflow)"
         echo ""
         echo "Custom image env vars (forwarded when LANGFLOW_IMAGE is set):"
-        echo "  GOOGLE_CLOUD_PROJECT       - GCP project for Vertex AI"
-        echo "  GRANITE_GUARDIAN_ENDPOINT   - Granite Guardian API endpoint"
-        echo "  GRANITE_GUARDIAN_API_KEY    - Granite Guardian API key"
-        echo "  GRANITE_CA_BUNDLE          - Custom CA bundle path"
+        echo "  GOOGLE_CLOUD_PROJECT              - GCP project for Vertex AI"
+        echo "  GRANITE_GUARDIAN_ENDPOINT          - Granite Guardian API endpoint"
+        echo "  GRANITE_GUARDIAN_API_KEY           - Granite Guardian API key"
+        echo "  GRANITE_CA_BUNDLE                  - Custom CA bundle path"
+        echo "  LANGFLOW_DEVELOPER_API_ENABLED     - Enable V2 Workflow API (default: true)"
+        echo "  LANGFLOW_API_KEY                   - API key for V2 API auth (optional)"
         echo ""
         echo "Prerequisites:"
         echo "  PostgreSQL must be running: make db-start"

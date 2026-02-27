@@ -25,8 +25,12 @@ VALID_ROLES = ("user", "assistant")
 
 
 class ChatMessageBase(SQLModel):
-    """Shared properties for ChatMessage."""
-    content: str = Field(min_length=1, max_length=10000)
+    """Shared properties for ChatMessage.
+
+    Note: content allows empty strings to support placeholder assistant
+    messages created by the job-based flow (filled on job completion).
+    """
+    content: str = Field(min_length=0, max_length=10000)
     role: str = Field(max_length=20)
 
     @field_validator("role")
@@ -39,8 +43,12 @@ class ChatMessageBase(SQLModel):
 
 
 class ChatMessageCreate(ChatMessageBase):
-    """Properties to receive on message creation."""
-    pass
+    """Properties to receive on message creation.
+
+    Requires non-empty content (unlike the base which allows empty
+    for placeholder assistant messages).
+    """
+    content: str = Field(min_length=1, max_length=10000)
 
 
 class ChatMessage(ChatMessageBase, table=True):
