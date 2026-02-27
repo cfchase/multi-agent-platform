@@ -223,14 +223,15 @@ class MockLangflowClient:
     ) -> dict:
         """Mock build_v2_inputs - mirrors LangflowClient."""
         inputs: dict = {
-            "input_value": message,
-            "input_type": "chat",
-            "output_type": "chat",
+            "Chat Input.input_value": message,
         }
         if session_id:
-            inputs["session_id"] = session_id
+            inputs["Chat Input.session_id"] = session_id
         if tweaks:
-            inputs["tweaks"] = tweaks
+            for component_name, params in tweaks.items():
+                if isinstance(params, dict):
+                    for param_name, value in params.items():
+                        inputs[f"{component_name}.{param_name}"] = value
         return inputs
 
     async def submit_workflow(
@@ -242,7 +243,7 @@ class MockLangflowClient:
         """
         Mock submit_workflow - returns a mock job submission response.
         """
-        self._record_call("submit_workflow", inputs.get("input_value", ""), session_id)
+        self._record_call("submit_workflow", inputs.get("Chat Input.input_value", ""), session_id)
         logger.debug(f"[MOCK] submit_workflow called: flow_id={flow_id}")
 
         if self.simulate_error:
@@ -269,19 +270,13 @@ class MockLangflowClient:
             "job_id": job_id,
             "status": "completed",
             "outputs": {
-                "outputs": [
-                    {
-                        "outputs": [
-                            {
-                                "results": {
-                                    "message": {
-                                        "text": response,
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                ]
+                "Chat Output": {
+                    "type": "message",
+                    "component_id": "ChatOutput-mock",
+                    "status": "completed",
+                    "content": response,
+                    "metadata": {"component_type": "ChatOutput"},
+                }
             },
         }
 

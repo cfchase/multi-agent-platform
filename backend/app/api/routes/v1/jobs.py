@@ -49,8 +49,8 @@ def extract_result_text(outputs: dict) -> str:
     """
     Extract the chat output text from LangFlow V2 response outputs.
 
-    Navigates the V2 output structure to find the message text,
-    using the same pattern as the existing chat() method.
+    V2 outputs structure: {"Component Name": {"type": "message", "content": "...", ...}}
+    Looks for the first component with type "message" and returns its content.
 
     Args:
         outputs: The 'outputs' dict from V2 workflow status response
@@ -59,17 +59,12 @@ def extract_result_text(outputs: dict) -> str:
         The extracted text, or empty string if not found
     """
     try:
-        output_list = outputs.get("outputs", [])
-        if output_list:
-            first_output = output_list[0]
-            if "outputs" in first_output:
-                inner_outputs = first_output["outputs"]
-                if inner_outputs:
-                    message_data = inner_outputs[0].get("results", {}).get(
-                        "message", {}
-                    )
-                    return message_data.get("text", "")
-    except (IndexError, AttributeError, TypeError):
+        for component_name, component_output in outputs.items():
+            if isinstance(component_output, dict):
+                content = component_output.get("content")
+                if content is not None:
+                    return str(content)
+    except (AttributeError, TypeError):
         logger.warning("Failed to extract result text from V2 outputs")
     return ""
 

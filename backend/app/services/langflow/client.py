@@ -382,29 +382,31 @@ class LangflowClient:
         tweaks: dict | None = None,
     ) -> dict:
         """
-        Build V2-compatible inputs from message and tweaks.
+        Build V2-compatible flat inputs from message and tweaks.
 
-        V2 uses tweaks dict internally via process_tweaks(), so we pass tweaks
-        alongside the standard input_value in the payload. The V2 controller
-        calls process_tweaks(graph_data, tweaks) which accepts display-name keys.
+        V2 uses flat format: "display_name.param_name": value
+        parse_flat_inputs() converts this to tweaks dict, then process_tweaks()
+        applies them to the graph (supports both component IDs and display names).
 
         Args:
             message: The user message
             session_id: Optional session ID for conversation continuity
-            tweaks: Optional tweaks dict (display-name keyed)
+            tweaks: Optional tweaks dict (display-name keyed, e.g.
+                    {"User Settings": {"settings_data": {...}}})
 
         Returns:
-            Dict with input_value, session_id, and tweaks for V2 payload
+            Dict with flat inputs for V2 WorkflowExecutionRequest.inputs
         """
         inputs: dict = {
-            "input_value": message,
-            "input_type": "chat",
-            "output_type": "chat",
+            "Chat Input.input_value": message,
         }
         if session_id:
-            inputs["session_id"] = session_id
+            inputs["Chat Input.session_id"] = session_id
         if tweaks:
-            inputs["tweaks"] = tweaks
+            for component_name, params in tweaks.items():
+                if isinstance(params, dict):
+                    for param_name, value in params.items():
+                        inputs[f"{component_name}.{param_name}"] = value
         return inputs
 
     async def submit_workflow(
@@ -431,7 +433,7 @@ class LangflowClient:
         payload = {
             "flow_id": flow_id,
             "background": True,
-            **inputs,
+            "inputs": inputs,
         }
 
         async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
