@@ -4,3 +4,30 @@
   right: 20px;
   z-index: 1000;
 }
+
+/* Cancel button positioning in the loading message */
+.pf-chatbot__job-cancel-area {
+  padding-top: var(--pf-t--global--spacer--xs, 4px);
+}
+
+/* Tooltip wrapper for job status -- allows hover target on loading message */
+.pf-chatbot__job-tooltip-wrapper {
+  display: contents;
+}
+
+/* Error details formatting */
+.pf-chatbot__error-details {
+  padding-top: var(--pf-t--global--spacer--sm, 8px);
+}
+
+.pf-chatbot__error-pre {
+  font-size: var(--pf-t--global--font--size--xs, 0.75rem);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--pf-t--global--spacer--sm, 8px);
+  background-color: var(--pf-t--global--background--color--secondary--default, #f0f0f0);
+  border-radius: var(--pf-t--global--border--radius--small, 3px);
+  margin: 0;
+}
