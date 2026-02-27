@@ -91,3 +91,58 @@ class LangflowClientProtocol(Protocol):
             LangflowError: If the API call fails
         """
         ...
+
+    def build_v2_inputs(
+        self,
+        message: str,
+        session_id: str | None = None,
+        tweaks: dict | None = None,
+    ) -> dict:
+        """
+        Build V2-compatible inputs from message and tweaks.
+
+        Returns:
+            Dict with input_value, session_id, and tweaks for V2 payload
+        """
+        ...
+
+    async def submit_workflow(
+        self,
+        flow_id: str,
+        inputs: dict,
+        session_id: str | None = None,
+    ) -> dict:
+        """
+        Submit workflow for background execution via V2 API.
+
+        Returns:
+            Dict with job_id, status, and other metadata
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        ...
+
+    async def get_workflow_status(self, job_id: str) -> dict:
+        """
+        Get workflow status from V2 API.
+
+        Returns:
+            Dict with job_id, status, outputs, and other metadata
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        ...
+
+    async def stop_workflow(self, job_id: str) -> dict:
+        """
+        Stop a running workflow via V2 API.
+
+        Returns:
+            Dict with job_id and message
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        ...

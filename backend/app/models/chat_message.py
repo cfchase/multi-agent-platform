@@ -16,6 +16,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from app.models.chat import Chat
+    from app.models.job import Job
 
 
 # Valid roles for chat messages - type hint only (SQLModel can't use Literal for db columns)
@@ -53,8 +54,9 @@ class ChatMessage(ChatMessageBase, table=True):
         sa_type=DateTime(timezone=True),
     )
 
-    # Relationship
+    # Relationships
     chat: Optional["Chat"] = Relationship(back_populates="messages")
+    job: Optional["Job"] = Relationship(back_populates="chat_message")
 
 
 class ChatMessagePublic(ChatMessageBase):

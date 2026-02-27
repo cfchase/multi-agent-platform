@@ -69,6 +69,14 @@ from app.models.chat_message import (
     ChatMessagesPublic,
 )
 
+# Job models
+from app.models.job import (
+    Job,
+    JobPublic,
+    JobStatus,
+    TERMINAL_STATUSES,
+)
+
 # Integration models
 from app.models.user_integration import (
     UserIntegration,
@@ -114,6 +122,11 @@ __all__ = [
     "ChatMessageCreate",
     "ChatMessagePublic",
     "ChatMessagesPublic",
+    # Job
+    "Job",
+    "JobPublic",
+    "JobStatus",
+    "TERMINAL_STATUSES",
     # Integration
     "UserIntegration",
     "UserIntegrationPublic",
