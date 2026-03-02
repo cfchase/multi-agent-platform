@@ -30,7 +30,7 @@ def upgrade():
     sa.Column('completed_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['chat_message_id'], ['chat_message.id'], ),
+    sa.ForeignKeyConstraint(['chat_message_id'], ['chat_message.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_job_chat_message_id'), 'job', ['chat_message_id'], unique=False)

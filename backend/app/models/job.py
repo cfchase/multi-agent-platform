@@ -43,7 +43,7 @@ class Job(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     chat_message_id: int = Field(
-        foreign_key="chat_message.id", nullable=False, index=True
+        foreign_key="chat_message.id", nullable=False, index=True, ondelete="CASCADE"
     )
     langflow_job_id: str | None = Field(
         default=None, index=True, max_length=255
