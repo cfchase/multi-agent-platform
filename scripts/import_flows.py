@@ -8,9 +8,7 @@ Usage:
 
 Environment variables:
     LANGFLOW_URL      - LangFlow API URL (default: http://localhost:7860)
-    LANGFLOW_USER     - LangFlow username (default: dev@localhost.local)
-    LANGFLOW_PASSWORD - LangFlow password (default: devpassword123)
-    LANGFLOW_API_KEY  - LangFlow API key (optional, overrides user/password)
+    LANGFLOW_API_KEY  - LangFlow API key (required, validated via x-api-key header)
     FLOW_SOURCE_PATH  - Simple mode: single local path to import
     GITHUB_FLOW_TOKEN - Token for private git repos
 
@@ -38,8 +36,6 @@ import yaml
 PROJECT_ROOT = Path(__file__).parent.parent
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "local" / "flow-sources.yaml"
 LANGFLOW_URL = os.environ.get("LANGFLOW_URL", "http://localhost:7860")
-LANGFLOW_USER = os.environ.get("LANGFLOW_USER", "dev@localhost.local")
-LANGFLOW_PASSWORD = os.environ.get("LANGFLOW_PASSWORD", "devpassword123")
 CACHE_DIR = Path(os.environ.get("FLOW_CACHE_DIR", "/tmp/flow-cache"))
 
 # Component installation paths (relative to project root)
@@ -67,8 +63,8 @@ BLOCKED_HOSTS = {
     "metadata.google.internal",  # GCP metadata
 }
 
-# Global access token
-ACCESS_TOKEN: str | None = None
+# Global API key for LangFlow authentication
+API_KEY: str | None = os.environ.get("LANGFLOW_API_KEY")
 
 # Cache for project name -> ID lookups
 PROJECT_CACHE: dict[str, str] = {}
@@ -539,36 +535,34 @@ def install_components(source: dict) -> bool:
 
 
 def authenticate() -> bool:
-    """Authenticate with LangFlow and get access token."""
-    global ACCESS_TOKEN
+    """Verify LangFlow API key authentication.
 
-    # Check for API key first
-    api_key = os.environ.get("LANGFLOW_API_KEY")
-    if api_key:
-        ACCESS_TOKEN = api_key
-        log_info("Using API key from LANGFLOW_API_KEY")
-        return True
-
-    log_info(f"Authenticating as {LANGFLOW_USER}...")
-    resp = request_with_retry(
-        "POST",
-        f"{LANGFLOW_URL}/api/v1/login",
-        data={"username": LANGFLOW_USER, "password": LANGFLOW_PASSWORD},
-        timeout=10,
-    )
-    if resp is None:
+    Uses the LANGFLOW_API_KEY env var with x-api-key header.
+    LangFlow must have LANGFLOW_API_KEY_SOURCE=env set to validate
+    API keys from environment variables.
+    """
+    if not API_KEY:
+        log_error(
+            "LANGFLOW_API_KEY not set. "
+            "Set it in config/local/.env or export LANGFLOW_API_KEY=..."
+        )
         return False
 
-    if resp.ok:
-        try:
-            data = resp.json()
-            ACCESS_TOKEN = data.get("access_token")
-            if ACCESS_TOKEN:
-                log_info("Authentication successful")
-                return True
-        except json.JSONDecodeError:
-            pass
-    log_error(f"Authentication failed: {resp.text[:200]}")
+    # Verify the API key works
+    resp = request_with_retry(
+        "GET",
+        f"{LANGFLOW_URL}/api/v1/flows/",
+        headers={"x-api-key": API_KEY},
+        timeout=10,
+    )
+    if resp is not None and resp.ok:
+        log_info("Authentication successful (API key)")
+        return True
+
+    detail = ""
+    if resp is not None:
+        detail = f": {resp.text[:200]}"
+    log_error(f"API key authentication failed{detail}")
     return False
 
 
@@ -579,8 +573,8 @@ def list_all_flows() -> list[dict] | None:
     Returns None on error.
     """
     headers = {}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    if API_KEY:
+        headers["x-api-key"] = API_KEY
 
     resp = request_with_retry(
         "GET",
@@ -610,8 +604,8 @@ def delete_flow(flow_id: str) -> bool:
     Returns True if deleted successfully.
     """
     headers = {"Content-Type": "application/json"}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    if API_KEY:
+        headers["x-api-key"] = API_KEY
 
     resp = request_with_retry(
         "DELETE",
@@ -650,8 +644,8 @@ def find_flow_by_name(flows: list[dict], name: str, project_id: str | None = Non
 def create_project(project_name: str) -> str | None:
     """Create a new project and return its ID."""
     headers = {"Content-Type": "application/json"}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    if API_KEY:
+        headers["x-api-key"] = API_KEY
 
     resp = request_with_retry(
         "POST",
@@ -684,8 +678,8 @@ def get_project_id(project_name: str, create_if_missing: bool = True) -> str | N
         return PROJECT_CACHE[project_name]
 
     headers = {}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    if API_KEY:
+        headers["x-api-key"] = API_KEY
 
     resp = request_with_retry(
         "GET",
@@ -752,8 +746,8 @@ def import_flow_data(
     same project, it is deleted before importing the new version.
     """
     headers = {"Content-Type": "application/json"}
-    if ACCESS_TOKEN:
-        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+    if API_KEY:
+        headers["x-api-key"] = API_KEY
 
     # Check for existing flow and delete if found
     flows = list_all_flows()

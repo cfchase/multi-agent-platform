@@ -31,7 +31,7 @@ langflow:
       # Custom image with redhat_agents baked in (built via GitLab CI)
       repository: quay.io/cfchase/agents-python-langflow
       imagePullPolicy: Always
-      tag: "1.8.0"
+      tag: "1.8.0.rc0"
     service:
       type: ClusterIP
       port: 7860

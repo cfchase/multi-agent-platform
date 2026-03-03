@@ -242,7 +242,7 @@ created_at      TIMESTAMP
 |-----------|-------|------|-----------|
 | frontend | app-frontend | 8080 | 256Mi / 200m |
 | backend | app-backend | 8000 | 512Mi / 500m |
-| langflow | langflowai/langflow:1.8.0 | 7860 | 2Gi / 1000m |
+| langflow | langflowai/langflow:1.8.0.rc0 | 7860 | 2Gi / 1000m |
 | langfuse | langfuse/langfuse:latest | 3000 | 1Gi / 500m |
 | mlflow | ghcr.io/mlflow/mlflow:v2.16.0 | 5000 | 1Gi / 500m |
 | postgres | postgres:15-alpine | 5432 | 512Mi / 500m |

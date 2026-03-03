@@ -48,7 +48,7 @@ spec:
             - ALL
       containers:
       - name: langflow
-        image: docker.io/langflowai/langflow:1.8.0
+        image: docker.io/langflowai/langflow:1.8.0.rc0
         imagePullPolicy: Always
         ports:
         - containerPort: 7860

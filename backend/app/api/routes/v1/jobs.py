@@ -6,6 +6,7 @@ This module provides:
 - POST /jobs/{id}/cancel — Cancel a running job
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -14,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 from app.api.deps import CurrentUser, SessionDep
 from app.models import Chat, ChatMessage, Job, JobPublic, JobStatus, TERMINAL_STATUSES
 from app.services.langflow import get_langflow_client
+from app.services.langflow.client import LangflowError
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +134,30 @@ async def sync_job_status_with_langflow(
             session.commit()
             session.refresh(job)
 
+    except LangflowError as e:
+        # LangFlow V2 returns HTTP 500 for failed jobs with JOB_FAILED code.
+        # Parse the error to update job status instead of leaving it stuck.
+        if e.status_code == 500 and "JOB_FAILED" in e.message:
+            logger.info(f"Job {job.id} failed in LangFlow: {e.message}")
+            # Extract readable error from the JSON response
+            error_msg = "Job failed in LangFlow"
+            try:
+                detail = json.loads(
+                    e.message.replace("Failed to get workflow status: ", "", 1)
+                )
+                error_msg = detail.get("detail", {}).get("message", error_msg)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            now = datetime.now(timezone.utc)
+            job.status = JobStatus.FAILED.value
+            job.error_message = error_msg
+            job.completed_at = now
+            job.updated_at = now
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+        else:
+            logger.warning(f"LangFlow error syncing job {job.id}: {e}")
     except Exception as e:
         logger.warning(f"Error syncing job {job.id} with LangFlow: {e}")
 
