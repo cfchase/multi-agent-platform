@@ -117,10 +117,17 @@ async def sync_job_status_with_langflow(
                 job.started_at = now
 
             if new_status == JobStatus.COMPLETED:
-                job.result_content = extract_result_text(
+                result_text = extract_result_text(
                     lf_response.get("outputs", {})
                 )
+                job.result_content = result_text
                 job.completed_at = now
+                # Write result back to the chat message so it appears in message history
+                if result_text and job.chat_message_id:
+                    chat_message = session.get(ChatMessage, job.chat_message_id)
+                    if chat_message:
+                        chat_message.content = result_text
+                        session.add(chat_message)
             elif new_status in (JobStatus.FAILED, JobStatus.TIMED_OUT):
                 errors = lf_response.get("errors", [])
                 if errors and isinstance(errors[0], dict):
