@@ -197,6 +197,103 @@ class MockLangflowClient:
 
         logger.debug(f"[MOCK] Finished streaming response: {response[:50]}...")
 
+    # --- V2 Workflow API Mock Methods ---
+
+    async def resolve_flow_id(
+        self,
+        flow_id: str | None = None,
+        flow_name: str | None = None,
+    ) -> str | None:
+        """
+        Mock resolve_flow_id - returns the flow_id if provided,
+        otherwise returns a mock flow ID.
+        """
+        if self.simulate_error:
+            raise LangflowError(self.error_message, status_code=500)
+
+        if flow_id:
+            return flow_id
+        return "mock-flow-1"
+
+    def build_v2_inputs(
+        self,
+        message: str,
+        session_id: str | None = None,
+        tweaks: dict | None = None,
+    ) -> dict:
+        """Mock build_v2_inputs - mirrors LangflowClient."""
+        inputs: dict = {
+            "Chat Input.input_value": message,
+        }
+        if session_id:
+            inputs["Chat Input.session_id"] = session_id
+        if tweaks:
+            for component_name, params in tweaks.items():
+                if isinstance(params, dict):
+                    for param_name, value in params.items():
+                        inputs[f"{component_name}.{param_name}"] = value
+        return inputs
+
+    async def submit_workflow(
+        self,
+        flow_id: str,
+        inputs: dict,
+        session_id: str | None = None,
+    ) -> dict:
+        """
+        Mock submit_workflow - returns a mock job submission response.
+        """
+        self._record_call("submit_workflow", inputs.get("Chat Input.input_value", ""), session_id)
+        logger.debug(f"[MOCK] submit_workflow called: flow_id={flow_id}")
+
+        if self.simulate_error:
+            raise LangflowError(self.error_message, status_code=500)
+
+        await asyncio.sleep(0.05)
+        return {
+            "job_id": "mock-job-123",
+            "flow_id": flow_id,
+            "status": "queued",
+        }
+
+    async def get_workflow_status(self, job_id: str) -> dict:
+        """
+        Mock get_workflow_status - returns a completed job status.
+        """
+        logger.debug(f"[MOCK] get_workflow_status called: job_id={job_id}")
+
+        if self.simulate_error:
+            raise LangflowError(self.error_message, status_code=500)
+
+        response = self._get_next_response()
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "outputs": {
+                "Chat Output": {
+                    "type": "message",
+                    "component_id": "ChatOutput-mock",
+                    "status": "completed",
+                    "content": response,
+                    "metadata": {"component_type": "ChatOutput"},
+                }
+            },
+        }
+
+    async def stop_workflow(self, job_id: str) -> dict:
+        """
+        Mock stop_workflow - returns a cancellation confirmation.
+        """
+        logger.debug(f"[MOCK] stop_workflow called: job_id={job_id}")
+
+        if self.simulate_error:
+            raise LangflowError(self.error_message, status_code=500)
+
+        return {
+            "job_id": job_id,
+            "message": "Job cancelled successfully.",
+        }
+
     # Test helper methods
 
     def get_call_history(self) -> list[dict]:

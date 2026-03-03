@@ -7,9 +7,11 @@ import {
   Dropdown,
   DropdownItem,
   DropdownList,
+  ExpandableSection,
   MenuToggle,
   MenuToggleElement,
   PageSection,
+  Tooltip,
 } from '@patternfly/react-core';
 import {
   Chatbot,
@@ -31,7 +33,8 @@ import {
 } from '@patternfly/chatbot';
 import { ArrowDownIcon, TrashIcon } from '@patternfly/react-icons';
 
-import { ChatAPI, Chat as ChatType, ChatMessage, StreamingEvent, Flow } from './chatApi';
+import { ChatAPI, Chat as ChatType, ChatMessage, Flow } from './chatApi';
+import { useJobPolling } from './useJobPolling';
 import userAvatar from '@app/images/user-avatar.svg';
 import aiLogo from '@app/images/ai-logo-transparent.svg';
 
@@ -51,6 +54,12 @@ function convertMessageToProps(msg: ChatMessage): MessageProps {
     timestamp: new Date(msg.created_at).toLocaleString(),
     avatarProps: isUser ? { isBordered: true } : undefined,
   };
+}
+
+/** Format elapsed seconds as human-readable string. */
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 function Chat(): React.ReactElement {
@@ -80,11 +89,32 @@ function Chat(): React.ReactElement {
   // Operation error state (for displaying errors to user)
   const [operationError, setOperationError] = React.useState<string | null>(null);
 
+  // Job state
+  const [activeJobId, setActiveJobId] = React.useState<number | null>(null);
+  const [jobStartTime, setJobStartTime] = React.useState<Date | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const loadingBotMessageIdRef = React.useRef<string | null>(null);
+  const originalMessageTextRef = React.useRef<string>('');
+
+  // Use the polling hook
+  const { data: jobData } = useJobPolling(activeJobId);
+
   const historyRef = React.useRef<HTMLButtonElement>(null);
-  const streamControllerRef = React.useRef<{ close: () => void } | null>(null);
   const messageBoxRef = React.useRef<MessageBoxHandle | null>(null);
   const [userScrolledUp, setUserScrolledUp] = React.useState(false);
   const scrollDetectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Elapsed time timer
+  React.useEffect(() => {
+    if (!jobStartTime || !activeJobId) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.round((Date.now() - jobStartTime.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [jobStartTime, activeJobId]);
 
   // Scroll utility functions
   const scrollToBottom = React.useCallback(() => {
@@ -140,7 +170,7 @@ function Chat(): React.ReactElement {
     }
   };
 
-  // Load messages and restore flow when chat changes
+  // Load messages and check for active jobs when chat changes
   React.useEffect(() => {
     setLastError(null);
     setErrorMessages(new Map());
@@ -149,13 +179,17 @@ function Chat(): React.ReactElement {
       if (chat?.flow_name) {
         setSelectedFlowName(chat.flow_name);
       }
-      // Skip loading messages if we're currently sending — handleSend manages
+      // Skip loading messages if we're currently sending -- handleSend manages
       // messages directly and loadMessages would overwrite the loading indicator.
       if (!isSending) {
         loadMessages(selectedChatId);
+        // Page refresh recovery: check for active jobs
+        checkForActiveJob(selectedChatId);
       }
     } else {
       setMessages([]);
+      setActiveJobId(null);
+      setJobStartTime(null);
     }
   }, [selectedChatId]);
 
@@ -190,6 +224,131 @@ function Chat(): React.ReactElement {
       setMessages([]);
     }
   };
+
+  /**
+   * Page refresh recovery: check if there's an active (non-terminal) job for this chat.
+   * If found, resume polling and show the typing indicator.
+   */
+  const checkForActiveJob = async (chatId: number) => {
+    try {
+      const activeJob = await ChatAPI.getActiveJob(chatId);
+      if (activeJob) {
+        // Resume polling for the active job
+        setActiveJobId(activeJob.id);
+        setJobStartTime(activeJob.started_at ? new Date(activeJob.started_at) : new Date());
+        setIsSending(true);
+
+        // Find the placeholder assistant message and show it as loading
+        const botMsgId = `recovered-bot-${activeJob.chat_message_id}`;
+        loadingBotMessageIdRef.current = botMsgId;
+
+        // Add a loading indicator for the recovered job
+        setMessages((prev) => {
+          // Check if the last message is the empty placeholder
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.role === 'bot' && !lastMsg.content) {
+            // Replace the empty placeholder with a loading indicator
+            return prev.map((msg, i) =>
+              i === prev.length - 1
+                ? { ...msg, id: botMsgId, isLoading: true }
+                : msg
+            );
+          }
+          // Otherwise add a loading message
+          return [
+            ...prev,
+            {
+              id: botMsgId,
+              role: 'bot' as const,
+              content: '',
+              name: 'Assistant',
+              avatar: aiLogo,
+              timestamp: new Date().toLocaleString(),
+              isLoading: true,
+            },
+          ];
+        });
+      }
+    } catch {
+      // No active job -- expected for most chats
+    }
+  };
+
+  // React to job status changes
+  React.useEffect(() => {
+    if (!jobData || !activeJobId) return;
+    const botMessageId = loadingBotMessageIdRef.current;
+    if (!botMessageId) return;
+
+    if (jobData.status === 'completed' && jobData.result_content) {
+      // Update the bot message with the result
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === botMessageId
+            ? { ...msg, content: jobData.result_content!, isLoading: false }
+            : msg
+        )
+      );
+      // Reload messages to get server-side IDs
+      if (selectedChatId) {
+        loadMessages(selectedChatId);
+      }
+      setIsSending(false);
+      setActiveJobId(null);
+      setJobStartTime(null);
+      loadingBotMessageIdRef.current = null;
+      setAnnouncement(`Assistant: ${jobData.result_content}`);
+
+      // Update chat title on first real message (only user+loading = length 2)
+      if (messages.length <= 2 && selectedChatId) {
+        const originalText = originalMessageTextRef.current;
+        if (originalText) {
+          const title = originalText.slice(0, 50) + (originalText.length > 50 ? '...' : '');
+          ChatAPI.updateChat(selectedChatId, { title }).then(() => loadChats());
+          const sendFlowName = isFlowLocked ? selectedChat?.flow_name : selectedFlowName;
+          if (sendFlowName) {
+            setChats((prev) =>
+              prev.map((c) =>
+                c.id === selectedChatId ? { ...c, flow_name: sendFlowName } : c
+              )
+            );
+          }
+        }
+      }
+    } else if (jobData.status === 'failed' || jobData.status === 'timed_out') {
+      const errorText = jobData.error_message || 'An unknown error occurred.';
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === botMessageId
+            ? { ...msg, content: '', isLoading: false }
+            : msg
+        )
+      );
+      setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
+      setLastError({
+        message: originalMessageTextRef.current,
+        chatId: selectedChatId!,
+        botMessageId,
+        errorText,
+      });
+      setIsSending(false);
+      setActiveJobId(null);
+      setJobStartTime(null);
+      loadingBotMessageIdRef.current = null;
+    } else if (jobData.status === 'cancelled') {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === botMessageId
+            ? { ...msg, content: 'Request cancelled', isLoading: false }
+            : msg
+        )
+      );
+      setIsSending(false);
+      setActiveJobId(null);
+      setJobStartTime(null);
+      loadingBotMessageIdRef.current = null;
+    }
+  }, [jobData]);
 
   const handleNewChat = async () => {
     setOperationError(null);
@@ -261,7 +420,10 @@ function Chat(): React.ReactElement {
 
     setIsSending(true);
     setLastError(null);
+    setActiveJobId(null);
+    setJobStartTime(new Date());
     setUserScrolledUp(false);
+    originalMessageTextRef.current = messageText;
     const timestamp = new Date().toLocaleString();
     const isRetry = !!retryMessageText;
 
@@ -278,6 +440,7 @@ function Chat(): React.ReactElement {
 
     // Add loading bot message
     const botMessageId = `bot-${Date.now()}`;
+    loadingBotMessageIdRef.current = botMessageId;
     const loadingBotMessage: MessageProps = {
       id: botMessageId,
       role: 'bot',
@@ -308,102 +471,72 @@ function Chat(): React.ReactElement {
     setAnnouncement(`Message from You: ${messageText}. Assistant is thinking...`);
     setTimeout(() => scrollToBottom(), 50);
 
-    let accumulatedContent = '';
-
-    const streamController = ChatAPI.createStreamingMessage(
-      chatId,
-      messageText,
-      (event: StreamingEvent) => {
-        if (event.type === 'content' && event.content) {
-          accumulatedContent += event.content;
-          // Update the bot message with accumulated content
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === botMessageId
-                ? { ...msg, content: accumulatedContent, isLoading: false }
-                : msg
-            )
-          );
-        } else if (event.type === 'done') {
-          streamControllerRef.current = null;
-          // Reload to get the saved message IDs
-          loadMessages(chatId);
-          setIsSending(false);
-          setAnnouncement(`Assistant: ${accumulatedContent}`);
-
-          // Update chat title and lock flow on first message
-          if (messages.length === 0) {
-            const title = messageText.slice(0, 50) + (messageText.length > 50 ? '...' : '');
-            ChatAPI.updateChat(chatId, { title }).then(() => loadChats());
-            // Update local state so dropdown locks immediately
-            setChats((prev) =>
-              prev.map((c) =>
-                c.id === chatId ? { ...c, flow_name: sendFlowName } : c
-              )
-            );
-          }
-        } else if (event.type === 'error') {
-          const errorText = event.error || 'An unknown error occurred.';
-          streamControllerRef.current = null;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === botMessageId
-                ? { ...msg, content: accumulatedContent || '', isLoading: false }
-                : msg
-            )
-          );
-          setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
-          setLastError({
-            message: messageText,
-            chatId: chatId,
-            botMessageId,
-            errorText,
-          });
-          setIsSending(false);
-        }
-      },
-      (err) => {
-        console.error('Streaming error:', err);
-        const errorText = err.message || 'An unknown error occurred.';
-        streamControllerRef.current = null;
+    try {
+      const jobResponse = await ChatAPI.createJobMessage(
+        chatId, messageText, sendFlowName || undefined
+      );
+      setActiveJobId(jobResponse.id);
+      // If the job already failed immediately (e.g., flow resolution error)
+      if (jobResponse.status === 'failed') {
+        const errorText = jobResponse.error_message || 'Failed to submit request.';
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === botMessageId
-              ? { ...msg, content: accumulatedContent || '', isLoading: false }
+              ? { ...msg, content: '', isLoading: false }
               : msg
           )
         );
         setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
-        setLastError({
-          message: messageText,
-          chatId: chatId,
-          botMessageId,
-          errorText,
-        });
+        setLastError({ message: messageText, chatId, botMessageId, errorText });
         setIsSending(false);
-      },
-      () => {
-        streamControllerRef.current = null;
-        setIsSending(false);
-      },
-      sendFlowName || undefined
-    );
-
-    streamControllerRef.current = streamController;
+        setActiveJobId(null);
+        setJobStartTime(null);
+        loadingBotMessageIdRef.current = null;
+      }
+    } catch (err) {
+      // Handle immediate submission failure
+      console.error('Failed to create job:', err);
+      const errorText = err instanceof Error ? err.message : 'Failed to submit request.';
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === botMessageId
+            ? { ...msg, content: '', isLoading: false }
+            : msg
+        )
+      );
+      setErrorMessages((prev) => new Map(prev).set(botMessageId, errorText));
+      setLastError({ message: messageText, chatId, botMessageId, errorText });
+      setIsSending(false);
+      setActiveJobId(null);
+      setJobStartTime(null);
+      loadingBotMessageIdRef.current = null;
+    }
   };
 
-  const handleStopStreaming = () => {
-    if (streamControllerRef.current) {
-      streamControllerRef.current.close();
-      streamControllerRef.current = null;
+  const handleCancelJob = async () => {
+    if (activeJobId) {
+      try {
+        await ChatAPI.cancelJob(activeJobId);
+        // The useEffect watching jobData will handle the cancelled state on next poll
+      } catch (err) {
+        console.error('Failed to cancel job:', err);
+        // Force local cancellation state
+        const botMessageId = loadingBotMessageIdRef.current;
+        if (botMessageId) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === botMessageId
+                ? { ...msg, content: 'Request cancelled', isLoading: false }
+                : msg
+            )
+          );
+        }
+        setIsSending(false);
+        setActiveJobId(null);
+        setJobStartTime(null);
+        loadingBotMessageIdRef.current = null;
+      }
     }
-    setIsSending(false);
-    // Update any loading message to show it was stopped
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.isLoading ? { ...msg, content: msg.content || '(Stopped)', isLoading: false } : msg
-      )
-    );
   };
 
   const handleRetry = () => {
@@ -419,6 +552,14 @@ function Chat(): React.ReactElement {
   const isFlowLocked = !!selectedChat?.flow_name;
   const effectiveFlowName = isFlowLocked ? selectedChat.flow_name : selectedFlowName;
   const isFlowAvailable = !!effectiveFlowName && flows.some((f) => f.name === effectiveFlowName);
+
+  // Derive job status text for tooltip
+  const jobStatusText = React.useMemo(() => {
+    if (!activeJobId || !jobData) return '';
+    const statusLabel = jobData.status === 'in_progress' ? 'Running' :
+      jobData.status === 'pending' ? 'Pending' : jobData.status;
+    return `${statusLabel} - ${formatElapsed(elapsedSeconds)}`;
+  }, [activeJobId, jobData, elapsedSeconds]);
 
   // Build conversations for the drawer
   const conversations: Conversation[] = chats.map((chat) => ({
@@ -535,6 +676,7 @@ function Chat(): React.ReactElement {
                     const hasPartialContent = hasError && !!message.content;
                     const canRetry = hasError && lastError && lastError.chatId === selectedChatId;
                     const showCopyAction = message.role === 'bot' && !message.isLoading && !hasError;
+                    const isActiveJobMessage = message.isLoading && !!activeJobId;
 
                     const retryLink = canRetry ? (
                       <AlertActionLink onClick={handleRetry} isDisabled={isSending}>
@@ -542,10 +684,53 @@ function Chat(): React.ReactElement {
                       </AlertActionLink>
                     ) : undefined;
 
-                    return (
+                    // Build extra content for active job loading messages (cancel button)
+                    // and for error messages with expandable details
+                    let extraContent: MessageProps['extraContent'] = undefined;
+
+                    if (isActiveJobMessage) {
+                      // Cancel button inline in typing indicator message area
+                      extraContent = {
+                        afterMainContent: (
+                          <div className="pf-chatbot__job-cancel-area">
+                            <Button
+                              variant="link"
+                              isDanger
+                              onClick={handleCancelJob}
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ),
+                      };
+                    } else if (hasError) {
+                      // Error display with expandable details and retry
+                      extraContent = {
+                        afterMainContent: (
+                          <div className="pf-chatbot__error-details">
+                            <Alert
+                              variant="danger"
+                              title="An error occurred"
+                              isInline
+                              isPlain
+                              actionLinks={retryLink}
+                            />
+                            <ExpandableSection toggleText="Show details" isIndented>
+                              <pre className="pf-chatbot__error-pre">{errorText}</pre>
+                            </ExpandableSection>
+                          </div>
+                        ),
+                      };
+                    }
+
+                    // Wrap active job messages in a tooltip showing status + elapsed time
+                    const messageElement = (
                       <Message
                         key={message.id}
                         {...message}
+                        // Override content for error messages without partial content
+                        {...(hasError && !hasPartialContent && !extraContent ? {} : {})}
                         actions={
                           showCopyAction
                             ? {
@@ -555,32 +740,21 @@ function Chat(): React.ReactElement {
                               }
                             : undefined
                         }
-                        {...(hasError && !hasPartialContent
-                          ? {
-                              error: {
-                                title: errorText,
-                                variant: 'danger',
-                                actionLinks: retryLink,
-                              },
-                            }
-                          : {})}
-                        {...(hasError && hasPartialContent
-                          ? {
-                              extraContent: {
-                                afterMainContent: (
-                                  <Alert
-                                    variant="danger"
-                                    title={errorText}
-                                    isInline
-                                    isPlain
-                                    actionLinks={retryLink}
-                                  />
-                                ),
-                              },
-                            }
-                          : {})}
+                        extraContent={extraContent}
                       />
                     );
+
+                    if (isActiveJobMessage && jobStatusText) {
+                      return (
+                        <Tooltip key={message.id} content={jobStatusText}>
+                          <div className="pf-chatbot__job-tooltip-wrapper">
+                            {messageElement}
+                          </div>
+                        </Tooltip>
+                      );
+                    }
+
+                    return messageElement;
                   })}
                 </MessageBox>
               </ChatbotContent>
@@ -597,7 +771,7 @@ function Chat(): React.ReactElement {
                   onSendMessage={handleSend}
                   isSendButtonDisabled={isSending || !isFlowAvailable}
                   hasStopButton={isSending}
-                  handleStopButton={handleStopStreaming}
+                  handleStopButton={handleCancelJob}
                 />
               </ChatbotFooter>
             </>
@@ -606,6 +780,6 @@ function Chat(): React.ReactElement {
       </Chatbot>
     </PageSection>
   );
-};
+}
 
 export { Chat };

@@ -65,6 +65,29 @@ export interface FlowsResponse {
 }
 
 // =============================================================================
+// Job Types
+// =============================================================================
+
+export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+
+export interface JobResponse {
+  id: number;
+  chat_message_id: number;
+  langflow_job_id: string | null;
+  flow_id: string | null;
+  status: JobStatus;
+  error_message: string | null;
+  result_content: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Terminal statuses -- polling stops when job reaches one of these. */
+export const TERMINAL_STATUSES: JobStatus[] = ['completed', 'failed', 'cancelled', 'timed_out'];
+
+// =============================================================================
 // Chat CRUD
 // =============================================================================
 
@@ -110,7 +133,66 @@ export const ChatAPI = {
   },
 
   // ===========================================================================
-  // Streaming
+  // Jobs
+  // ===========================================================================
+
+  /**
+   * Send a message and create a background job for AI processing.
+   *
+   * Returns the Job record. The frontend then polls GET /jobs/{id}?sync=true
+   * until the job reaches a terminal state.
+   */
+  async createJobMessage(chatId: number, content: string, flowName?: string): Promise<JobResponse> {
+    const body = flowName ? { content, flow_name: flowName } : { content };
+    const response = await apiClient.post<JobResponse>(
+      `${API_BASE}/${chatId}/messages/job`,
+      body
+    );
+    return response.data;
+  },
+
+  /**
+   * Get job status, optionally syncing with LangFlow first.
+   *
+   * When sync=true, the backend polls LangFlow V2 API before returning.
+   */
+  async getJob(jobId: number, sync: boolean = false): Promise<JobResponse> {
+    const params = sync ? '?sync=true' : '';
+    const response = await apiClient.get<JobResponse>(`/v1/jobs/${jobId}${params}`);
+    return response.data;
+  },
+
+  /**
+   * Cancel a running job.
+   *
+   * Calls LangFlow V2 stop endpoint and updates job status to cancelled.
+   */
+  async cancelJob(jobId: number): Promise<JobResponse> {
+    const response = await apiClient.post<JobResponse>(`/v1/jobs/${jobId}/cancel`);
+    return response.data;
+  },
+
+  /**
+   * Get the active (non-terminal) job for a chat, if any.
+   *
+   * Used for page refresh recovery -- checks if there's an in-flight job
+   * that the frontend should resume polling for.
+   * Returns null (via 404) if no active job exists.
+   */
+  async getActiveJob(chatId: number): Promise<JobResponse | null> {
+    try {
+      const response = await apiClient.get<JobResponse>(
+        `${API_BASE}/${chatId}/active-job`
+      );
+      return response.data;
+    } catch {
+      // 404 means no active job -- expected behavior
+      return null;
+    }
+  },
+
+  // ===========================================================================
+  // Streaming (legacy, kept for backward compatibility)
   // ===========================================================================
 
   /**

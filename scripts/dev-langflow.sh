@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 init_container_tool || exit 1
 
 # Configuration
-LANGFLOW_VERSION="${LANGFLOW_VERSION:-latest}"
+LANGFLOW_VERSION="${LANGFLOW_VERSION:-1.8.0.rc0}"
 LANGFLOW_IMAGE="${LANGFLOW_IMAGE:-docker.io/langflowai/langflow:${LANGFLOW_VERSION}}"
 CONTAINER_NAME="app-langflow-dev"
 LANGFLOW_PORT="${LANGFLOW_PORT:-7860}"
@@ -95,6 +95,10 @@ case "$1" in
                 -e LANGFUSE_HOST="${LANGFUSE_HOST:-http://${DB_HOST}:${LANGFUSE_WEB_PORT:-3000}}"
                 -e TZ="${TZ:-UTC}"
                 -e LANGFLOW_LAZY_LOAD_COMPONENTS=false
+                # V2 Workflow API (Phase 9: job model for long-running flows)
+                -e LANGFLOW_DEVELOPER_API_ENABLED=${LANGFLOW_DEVELOPER_API_ENABLED:-true}
+                ${LANGFLOW_API_KEY:+-e LANGFLOW_API_KEY=$LANGFLOW_API_KEY}
+                ${LANGFLOW_API_KEY_SOURCE:+-e LANGFLOW_API_KEY_SOURCE=$LANGFLOW_API_KEY_SOURCE}
             )
 
             # Detect host DNS servers (needed for VPN-resolved internal hostnames)
@@ -128,6 +132,7 @@ case "$1" in
                     -e GRANITE_GUARDIAN_ENDPOINT="${GRANITE_GUARDIAN_ENDPOINT:-}"
                     -e GRANITE_GUARDIAN_API_KEY="${GRANITE_GUARDIAN_API_KEY:-}"
                     -e GRANITE_CA_BUNDLE="${GRANITE_CA_BUNDLE:-}"
+                    ${LANGFLOW_API_KEY:+-e LANGFLOW_API_KEY=$LANGFLOW_API_KEY}
                 )
 
                 CUSTOM_VOL_ARGS=(
@@ -279,10 +284,13 @@ case "$1" in
         echo "  LANGFLOW_DB       - Database name (default: langflow)"
         echo ""
         echo "Custom image env vars (forwarded when LANGFLOW_IMAGE is set):"
-        echo "  GOOGLE_CLOUD_PROJECT       - GCP project for Vertex AI"
-        echo "  GRANITE_GUARDIAN_ENDPOINT   - Granite Guardian API endpoint"
-        echo "  GRANITE_GUARDIAN_API_KEY    - Granite Guardian API key"
-        echo "  GRANITE_CA_BUNDLE          - Custom CA bundle path"
+        echo "  GOOGLE_CLOUD_PROJECT              - GCP project for Vertex AI"
+        echo "  GRANITE_GUARDIAN_ENDPOINT          - Granite Guardian API endpoint"
+        echo "  GRANITE_GUARDIAN_API_KEY           - Granite Guardian API key"
+        echo "  GRANITE_CA_BUNDLE                  - Custom CA bundle path"
+        echo "  LANGFLOW_DEVELOPER_API_ENABLED     - Enable V2 Workflow API (default: true)"
+        echo "  LANGFLOW_API_KEY                   - Shared API key for backend-to-LangFlow auth"
+        echo "  LANGFLOW_API_KEY_SOURCE            - Set to 'env' to validate API key from env var"
         echo ""
         echo "Prerequisites:"
         echo "  PostgreSQL must be running: make db-start"

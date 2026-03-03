@@ -5,6 +5,7 @@ import { Chat } from './Chat';
 import { ChatAPI } from './chatApi';
 import { BrowserRouter } from 'react-router-dom';
 import { AppProvider } from '@app/contexts/AppContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock the ChatAPI
 vi.mock('./chatApi', () => ({
@@ -16,8 +17,18 @@ vi.mock('./chatApi', () => ({
     updateChat: vi.fn(),
     deleteChat: vi.fn(),
     getMessages: vi.fn(),
+    createJobMessage: vi.fn(),
+    getJob: vi.fn(),
+    cancelJob: vi.fn(),
+    getActiveJob: vi.fn(),
+    // Legacy streaming kept for backward compatibility
     createStreamingMessage: vi.fn(),
   },
+}));
+
+// Mock the useJobPolling hook
+vi.mock('./useJobPolling', () => ({
+  useJobPolling: vi.fn().mockReturnValue({ data: null }),
 }));
 
 // Mock the image imports
@@ -43,17 +54,42 @@ const MOCK_MESSAGES = [
   { id: 2, chat_id: 1, content: 'Hi there!', role: 'assistant', created_at: '2024-01-01T10:00:01' },
 ];
 
+const MOCK_JOB_RESPONSE = {
+  id: 1,
+  chat_message_id: 3,
+  langflow_job_id: 'lf-job-123',
+  flow_id: 'flow-1',
+  status: 'in_progress' as const,
+  error_message: null,
+  result_content: null,
+  started_at: '2024-01-01T10:00:00',
+  completed_at: null,
+  created_at: '2024-01-01T10:00:00',
+  updated_at: '2024-01-01T10:00:00',
+};
+
 // =============================================================================
 // Test Utilities
 // =============================================================================
 
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+}
+
 function renderChat() {
+  const queryClient = createQueryClient();
   return render(
-    <BrowserRouter>
-      <AppProvider>
-        <Chat />
-      </AppProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppProvider>
+          <Chat />
+        </AppProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -61,6 +97,7 @@ function setupDefaultMocks(): void {
   vi.mocked(ChatAPI.getChats).mockResolvedValue({ data: MOCK_CHATS, count: 2 });
   vi.mocked(ChatAPI.getFlows).mockResolvedValue({ data: MOCK_FLOWS, count: 2 });
   vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: MOCK_MESSAGES, count: 2 });
+  vi.mocked(ChatAPI.getActiveJob).mockResolvedValue(null);
 }
 
 describe('Chat component', () => {
@@ -135,20 +172,8 @@ describe('Chat component', () => {
     });
   });
 
-  test('should call createStreamingMessage when sending a message', async () => {
-    const mockClose = vi.fn();
-
-    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
-      (_chatId, _content, onMessage, _onError, onComplete) => {
-        // Simulate immediate completion
-        setTimeout(() => {
-          onMessage({ type: 'content', content: 'Response' });
-          onMessage({ type: 'done' });
-          onComplete?.();
-        }, 10);
-        return { close: mockClose };
-      }
-    );
+  test('should call createJobMessage when sending a message', async () => {
+    vi.mocked(ChatAPI.createJobMessage).mockResolvedValue(MOCK_JOB_RESPONSE);
 
     renderChat();
 
@@ -156,15 +181,14 @@ describe('Chat component', () => {
       expect(ChatAPI.getChats).toHaveBeenCalled();
     });
 
-    // Verify the streaming API is properly mocked
-    expect(ChatAPI.createStreamingMessage).toBeDefined();
+    // Verify the job API is properly mocked
+    expect(ChatAPI.createJobMessage).toBeDefined();
   });
 
-  test('should provide close function for stopping streams', async () => {
-    const mockClose = vi.fn();
-
-    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(() => {
-      return { close: mockClose };
+  test('should provide cancelJob function for stopping jobs', async () => {
+    vi.mocked(ChatAPI.cancelJob).mockResolvedValue({
+      ...MOCK_JOB_RESPONSE,
+      status: 'cancelled',
     });
 
     renderChat();
@@ -173,11 +197,9 @@ describe('Chat component', () => {
       expect(ChatAPI.getChats).toHaveBeenCalled();
     });
 
-    // Verify the streaming API returns a close function
-    const result = ChatAPI.createStreamingMessage(1, 'test', () => {}, () => {}, () => {});
-    expect(result.close).toBeDefined();
-    result.close();
-    expect(mockClose).toHaveBeenCalled();
+    // Verify the cancel API returns cancelled status
+    const result = await ChatAPI.cancelJob(1);
+    expect(result.status).toBe('cancelled');
   });
 
   test('should call deleteChat API when delete is triggered', async () => {
@@ -207,16 +229,9 @@ describe('Chat component', () => {
     expect(screen.getByText('Research Assistant')).toBeVisible();
   });
 
-  test('should display actual error message from SSE error event', async () => {
-    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
-
-    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
-      (_chatId, _content, onMessage) => {
-        setTimeout(() => {
-          onMessage({ type: 'error', error: 'Failed to connect to Langflow: Connection refused' });
-        }, 10);
-        return { close: vi.fn() };
-      }
+  test('should handle job creation failure', async () => {
+    vi.mocked(ChatAPI.createJobMessage).mockRejectedValue(
+      new Error('Failed to connect to Langflow: Connection refused')
     );
 
     renderChat();
@@ -225,76 +240,51 @@ describe('Chat component', () => {
       expect(ChatAPI.getChats).toHaveBeenCalled();
     });
 
-    // Simulate sending by calling the streaming mock directly and checking the onMessage callback
-    const onMessage = vi.fn();
-    ChatAPI.createStreamingMessage(1, 'test', onMessage);
+    // Verify the job API handles errors
+    await expect(ChatAPI.createJobMessage(1, 'test')).rejects.toThrow(
+      'Failed to connect to Langflow: Connection refused'
+    );
+  });
+
+  test('should handle immediate job failure status', async () => {
+    vi.mocked(ChatAPI.createJobMessage).mockResolvedValue({
+      ...MOCK_JOB_RESPONSE,
+      status: 'failed',
+      error_message: 'No flow configured or found',
+    });
+
+    renderChat();
 
     await waitFor(() => {
-      expect(onMessage).toHaveBeenCalledWith({
-        type: 'error',
-        error: 'Failed to connect to Langflow: Connection refused',
-      });
+      expect(ChatAPI.getChats).toHaveBeenCalled();
+    });
+
+    // Verify the API returns failed status
+    const result = await ChatAPI.createJobMessage(1, 'test');
+    expect(result.status).toBe('failed');
+    expect(result.error_message).toBe('No flow configured or found');
+  });
+
+  test('should check for active jobs on chat load for page refresh recovery', async () => {
+    vi.mocked(ChatAPI.getActiveJob).mockResolvedValue(null);
+
+    renderChat();
+
+    await waitFor(() => {
+      expect(ChatAPI.getActiveJob).toHaveBeenCalledWith(1);
     });
   });
 
-  test('should pass partial content and error separately when error occurs mid-stream', async () => {
-    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
-
-    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
-      (_chatId, _content, onMessage) => {
-        setTimeout(() => {
-          onMessage({ type: 'content', content: 'Here is the beginning' });
-          onMessage({ type: 'error', error: 'Langflow streaming error: 500' });
-        }, 10);
-        return { close: vi.fn() };
-      }
-    );
+  test('should recover in-flight job on page refresh', async () => {
+    vi.mocked(ChatAPI.getActiveJob).mockResolvedValue(MOCK_JOB_RESPONSE);
 
     renderChat();
 
     await waitFor(() => {
-      expect(ChatAPI.getChats).toHaveBeenCalled();
+      expect(ChatAPI.getActiveJob).toHaveBeenCalledWith(1);
     });
 
-    // Verify the streaming API delivers both content and error events
-    const events: Array<{ type: string; content?: string; error?: string }> = [];
-    ChatAPI.createStreamingMessage(1, 'test', (event) => events.push(event));
-
-    await waitFor(() => {
-      expect(events).toHaveLength(2);
-      expect(events[0]).toEqual({ type: 'content', content: 'Here is the beginning' });
-      expect(events[1]).toEqual({ type: 'error', error: 'Langflow streaming error: 500' });
-    });
-  });
-
-  test('should pass network error message through to error handler', async () => {
-    vi.mocked(ChatAPI.getMessages).mockResolvedValue({ data: [], count: 0 });
-
-    vi.mocked(ChatAPI.createStreamingMessage).mockImplementation(
-      (_chatId, _content, _onMessage, onError) => {
-        setTimeout(() => {
-          onError?.(new Error('Missing integration: jira. Please connect the service in Settings.'));
-        }, 10);
-        return { close: vi.fn() };
-      }
-    );
-
-    renderChat();
-
-    await waitFor(() => {
-      expect(ChatAPI.getChats).toHaveBeenCalled();
-    });
-
-    // Verify the onError callback receives the actual error message
-    const onError = vi.fn();
-    ChatAPI.createStreamingMessage(1, 'test', vi.fn(), onError);
-
-    await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Missing integration: jira. Please connect the service in Settings.',
-        })
-      );
-    });
+    // The active job should be detected and polling should resume
+    expect(ChatAPI.getActiveJob).toHaveBeenCalled();
   });
 });

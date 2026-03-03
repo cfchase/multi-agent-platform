@@ -373,6 +373,155 @@ class LangflowClient:
                 logger.error(f"Langflow connection error: {e}")
                 raise LangflowError(f"Failed to connect to Langflow: {str(e)}")
 
+    # --- V2 Workflow API Methods ---
+
+    def build_v2_inputs(
+        self,
+        message: str,
+        session_id: str | None = None,
+        tweaks: dict | None = None,
+    ) -> dict:
+        """
+        Build V2-compatible flat inputs from message and tweaks.
+
+        V2 uses flat format: "display_name.param_name": value
+        parse_flat_inputs() converts this to tweaks dict, then process_tweaks()
+        applies them to the graph (supports both component IDs and display names).
+
+        Args:
+            message: The user message
+            session_id: Optional session ID for conversation continuity
+            tweaks: Optional tweaks dict (display-name keyed, e.g.
+                    {"User Settings": {"settings_data": {...}}})
+
+        Returns:
+            Dict with flat inputs for V2 WorkflowExecutionRequest.inputs
+        """
+        inputs: dict = {
+            "Chat Input.input_value": message,
+        }
+        if session_id:
+            inputs["Chat Input.session_id"] = session_id
+        if tweaks:
+            for component_name, params in tweaks.items():
+                if isinstance(params, dict):
+                    for param_name, value in params.items():
+                        inputs[f"{component_name}.{param_name}"] = value
+        return inputs
+
+    async def submit_workflow(
+        self,
+        flow_id: str,
+        inputs: dict,
+        session_id: str | None = None,
+    ) -> dict:
+        """
+        Submit workflow for background execution via V2 API.
+
+        Args:
+            flow_id: The flow ID to execute
+            inputs: V2-compatible inputs (from build_v2_inputs)
+            session_id: Optional session ID
+
+        Returns:
+            Dict with job_id, status, and other metadata from V2 API
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        url = f"{self.base_url}/api/v2/workflows"
+        payload = {
+            "flow_id": flow_id,
+            "background": True,
+            "inputs": inputs,
+        }
+
+        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client:
+            try:
+                response = await client.post(
+                    url, json=payload, headers=self.headers
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"Langflow V2 submit error: {e.response.status_code} - {e.response.text}"
+                )
+                raise LangflowError(
+                    f"Failed to submit workflow: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+            except httpx.RequestError as e:
+                logger.error(f"Langflow V2 connection error: {e}")
+                raise LangflowError(f"Failed to connect to Langflow V2: {str(e)}")
+
+    async def get_workflow_status(self, job_id: str) -> dict:
+        """
+        Get workflow status from V2 API.
+
+        Args:
+            job_id: The LangFlow job ID to check
+
+        Returns:
+            Dict with job_id, status, outputs, and other metadata
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        url = f"{self.base_url}/api/v2/workflows?job_id={job_id}"
+
+        async with httpx.AsyncClient(timeout=LIST_FLOWS_TIMEOUT) as client:
+            try:
+                response = await client.get(url, headers=self.headers)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"Langflow V2 status error: {e.response.status_code} - {e.response.text}"
+                )
+                raise LangflowError(
+                    f"Failed to get workflow status: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+            except httpx.RequestError as e:
+                logger.error(f"Langflow V2 connection error: {e}")
+                raise LangflowError(f"Failed to connect to Langflow V2: {str(e)}")
+
+    async def stop_workflow(self, job_id: str) -> dict:
+        """
+        Stop a running workflow via V2 API.
+
+        Args:
+            job_id: The LangFlow job ID to stop
+
+        Returns:
+            Dict with job_id and message from V2 API
+
+        Raises:
+            LangflowError: If the API call fails
+        """
+        url = f"{self.base_url}/api/v2/workflows/stop"
+        payload = {"job_id": job_id}
+
+        async with httpx.AsyncClient(timeout=LIST_FLOWS_TIMEOUT) as client:
+            try:
+                response = await client.post(
+                    url, json=payload, headers=self.headers
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"Langflow V2 stop error: {e.response.status_code} - {e.response.text}"
+                )
+                raise LangflowError(
+                    f"Failed to stop workflow: {e.response.text}",
+                    status_code=e.response.status_code,
+                )
+            except httpx.RequestError as e:
+                logger.error(f"Langflow V2 connection error: {e}")
+                raise LangflowError(f"Failed to connect to Langflow V2: {str(e)}")
+
     async def chat_stream(
         self,
         message: str,

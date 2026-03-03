@@ -48,7 +48,7 @@ spec:
             - ALL
       containers:
       - name: langflow
-        image: docker.io/langflowai/langflow:latest
+        image: docker.io/langflowai/langflow:1.8.0.rc0
         imagePullPolicy: Always
         ports:
         - containerPort: 7860
@@ -84,6 +84,9 @@ spec:
           value: "INFO"
         - name: LANGFLOW_UPDATE_STARTER_PROJECTS
           value: "false"
+        # V2 Workflow API (required for job-based execution)
+        - name: LANGFLOW_DEVELOPER_API_ENABLED
+          value: "true"
         volumeMounts:
         # All persistent data uses single PVC with subPath
         - name: langflow-data
